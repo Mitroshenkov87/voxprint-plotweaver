@@ -1,21 +1,25 @@
-"""Model registry, shared download folder, and SHA-256 checks.
+"""Model registry, shared GGUF folder, and SHA-256 checks.
 
-Default entries are Apache-2.0. A licence outside Apache-2.0 / MIT is refused
-unless the caller passes allow_other_license.
+Weights live in `<models>/llm` (the suite folder Audiobook Builder uses).
+Every entry records a confirmed base licence. Apache-2.0 and MIT are accepted.
+An empty licence is refused, including with --allow-other-license, because an
+untagged tune has nothing to record. Heretic is not a registry entry.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
-from plotweaver.atomic import read_json, write_json
+from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
-from plotweaver.paths import models_dir
+from plotweaver.paths import gguf_dir
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
 
@@ -33,6 +37,11 @@ class RegistryEntry:
     context: int
     moe: bool
     notes: str
+    revision: str = ""
+    base_repo: str = ""
+    base_revision: str = ""
+    base_license: str = ""
+    card: str = ""
 
 
 def load_registry(path: Path) -> list[RegistryEntry]:
@@ -44,28 +53,55 @@ def load_registry(path: Path) -> list[RegistryEntry]:
     for row in rows:
         if not isinstance(row, dict):
             continue
-        entries.append(
-            RegistryEntry(
-                id=str(row["id"]),
-                role=str(row.get("role") or "main"),
-                repo=str(row["repo"]),
-                filename=str(row["filename"]),
-                sha256=str(row["sha256"]).lower(),
-                size=int(row["size"]),
-                license=str(row.get("license") or ""),
-                min_vram_gb=float(row.get("min_vram_gb") or 0),
-                context=int(row.get("context") or 8192),
-                moe=bool(row.get("moe")),
-                notes=str(row.get("notes") or ""),
-            )
+        entry = RegistryEntry(
+            id=str(row["id"]),
+            role=str(row.get("role") or "main"),
+            repo=str(row["repo"]),
+            filename=str(row["filename"]),
+            sha256=str(row["sha256"]).lower(),
+            size=int(row["size"]),
+            license=str(row.get("license") or ""),
+            min_vram_gb=float(row.get("min_vram_gb") or 0),
+            context=int(row.get("context") or 8192),
+            moe=bool(row.get("moe")),
+            notes=str(row.get("notes") or ""),
+            revision=str(row.get("revision") or ""),
+            base_repo=str(row.get("base_repo") or ""),
+            base_revision=str(row.get("base_revision") or ""),
+            base_license=str(row.get("base_license") or ""),
+            card=str(row.get("card") or ""),
         )
+        if not entry.revision or not entry.base_repo or not entry.base_license:
+            raise PlotweaverError(
+                f"{entry.id} needs revision, base_repo, and base_license. "
+                "Untagged tunes are not downloaded."
+            )
+        entries.append(entry)
     return entries
 
 
 def licence_allowed(entry: RegistryEntry, *, allow_other: bool = False) -> bool:
-    if entry.license.lower() in APPROVED_LICENSES:
+    return _licence_ok(entry.license, allow_other=allow_other) and _licence_ok(
+        entry.base_license, allow_other=allow_other
+    )
+
+
+def _licence_ok(value: str, *, allow_other: bool) -> bool:
+    text = value.strip().lower()
+    if not text:
+        return False
+    if text in APPROVED_LICENSES:
         return True
     return allow_other
+
+
+def canonical_licence(value: str) -> str:
+    text = value.strip().lower()
+    if text == "apache-2.0":
+        return "Apache-2.0"
+    if text == "mit":
+        return "MIT"
+    return value.strip()
 
 
 def verify_file(path: Path, *, size: int, sha256: str) -> None:
@@ -82,16 +118,28 @@ def verify_file(path: Path, *, size: int, sha256: str) -> None:
 
 
 def claim_user(store: Path, user: str = "plotweaver") -> None:
-    """Reference-count this app in the shared models folder (.users.json)."""
+    """Add this app to `<models>/.users.json` without dropping other suite apps.
+
+    The file is the same one Audiobook Builder and Movie Dubber share. A key that
+    is already true is left byte-for-byte alone.
+    """
     store.mkdir(parents=True, exist_ok=True)
     path = store / ".users.json"
-    data: dict[str, object] = {}
+    data: dict[str, bool] = {}
     if path.is_file():
-        loaded = read_json(path)
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8-sig"))
+        except UnicodeError, json.JSONDecodeError:
+            loaded = None
         if isinstance(loaded, dict):
-            data = loaded
+            data = {str(key): bool(value) for key, value in loaded.items()}
+    if data.get(user) is True:
+        return
     data[user] = True
-    write_json(path, data)
+    payload = json.dumps(data, indent=1, sort_keys=True)
+    tmp = path.with_name(f".users.json.{os.urandom(4).hex()}.tmp")
+    tmp.write_text(payload, encoding="utf-8", newline="\n")
+    os.replace(tmp, path)
 
 
 def download_model(
@@ -99,40 +147,47 @@ def download_model(
 ) -> Path:
     if not licence_allowed(entry, allow_other=allow_other):
         raise PlotweaverError(
-            f"{entry.id} is licensed {entry.license!r}. "
-            "Plotweaver downloads Apache-2.0 and MIT weights unless you pass "
-            "--allow-other-license."
+            f"{entry.id} is licensed {entry.license!r} "
+            f"(base {entry.base_license!r}). "
+            "Plotweaver downloads Apache-2.0 and MIT weights with a confirmed "
+            "base licence unless you pass --allow-other-license. "
+            "An empty licence is refused."
         )
-    folder = store or models_dir()
+    folder = store or gguf_dir()
     folder.mkdir(parents=True, exist_ok=True)
-    claim_user(folder)
+    claim_user(folder.parent)
     target = folder / entry.filename
-    if target.is_file():
-        verify_file(target, size=entry.size, sha256=entry.sha256)
-        return target
-    url = f"https://huggingface.co/{entry.repo}/resolve/main/{entry.filename}?download=true"
-    partial = target.with_suffix(target.suffix + ".partial")
-    headers = {"User-Agent": "plotweaver"}
-    with httpx.stream(
-        "GET",
-        url,
-        headers=headers,
-        follow_redirects=True,
-        timeout=httpx.Timeout(3600.0, connect=30.0),
-    ) as response:
-        response.raise_for_status()
-        with partial.open("wb") as handle:
-            for chunk in response.iter_bytes(1024 * 1024):
-                handle.write(chunk)
-    partial.replace(target)
+    url = (
+        f"https://huggingface.co/{entry.repo}/resolve/{entry.revision}/"
+        f"{entry.filename}?download=true"
+    )
+    if not target.is_file():
+        partial = target.with_suffix(target.suffix + ".partial")
+        headers = {"User-Agent": "plotweaver"}
+        with httpx.stream(
+            "GET",
+            url,
+            headers=headers,
+            follow_redirects=True,
+            timeout=httpx.Timeout(3600.0, connect=30.0),
+        ) as response:
+            response.raise_for_status()
+            with partial.open("wb") as handle:
+                for chunk in response.iter_bytes(1024 * 1024):
+                    handle.write(chunk)
+        partial.replace(target)
     verify_file(target, size=entry.size, sha256=entry.sha256)
     manifest = {
         "id": entry.id,
-        "license": entry.license,
-        "source": url,
-        "sha256": entry.sha256,
-        "size": entry.size,
+        "repo": entry.repo,
+        "revision": entry.revision,
+        "files": [{"path": entry.filename, "sha256": entry.sha256, "size": entry.size}],
+        "license": canonical_licence(entry.license),
+        "base_repo": entry.base_repo,
+        "base_revision": entry.base_revision,
+        "base_license": canonical_licence(entry.base_license),
         "role": entry.role,
+        "card": entry.card,
         "notes": entry.notes,
     }
     write_json(folder / f"{entry.id}.manifest.json", manifest)

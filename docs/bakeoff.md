@@ -4,7 +4,7 @@ Both scripts pick an interpreter that can already `import plotweaver`. If none c
 
 ## RTX 4090 bake-off
 
-Use a Linux VM with an RTX 4090 (or another RTX 40-series card), the NVIDIA driver, and a CUDA 12 or 13 user-space new enough for the llama.cpp build the script selects. Weights land in `~/.local/share/voxprint/models` and are checked by size and SHA-256. A model whose `min_vram_gb` exceeds free VRAM is skipped. A licence other than Apache-2.0 or MIT is refused unless you pass `--allow-other-license`.
+Use a Linux VM with an RTX 4090 (or another RTX 40-series card) and the NVIDIA driver. The script downloads llama.cpp `llama-server` b11476, the Vulkan build Audiobook Builder pins, into `~/.local/share/voxprint/models/llm/llama.cpp-b11476`. GGUF weights land in `~/.local/share/voxprint/models/llm` (the shared suite folder) and are checked by revision, size, and SHA-256. A model whose `min_vram_gb` exceeds free VRAM is skipped. A licence other than Apache-2.0 or MIT is refused unless you pass `--allow-other-license`. An empty licence tag is refused either way. Heretic is not part of this run.
 
 ```bash
 bash scripts/bakeoff.sh
@@ -13,11 +13,20 @@ bash scripts/bakeoff.sh
 That command:
 
 1. Installs Python dependencies if this checkout is not importable yet.
-2. Downloads the three GGUF files in `bakeoff/models.toml` (T-pro as the main Russian model, then the Qwen and Gemma low-refusal quants).
-3. Downloads a llama.cpp `llama-server` CUDA build on first real use.
+2. Downloads the GGUF files in `bakeoff/models.toml` into `~/.local/share/voxprint/models/llm`. T-pro is the 24 GB standard drafter. Gemma 4 12B Q4_K_M is the 16 GB standard drafter and the same file Audiobook Builder uses. The Qwen 27B and Gemma 31B abliterated quants are the low-refusal passes. Each manifest records the quant licence and the confirmed base licence (all Apache-2.0).
+3. Downloads llama.cpp b11476 Vulkan `llama-server` on first real use, into the shared `llm/llama.cpp-b11476` tree. An existing Audiobook Builder copy is reused.
 4. Writes every synopsis in `bakeoff/synopses/` as three chapters with dark themes off, one candidate at a time.
 5. Writes them again with dark themes on: T-pro drafts, then each low-refusal model fills placeholders in one swap and proofreads.
 6. Scores the exports with the main model and builds a blind packet.
+
+| Id | Card | Role | Weights | Base |
+|---|---|---|---|---|
+| t-pro-it-2.1-q4 | 24 GB | standard | Apache-2.0 | t-tech/T-pro-it-2.1, Apache-2.0 |
+| gemma-4-12b-it-q4 | 16 GB | standard | Apache-2.0 | google/gemma-4-12b-it, Apache-2.0 |
+| qwen3.6-27b-abliterated-q4 | 24 GB | low-refusal | Apache-2.0 | huihui-ai/Huihui-Qwen3.6-27B-abliterated, Apache-2.0 |
+| gemma-4-31b-abliterated-q4 | 24 GB | low-refusal | Apache-2.0 | google/gemma-4-31b-it, Apache-2.0 |
+
+The 16 GB card has no separate low-refusal file in this registry: those quants need 18 GB and 20 GB. TheDrummer tunes are omitted because their cards have no licence tag.
 
 Results:
 
@@ -42,18 +51,19 @@ PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --limit 1
 
 Fiction only. SpaceX may be named as the company. The crew and mission control in `scenarios/mars-e2e/synopsis.md` are invented. `outline.md` is a human scene list and is not sent to the model.
 
-On the GPU VM, after the bake-off has downloaded T-pro (or with any other Apache-2.0 GGUF you pass explicitly):
+On the GPU VM, after the bake-off has downloaded T-pro, the script uses that shared file when you do not pass another GGUF:
 
 ```bash
-bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/T-pro-it-2.1-Q4_K_M.gguf"
+bash scripts/e2e_mars.sh
 ```
 
 Equivalent:
 
 ```bash
-export PLOTWEAVER_MAIN_GGUF="$HOME/.local/share/voxprint/models/T-pro-it-2.1-Q4_K_M.gguf"
-bash scripts/e2e_mars.sh
+bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
 ```
+
+The 16 GB drafter, shared with Audiobook Builder, is `~/.local/share/voxprint/models/llm/gemma-4-12b-it-Q4_K_M.gguf`.
 
 Default output is `./out/mars-e2e/`. Override with `PLOTWEAVER_MARS_OUT`. The script runs autopilot with `--yes` (no bible gate), six chapters, about 6,000 words as the target. The Audiobook Builder file is:
 

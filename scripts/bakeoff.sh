@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # One-command Russian bake-off. On a GPU machine this downloads the registry
-# and writes the books. PLOTWEAVER_MOCK=1 or --mock runs the deterministic path.
+# GGUFs into <models>/llm and llama.cpp b11476 (Vulkan) beside them, then writes
+# the books. PLOTWEAVER_MOCK=1 or --mock runs the deterministic path.
+# Heretic is not downloaded or started. TheDrummer tunes are not in the registry.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

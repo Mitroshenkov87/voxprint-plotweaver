@@ -7,8 +7,8 @@ The source code of this program is licensed under the Apache License, Version 2.
 Not covered by that licence (each has its own terms):
   * Model weights downloaded at runtime. The default registry lists Apache-2.0
     weights only. Each file keeps the licence recorded in its manifest.
-  * llama.cpp (MIT), used as an external llama-server binary. Plotweaver does not
-    vendor its source. https://github.com/ggml-org/llama.cpp
+  * llama.cpp b11476 (MIT), used as an external Vulkan llama-server binary. Plotweaver
+    does not vendor its source. https://github.com/ggml-org/llama.cpp
   * FictionBook 2.1 XML Schema (BSD-2-Clause), Copyright 2004 Dmitry Gribov.
     Vendored at src/plotweaver/data/fb2/ from https://github.com/gribuser/fb2.
     The copyright notice and disclaimer stay in those files and in LICENSE.md

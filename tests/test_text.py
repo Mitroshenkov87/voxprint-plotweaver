@@ -6,7 +6,7 @@ import struct
 from pathlib import Path
 
 from plotweaver.gguf import block_and_experts
-from plotweaver.llama_release import cuda_major_from_smi, select_asset
+from plotweaver.llama_release import LLAMA_BUILD, pinned_asset
 from plotweaver.references import compare_texts
 from plotweaver.registry import RegistryEntry, licence_allowed
 from plotweaver.textutil import prepare_prose, restore_yo
@@ -51,22 +51,16 @@ def test_tiny_gguf_reports_blocks(tmp_path: Path) -> None:
     assert block_and_experts(path) == (32, 0)
 
 
-def test_cuda_asset_picker() -> None:
-    names = [
-        "llama-b1-bin-ubuntu-cuda-12.8-x64.tar.gz",
-        "llama-b1-bin-ubuntu-cuda-13.4-x64.tar.gz",
-        "cudart-llama-bin-ubuntu-cuda-12.8-x64.tar.gz",
-        "llama-b1-bin-win-cuda-12.4-x64.zip",
-    ]
-    assert (
-        select_asset(names, system="linux", cuda_major=12)
-        == "llama-b1-bin-ubuntu-cuda-12.8-x64.tar.gz"
-    )
-    assert (
-        select_asset(names, system="linux", cuda_major=13)
-        == "llama-b1-bin-ubuntu-cuda-13.4-x64.tar.gz"
-    )
-    assert cuda_major_from_smi("CUDA Version: 13.0") == 13
+def test_llama_cpp_pin_matches_audiobook_builder() -> None:
+    linux = pinned_asset("linux")
+    windows = pinned_asset("windows")
+    assert linux is not None and windows is not None
+    assert linux.name == f"llama-{LLAMA_BUILD}-bin-ubuntu-vulkan-x64.tar.gz"
+    assert linux.size == 31_684_207
+    assert linux.sha256 == "5bb4306d7917f33e81efda02e6f791ae6a82e86bee121227a3ab2b4e8e40427f"
+    assert windows.name == f"llama-{LLAMA_BUILD}-bin-win-vulkan-x64.zip"
+    assert windows.sha256 == "5c71e7b749697da4a8d46e9ee55486845cbba27c9dfbecb4007f31ba6610d523"
+    assert pinned_asset("darwin") is None
     entry = RegistryEntry(
         id="x",
         role="main",
@@ -79,6 +73,22 @@ def test_cuda_asset_picker() -> None:
         context=8192,
         moe=False,
         notes="",
+        base_license="apache-2.0",
     )
     assert not licence_allowed(entry)
     assert licence_allowed(entry, allow_other=True)
+    untagged = RegistryEntry(
+        id="untagged",
+        role="main",
+        repo="someone/tune",
+        filename="b.gguf",
+        sha256="abc",
+        size=1,
+        license="apache-2.0",
+        min_vram_gb=1,
+        context=8192,
+        moe=False,
+        notes="",
+    )
+    assert not licence_allowed(untagged)
+    assert not licence_allowed(untagged, allow_other=True)
