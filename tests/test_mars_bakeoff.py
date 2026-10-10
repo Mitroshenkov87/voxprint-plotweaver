@@ -79,6 +79,27 @@ def test_mars_mock_cli_exports_audiobook(tmp_path: Path) -> None:
         assert name not in book
 
 
+def test_mars_script_writes_sound_markup(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["PLOTWEAVER_NO_UPDATE_CHECK"] = "1"
+    env["PLOTWEAVER_MOCK"] = "1"
+    env["PLOTWEAVER_MARS_OUT"] = str(tmp_path / "mars")
+    env["VOXPRINT_GPU_LOCK"] = str(tmp_path / "lock.json")
+    proc = subprocess.run(
+        ["bash", "scripts/e2e_mars.sh", "--mock"],
+        cwd=repo_root(),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    sound = tmp_path / "mars" / "book.sound.vxbook"
+    assert sound.is_file()
+    assert (tmp_path / "mars" / "book.vxbook").is_file()
+    assert not [issue for issue in validate_vxbook(sound) if issue.severity == "error"]
+
+
 def test_bakeoff_mock_limit_one(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PLOTWEAVER_NO_UPDATE_CHECK"] = "1"

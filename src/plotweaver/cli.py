@@ -20,6 +20,7 @@ from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend, MockBackend
 from plotweaver.runner import run_book
 from plotweaver.scenarios import mars_request
+from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.ui.window import MainWindow
 from plotweaver.vxbook import validate_vxbook
@@ -77,6 +78,19 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("file", type=Path)
     validate.set_defaults(func=_vxbook_validate)
 
+    sound = sub.add_parser("sound", help="Add VXBOOK v1.1 + sound extension v1 markup.")
+    sound_commands = sound.add_subparsers(dest="sound_command", required=True)
+    sound_add = sound_commands.add_parser("add", help="Write a new .vxbook with sound markup.")
+    sound_add.add_argument("src", type=Path, help="A .vxbook file or a Plotweaver project folder.")
+    sound_add.add_argument("-o", "--output", type=Path, required=True)
+    sound_add.add_argument("--mock", action="store_true")
+    sound_add.add_argument(
+        "--mirror",
+        action="store_true",
+        help="Also write optional vx:sound lines. Off by default.",
+    )
+    sound_add.set_defaults(func=_sound_add)
+
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
@@ -128,6 +142,11 @@ def _add_export_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Also write the legacy numbered speaker-marks pair.",
     )
+    parser.add_argument(
+        "--sound",
+        action="store_true",
+        help="Also write book.sound.vxbook (VXBOOK v1.1 + sound extension v1).",
+    )
 
 
 def _export_formats(args: argparse.Namespace) -> list[str]:
@@ -150,6 +169,14 @@ def _vxbook_validate(args: argparse.Namespace) -> int:
     if not issues:
         print("ok")
     return 1 if any(issue.severity == "error" for issue in issues) else 0
+
+
+def _sound_add(args: argparse.Namespace) -> int:
+    warnings = add_sound(args.src, args.output, _backend(bool(args.mock)), mirror=bool(args.mirror))
+    for message in warnings:
+        print(f"warning: {message}")
+    print(args.output)
+    return 0
 
 
 def _version(_args: argparse.Namespace) -> int:
@@ -217,6 +244,7 @@ def _run(args: argparse.Namespace) -> int:
         reference_paths=list(args.reference or []),
         author=args.author,
         export_formats=_export_formats(args),
+        sound_markup=bool(args.sound),
     )
     _apply_models(request, args)
     project = Project.open_or_create(args.project, request)
@@ -259,6 +287,7 @@ def _scenario_mars(args: argparse.Namespace) -> int:
         request.low_refusal_model_id = args.low_refusal_model_id
     request.author = args.author
     request.export_formats = _export_formats(args)
+    request.sound_markup = bool(args.sound)
     if not args.mock and not request.main_gguf:
         raise PlotweaverError(
             "scenario-mars on a GPU needs --main-gguf. "

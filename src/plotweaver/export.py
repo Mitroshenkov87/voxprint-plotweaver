@@ -392,7 +392,15 @@ def publish_exports(source: Path, dest: Path) -> None:
     if source.resolve() == dest.resolve():
         return
     dest.mkdir(parents=True, exist_ok=True)
-    names = ("book.md", "book.docx", "book.epub", "book.fb2", "book.vxbook", "overlap-report.json")
+    names = (
+        "book.md",
+        "book.docx",
+        "book.epub",
+        "book.fb2",
+        "book.vxbook",
+        "book.sound.vxbook",
+        "overlap-report.json",
+    )
     for name in names:
         item = source / name
         if item.is_file():

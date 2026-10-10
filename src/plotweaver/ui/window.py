@@ -37,6 +37,7 @@ from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend, MockBackend
 from plotweaver.runner import RunResult, run_book
+from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.ui.i18n import tr
 from plotweaver.ui.theme import build_style, enable_acrylic
@@ -185,6 +186,7 @@ class MainWindow(QMainWindow):
         self.export_docx = QCheckBox(tr("export_docx"))
         self.export_md = QCheckBox(tr("export_markdown"))
         self.export_marks = QCheckBox(tr("export_marks"))
+        self.sound_markup = QCheckBox(tr("sound_markup"))
         formats = QHBoxLayout()
         formats.addWidget(self.export_epub)
         formats.addWidget(self.export_fb2)
@@ -211,6 +213,7 @@ class MainWindow(QMainWindow):
         form.addRow(tr("words"), self.words)
         form.addRow(tr("chapters"), self.chapters)
         form.addRow(tr("formats"), formats)
+        form.addRow("", self.sound_markup)
         form.addRow("", self.dark)
         form.addRow("", self.mock)
         form.addRow("", self.confirm)
@@ -260,8 +263,11 @@ class MainWindow(QMainWindow):
         open_button = QPushButton(tr("result"))
         open_button.setObjectName("primary")
         open_button.clicked.connect(self._open_export)
+        self.sound_button = QPushButton(tr("sound_markup"))
+        self.sound_button.clicked.connect(self._add_sound)
         layout.addWidget(self.result_label)
         layout.addWidget(open_button)
+        layout.addWidget(self.sound_button)
         outer.addWidget(card)
         return page
 
@@ -293,6 +299,7 @@ class MainWindow(QMainWindow):
             mode=BookMode(str(self.mode.currentData())),
             reference_paths=list(self._refs),
             export_formats=formats,
+            sound_markup=self.sound_markup.isChecked(),
         )
 
     def start(self, *, synchronous: bool, approve: bool = False) -> None:
@@ -356,6 +363,18 @@ class MainWindow(QMainWindow):
         self.result_label.setText(f"{tr('done')}\n{marks}")
         self.stack.setCurrentIndex(RESULT)
 
+    def _add_sound(self) -> None:
+        if self._project is None:
+            return
+        source = self._project.export_dir / "book.vxbook"
+        dest = self._project.export_dir / "book.sound.vxbook"
+        try:
+            add_sound(source, dest, _backend(self.mock.isChecked()))
+        except PlotweaverError as exc:
+            QMessageBox.warning(self, tr("app"), str(exc))
+            return
+        self.result_label.setText(f"{tr('done')}\n{source}\n{dest}")
+
     def _on_fail(self, message: str) -> None:
         self.progress_label.setText(message)
         self.bar.setRange(0, 1)
@@ -380,3 +399,6 @@ class MainWindow(QMainWindow):
             raise RuntimeError("self-test did not reach the result screen")
         if "book.vxbook" not in self.result_label.text():
             raise RuntimeError("self-test result has no book.vxbook path")
+        self.sound_button.click()
+        if self._project is None or not (self._project.export_dir / "book.sound.vxbook").is_file():
+            raise RuntimeError("self-test did not write book.sound.vxbook")

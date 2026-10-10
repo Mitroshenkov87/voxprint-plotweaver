@@ -10,6 +10,7 @@ from typing import Protocol
 from plotweaver.domain import Task
 from plotweaver.errors import ModelOutputError, assert_never
 from plotweaver.jsontext import parse_json_object
+from plotweaver.sound import mock_sound_document
 
 
 @dataclass
@@ -212,6 +213,8 @@ class MockBackend:
                     },
                     ensure_ascii=False,
                 )
+            case Task.SOUND:
+                return json.dumps(mock_sound_document(user), ensure_ascii=False)
             case _ as unreachable:
                 assert_never(unreachable)
 

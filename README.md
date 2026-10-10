@@ -48,7 +48,7 @@ plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf
 
 `--yes` skips the bible and outline gates. Omit it, read `bible.json` and `outline.json` in the project folder, then continue with `--approve`.
 
-The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (`book.epub`), with a navigation document and the suite cover. Add `--speaker-marks` for the legacy numbered `audiobook/speaker-marks.txt` pair, `--fb2` for FictionBook 2.1, `--docx` for Word, or `--markdown` for a Markdown file. The window has the same checkboxes. `--author` sets the name stored in the book manifest, the EPUB, and FictionBook title-info. `plotweaver vxbook validate FILE` runs the format checklist.
+The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (`book.epub`), with a navigation document and the suite cover. Add `--speaker-marks` for the legacy numbered `audiobook/speaker-marks.txt` pair, `--fb2` for FictionBook 2.1, `--docx` for Word, or `--markdown` for a Markdown file. `--sound`, or Add sound markup in the window, writes a second file `book.sound.vxbook` and leaves `book.vxbook` unchanged. The window has the same checkboxes. `--author` sets the name stored in the book manifest, the EPUB, and FictionBook title-info. `plotweaver vxbook validate FILE` runs the format checklist. `plotweaver sound add FILE -o OUT` adds sound markup to an existing book.
 
 ## Bake-off (RTX 4090 Linux VM)
 
@@ -74,7 +74,7 @@ On the GPU VM, after the weights are on disk:
 bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/T-pro-it-2.1-Q4_K_M.gguf"
 ```
 
-Output defaults to `./out/mars-e2e/`. The Audiobook Builder import is `book.vxbook`. `--speaker-marks` also writes the legacy numbered pair under `audiobook/`. Override the folder with `PLOTWEAVER_MARS_OUT`.
+Output defaults to `./out/mars-e2e/`. The Audiobook Builder import is `book.vxbook`. The same run also writes `book.sound.vxbook` (VXBOOK v1.1 + sound extension v1) beside it. `--speaker-marks` also writes the legacy numbered pair under `audiobook/`. Override the folder with `PLOTWEAVER_MARS_OUT`.
 
 Without a GPU:
 
