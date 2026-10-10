@@ -386,12 +386,39 @@ def download_model(
     return target
 
 
-def import_forge_manifest(manifest: Path, registry: Path | None = None) -> list[str]:
+def model_public_row(entry: RegistryEntry) -> dict[str, object]:
+    """Fields a bot can rely on from `plotweaver models list --json`."""
+    return {
+        "id": entry.id,
+        "enabled": entry.enabled,
+        "tier": entry.tier,
+        "role": entry.role,
+        "filename": entry.filename,
+        "repo": entry.repo,
+        "revision": entry.revision,
+        "sha256": entry.sha256,
+        "size": entry.size,
+        "license": entry.license,
+        "min_vram_gb": entry.min_vram_gb,
+        "uncensored": entry.uncensored,
+        "optional": entry.optional,
+        "default": entry.default,
+        "languages": list(entry.languages),
+    }
+
+
+def import_forge_manifest(
+    manifest: Path,
+    registry: Path | None = None,
+    *,
+    dry_run: bool = False,
+) -> list[str]:
     """Fill disabled least-censored rows from a Model Forge JSON manifest.
 
     Each object needs ``id``, ``revision``, ``sha256``, and ``size``. Optional
     ``repo``, ``filename``, and ``min_vram_gb`` replace those fields. The row
-    is enabled. Stock rows are refused.
+    is enabled. Stock rows are refused. ``dry_run`` validates and returns the
+    ids without writing the registry.
     """
     path = registry or registry_path()
     payload = json.loads(manifest.read_text(encoding="utf-8"))
@@ -414,6 +441,8 @@ def import_forge_manifest(manifest: Path, registry: Path | None = None) -> list[
             raise PlotweaverError(f"{model_id} is a stock model. Model Forge cannot replace it.")
         text = _fill_registry_block(text, model_id, _forge_updates(row))
         enabled.append(model_id)
+    if dry_run:
+        return enabled
     _write_registry(path, text)
     loaded = {entry.id: entry for entry in load_registry(path)}
     for model_id in enabled:

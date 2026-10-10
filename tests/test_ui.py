@@ -8,8 +8,11 @@ from pathlib import Path
 from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import QApplication
 
+from plotweaver.appinfo import version_label
 from plotweaver.settings import model_tier_override, uncensored_models_preference
 from plotweaver.ui.i18n import STRINGS
+from plotweaver.ui.icons import ICON_NAMES, suite_icon
+from plotweaver.ui.splash import Splash
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
     CARD_PLAIN,
@@ -114,4 +117,30 @@ def test_window_selftest(tmp_path: Path) -> None:
     assert (export / "book.sound.vxbook").is_file()
     assert not (export / "audiobook" / "speaker-marks.txt").is_file()
     assert not (export / "book.docx").is_file()
+    assert window.about_text() == version_label()
+    del app
+
+
+def test_suite_icons_and_splash() -> None:
+    app = QApplication.instance() or QApplication([])
+    folder = Path(__file__).parents[1] / "src" / "plotweaver" / "ui" / "icons"
+    blob = "\n".join((folder / f"{name}.svg").read_text(encoding="utf-8") for name in ICON_NAMES)
+    assert "currentColor" in blob
+    assert "floppy" not in blob.casefold()
+    icon = suite_icon("save", "#f2f2f5")
+    assert not icon.isNull()
+    splash = Splash()
+    splash.show()
+    assert splash.version_text == version_label()
+    window = MainWindow(mock=True)
+    window.show()
+    assert window.about_text() == '0.2.0 RC · build dev "Sefer"'
+    save = next(
+        button
+        for button in window.findChildren(type(window.download_uncensored))
+        if button.text() == "Save"
+    )
+    assert not save.icon().isNull()
+    assert not window.download_uncensored.icon().isNull()
+    splash.close()
     del app

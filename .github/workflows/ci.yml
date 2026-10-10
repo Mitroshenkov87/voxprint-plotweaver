@@ -119,11 +119,19 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          title="$(python3 -c 'import os, sys; sys.path.insert(0, "src"); from plotweaver.appinfo import release_title; print(release_title(int(os.environ["GITHUB_RUN_NUMBER"])))')"
+          pre="$(python3 -c 'import sys; sys.path.insert(0, "src"); from plotweaver.appinfo import is_prerelease; print("1" if is_prerelease() else "0")')"
           mkdir -p assets
           find release-parts -type f ! -name 'SHA256SUMS' -exec cp -t assets {} +
           cd assets
           sha256sum -- * | LC_ALL=C sort -k2 > SHA256SUMS
           sha256sum -c SHA256SUMS
-          tag="${GITHUB_REF_NAME}"
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease --title "$tag" --notes "Release candidate. The Windows setup and the Linux package include the app, Python 3.14, dependencies, and llama.cpp b11476. Model weights download on first run."
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            args=(release create "$tag" --title "$title" --notes "The Windows setup and the Linux package include the app, Python 3.14, dependencies, and llama.cpp b11476. Model weights download on first run.")
+            if [[ "$pre" == "1" ]]; then
+              args+=(--prerelease)
+            fi
+            gh "${args[@]}"
+          fi
           gh release upload "$tag" --clobber ./*

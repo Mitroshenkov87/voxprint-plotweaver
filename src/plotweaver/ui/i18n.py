@@ -58,6 +58,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_downloading": "Downloading…",
         "settings_save": "Save",
         "settings_saved": "Saved.",
+        "about": "About",
+        "save_as": "Save as",
+        "save_copy": "Save a copy",
     },
     "ru": {
         "app": "Voxprint AI Plotweaver",
@@ -114,6 +117,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_downloading": "Скачивание…",
         "settings_save": "Сохранить",
         "settings_saved": "Сохранено.",
+        "about": "О программе",
+        "save_as": "Сохранить как",
+        "save_copy": "Сохранить копию",
     },
     "de": {
         "app": "Voxprint AI Plotweaver",
@@ -170,6 +176,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_downloading": "Wird geladen…",
         "settings_save": "Speichern",
         "settings_saved": "Gespeichert.",
+        "about": "Info",
+        "save_as": "Speichern unter",
+        "save_copy": "Kopie speichern",
     },
 }
 

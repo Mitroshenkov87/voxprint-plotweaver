@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from plotweaver.appinfo import APP_NAME, version_label
 from plotweaver.bakeoff import run_bakeoff
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import GpuUnsupported, PlotweaverError
+from plotweaver.export import export_output_names
 from plotweaver.hardware import require_supported_gpu, vram_budget_gb, vram_headroom_gb
 from plotweaver.install import prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
@@ -22,20 +27,25 @@ from plotweaver.llm import LLMBackend, MockBackend
 from plotweaver.registry import (
     detected_tier,
     import_forge_manifest,
+    load_registry,
+    model_public_row,
+    registry_path,
     resolve_tier,
     tier_headroom_gb,
     usable_vram_gb,
 )
-from plotweaver.runner import run_book
+from plotweaver.runner import export_book, run_book
 from plotweaver.scenarios import mars_request
-from plotweaver.sound import add_sound
+from plotweaver.sound import add_sound, resolve_vxbook
 from plotweaver.store import Project
+from plotweaver.ui.splash import Splash
 from plotweaver.ui.window import MainWindow
 from plotweaver.vxbook import validate_vxbook
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="plotweaver", description=APP_NAME)
+    parser.add_argument("--version", action="version", version=version_label())
     sub = parser.add_subparsers(dest="command", required=True)
 
     version = sub.add_parser("version", help="Print the version and codename.")
@@ -47,7 +57,16 @@ def main(argv: list[str] | None = None) -> int:
 
     run = sub.add_parser("run", help="Write or resume one book.")
     _add_book_args(run)
+    _add_machine_args(run)
     run.set_defaults(func=_run)
+
+    export = sub.add_parser("export", help="Export an existing project, including book.vxbook.")
+    export.add_argument("--project", type=Path, required=True)
+    export.add_argument("--export-dir", type=Path)
+    export.add_argument("--mock", action="store_true")
+    _add_export_args(export)
+    _add_machine_args(export)
+    export.set_defaults(func=_export)
 
     scenario = sub.add_parser(
         "scenario-mars",
@@ -62,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     scenario.add_argument("--main-model-id", default="")
     scenario.add_argument("--least-censored-model-id", default="")
     _add_export_args(scenario)
+    _add_machine_args(scenario)
     scenario.set_defaults(func=_scenario_mars)
 
     bake = sub.add_parser("bakeoff", help="Run the Russian 10x3 bake-off, or a mock slice of it.")
@@ -84,10 +104,20 @@ def main(argv: list[str] | None = None) -> int:
     vx = vxbook.add_subparsers(dest="vx_command", required=True)
     validate = vx.add_parser("validate", help="Run the Voxprint Book validation checklist.")
     validate.add_argument("file", type=Path)
+    _add_machine_args(validate)
     validate.set_defaults(func=_vxbook_validate)
 
     models = sub.add_parser("models", help="Registry tools for Model Forge publications.")
     model_commands = models.add_subparsers(dest="models_command", required=True)
+    listing = model_commands.add_parser("list", help="List registry models.")
+    listing.add_argument(
+        "--registry",
+        type=Path,
+        default=None,
+        help="Registry file to read. Defaults to bakeoff/models.toml.",
+    )
+    _add_machine_args(listing)
+    listing.set_defaults(func=_models_list)
     forge = model_commands.add_parser(
         "import-forge-manifest",
         help="Enable placeholder rows from a Model Forge JSON manifest.",
@@ -99,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Registry file to update. Defaults to bakeoff/models.toml.",
     )
+    _add_machine_args(forge)
     forge.set_defaults(func=_import_forge_manifest)
 
     sound = sub.add_parser("sound", help="Add VXBOOK v1.1 + sound extension v1 markup.")
@@ -112,17 +143,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Also write optional vx:sound lines. Off by default.",
     )
+    _add_machine_args(sound_add)
     sound_add.set_defaults(func=_sound_add)
 
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
     except GpuUnsupported as exc:
-        print(exc, file=sys.stderr)
-        return 2
+        return _fail(args, str(exc), 2)
     except PlotweaverError as exc:
-        print(exc, file=sys.stderr)
-        return 1
+        return _fail(args, str(exc), 1)
 
 
 def _add_book_args(parser: argparse.ArgumentParser) -> None:
@@ -177,6 +207,19 @@ def _add_export_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_machine_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print one JSON object on stdout. The schema is in docs/CLI.md.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate inputs and print the planned actions. Write nothing and do not run a model.",
+    )
+
+
 def _export_formats(args: argparse.Namespace) -> list[str]:
     chosen = ["epub"]
     if args.fb2:
@@ -190,31 +233,152 @@ def _export_formats(args: argparse.Namespace) -> list[str]:
     return chosen
 
 
+def _fail(args: argparse.Namespace, message: str, code: int) -> int:
+    if getattr(args, "json", False):
+        _print_json({"ok": False, "error": message, "code": code})
+    else:
+        print(message, file=sys.stderr)
+    return code
+
+
+def _print_json(payload: dict[str, Any]) -> None:
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _emit(args: argparse.Namespace, payload: dict[str, Any], text: str) -> int:
+    if args.json:
+        _print_json(payload)
+    elif text:
+        print(text)
+    return int(payload.get("code", 0))
+
+
+def _output_paths(directory: Path, formats: list[str], *, sound: bool) -> list[str]:
+    return [str((directory / name).resolve()) for name in export_output_names(formats, sound=sound)]
+
+
 def _vxbook_validate(args: argparse.Namespace) -> int:
+    if args.dry_run:
+        if not args.file.is_file():
+            raise PlotweaverError(f"not a file: {args.file}")
+        payload: dict[str, Any] = {
+            "ok": True,
+            "command": "vxbook.validate",
+            "dry_run": True,
+            "code": 0,
+            "file": str(args.file.resolve()),
+            "actions": ["run the Voxprint Book validation checklist"],
+            "outputs": [],
+        }
+        text = f"dry-run\naction: validate {args.file.resolve()}"
+        return _emit(args, payload, text)
     issues = validate_vxbook(args.file)
-    for issue in issues:
-        print(f"{issue.severity}: {issue.message}")
-    if not issues:
-        print("ok")
-    return 1 if any(issue.severity == "error" for issue in issues) else 0
+    failed = any(issue.severity == "error" for issue in issues)
+    rows = [{"severity": issue.severity, "message": issue.message} for issue in issues]
+    if args.json:
+        _print_json(
+            {
+                "ok": not failed,
+                "command": "vxbook.validate",
+                "dry_run": False,
+                "code": 1 if failed else 0,
+                "file": str(args.file.resolve()),
+                "issues": rows,
+            }
+        )
+    else:
+        for issue in issues:
+            print(f"{issue.severity}: {issue.message}")
+        if not issues:
+            print("ok")
+    return 1 if failed else 0
 
 
 def _sound_add(args: argparse.Namespace) -> int:
-    warnings = add_sound(args.src, args.output, _backend(bool(args.mock)), mirror=bool(args.mirror))
-    for message in warnings:
-        print(f"warning: {message}")
-    print(args.output)
-    return 0
+    source = resolve_vxbook(args.src)
+    if source.resolve() == args.output.resolve():
+        raise PlotweaverError("sound markup writes a new file and leaves the original in place")
+    if args.dry_run:
+        problems = [issue.message for issue in validate_vxbook(source) if issue.severity == "error"]
+        if problems:
+            raise PlotweaverError(problems[0])
+        payload: dict[str, Any] = {
+            "ok": True,
+            "command": "sound.add",
+            "dry_run": True,
+            "code": 0,
+            "source": str(source.resolve()),
+            "output": str(args.output.resolve()),
+            "mirror": bool(args.mirror),
+            "actions": ["read the source .vxbook", "write sound markup to the output .vxbook"],
+            "outputs": [str(args.output.resolve())],
+        }
+        text = f"dry-run\nsource: {source.resolve()}\noutput: {args.output.resolve()}"
+        return _emit(args, payload, text)
+    warnings = add_sound(source, args.output, _backend(bool(args.mock)), mirror=bool(args.mirror))
+    payload = {
+        "ok": True,
+        "command": "sound.add",
+        "dry_run": False,
+        "code": 0,
+        "source": str(source.resolve()),
+        "output": str(args.output.resolve()),
+        "mirror": bool(args.mirror),
+        "warnings": list(warnings),
+    }
+    lines = [f"warning: {message}" for message in warnings]
+    lines.append(str(args.output))
+    return _emit(args, payload, "\n".join(lines))
+
+
+def _models_list(args: argparse.Namespace) -> int:
+    path = args.registry or registry_path()
+    if not path.is_file():
+        raise PlotweaverError(f"registry not found: {path}")
+    rows = [model_public_row(entry) for entry in load_registry(path)]
+    payload: dict[str, Any] = {
+        "ok": True,
+        "command": "models.list",
+        "dry_run": bool(args.dry_run),
+        "code": 0,
+        "registry": str(path.resolve()),
+        "actions": ["read the model registry"],
+        "models": rows,
+    }
+    lines = ["dry-run"] if args.dry_run else []
+    for row in rows:
+        state = "enabled" if row["enabled"] else "disabled"
+        lines.append(f"{row['id']}\t{state}\t{row['tier']}\t{row['role']}\t{row['filename']}")
+    return _emit(args, payload, "\n".join(lines))
 
 
 def _import_forge_manifest(args: argparse.Namespace) -> int:
-    for model_id in import_forge_manifest(args.file, args.registry):
-        print(model_id)
-    return 0
+    if not args.file.is_file():
+        raise PlotweaverError(f"manifest not found: {args.file}")
+    path = args.registry or registry_path()
+    enabled = import_forge_manifest(args.file, path, dry_run=bool(args.dry_run))
+    payload: dict[str, Any] = {
+        "ok": True,
+        "command": "models.import-forge-manifest",
+        "dry_run": bool(args.dry_run),
+        "code": 0,
+        "registry": str(path.resolve()),
+        "manifest": str(args.file.resolve()),
+        "models": enabled,
+        "writes": not bool(args.dry_run),
+        "actions": [
+            "validate the Model Forge manifest",
+            "enable the listed placeholder rows"
+            if not args.dry_run
+            else "leave the registry unchanged",
+        ],
+    }
+    prefix = "dry-run\n" if args.dry_run else ""
+    return _emit(args, payload, prefix + "\n".join(enabled))
 
 
 def _version(_args: argparse.Namespace) -> int:
-    print(f"{APP_NAME} {version_label()}")
+    print(version_label())
     return 0
 
 
@@ -259,13 +423,29 @@ def _apply_models(request: BookRequest, args: argparse.Namespace) -> None:
         request.least_censored_model_id = args.least_censored_model_id
 
 
-def _run(args: argparse.Namespace) -> int:
-    if args.synopsis is None and not (args.project / "project.json").is_file():
-        raise PlotweaverError("--synopsis is required when the project does not exist yet")
-    synopsis = ""
-    if args.synopsis is not None:
-        synopsis = args.synopsis.read_text(encoding="utf-8")
-    request = BookRequest(
+def _progress(args: argparse.Namespace) -> Callable[[str], None]:
+    if args.json:
+        return lambda message: print(message, file=sys.stderr)
+    return print
+
+
+def _check_export_dir(path: Path | None) -> None:
+    if path is not None and path.exists() and not path.is_dir():
+        raise PlotweaverError(f"--export-dir is not a directory: {path}")
+
+
+def _check_references(paths: list[str]) -> None:
+    for raw in paths:
+        if not Path(raw).is_file():
+            raise PlotweaverError(f"reference not found: {raw}")
+
+
+def _run_request(args: argparse.Namespace, synopsis: str) -> BookRequest:
+    if args.target_words < 1:
+        raise PlotweaverError("--target-words must be positive")
+    if args.scenes_per_chapter < 1:
+        raise PlotweaverError("--scenes-per-chapter must be positive")
+    return BookRequest(
         title=args.title,
         language=Language(args.language),
         synopsis=synopsis,
@@ -281,6 +461,49 @@ def _run(args: argparse.Namespace) -> int:
         export_formats=_export_formats(args),
         sound_markup=bool(args.sound),
     )
+
+
+def _run(args: argparse.Namespace) -> int:
+    exists = (args.project / "project.json").is_file()
+    if args.synopsis is None and not exists:
+        raise PlotweaverError("--synopsis is required when the project does not exist yet")
+    _check_export_dir(args.export_dir)
+    _check_references(list(args.reference or []))
+    synopsis = ""
+    if args.synopsis is not None:
+        if not args.synopsis.is_file():
+            raise PlotweaverError(f"synopsis not found: {args.synopsis}")
+        synopsis = args.synopsis.read_text(encoding="utf-8")
+        if not synopsis.strip():
+            raise PlotweaverError("synopsis is empty")
+    if exists and args.synopsis is None:
+        Project(args.project).request()
+    formats = _export_formats(args)
+    export_root = args.export_dir or (args.project / "export")
+    _run_request(args, synopsis or "resume")
+    if args.dry_run:
+        actions = [
+            "resume the project" if exists else "create the project",
+            "generate the book with the mock backend"
+            if args.mock
+            else "generate the book with the local model",
+            "write the export files, including book.vxbook",
+        ]
+        payload: dict[str, Any] = {
+            "ok": True,
+            "command": "run",
+            "dry_run": True,
+            "code": 0,
+            "project": str(args.project.resolve()),
+            "resume": exists,
+            "mock": bool(args.mock),
+            "actions": actions,
+            "outputs": _output_paths(export_root, formats, sound=bool(args.sound)),
+        }
+        lines = ["dry-run", *[f"action: {item}" for item in actions]]
+        lines.extend(f"output: {item}" for item in payload["outputs"])
+        return _emit(args, payload, "\n".join(lines))
+    request = _run_request(args, synopsis)
     _apply_models(request, args)
     project = Project.open_or_create(args.project, request)
     if project.request_path.is_file() and args.synopsis is None:
@@ -296,24 +519,126 @@ def _run(args: argparse.Namespace) -> int:
         if not request.least_censored_gguf:
             request.least_censored_gguf = stored.least_censored_gguf
             request.least_censored_model_id = stored.least_censored_model_id
+    progress = _progress(args)
     if not args.mock:
-        prepare_real_models(request, on_progress=print)
+        prepare_real_models(request, on_progress=progress)
     project.save_request(request)
     result = run_book(
         project,
         _backend(args.mock),
         yes=bool(args.yes),
         approve=bool(args.approve),
-        on_progress=print,
+        on_progress=progress,
         export_to=args.export_dir,
     )
-    print(f"status={result.status} gate={result.gate or '-'} swaps={result.swaps}")
+    outputs: list[str] = []
     if result.export_dir is not None:
-        print(result.export_dir)
-    return 0
+        outputs = _output_paths(result.export_dir, formats, sound=bool(args.sound))
+    payload = {
+        "ok": True,
+        "command": "run",
+        "dry_run": False,
+        "code": 0,
+        "status": result.status,
+        "gate": result.gate,
+        "swaps": result.swaps,
+        "refusals": result.refusals,
+        "placeholders": result.placeholders,
+        "rewrites": result.rewrites,
+        "project": str(project.root.resolve()),
+        "export_dir": str(result.export_dir.resolve()) if result.export_dir else None,
+        "outputs": outputs,
+    }
+    text = f"status={result.status} gate={result.gate or '-'} swaps={result.swaps}"
+    if result.export_dir is not None:
+        text = f"{text}\n{result.export_dir}"
+    return _emit(args, payload, text)
+
+
+def _export(args: argparse.Namespace) -> int:
+    if not (args.project / "project.json").is_file():
+        raise PlotweaverError(f"project not found: {args.project}")
+    _check_export_dir(args.export_dir)
+    project = Project(args.project)
+    request = project.request()
+    outline = project.artefacts / "outline.json"
+    if not outline.is_file():
+        raise PlotweaverError("the project has no outline to export")
+    formats = _export_formats(args)
+    export_root = args.export_dir or project.export_dir
+    if args.dry_run:
+        actions = [
+            "read the generated project",
+            "write the export files, including book.vxbook",
+        ]
+        if args.sound:
+            actions.append(
+                "add sound markup with the mock backend"
+                if args.mock
+                else "add sound markup with the local model"
+            )
+        payload: dict[str, Any] = {
+            "ok": True,
+            "command": "export",
+            "dry_run": True,
+            "code": 0,
+            "project": str(project.root.resolve()),
+            "title": request.title,
+            "actions": actions,
+            "outputs": _output_paths(export_root, formats, sound=bool(args.sound)),
+        }
+        lines = ["dry-run", *[f"action: {item}" for item in actions]]
+        lines.extend(f"output: {item}" for item in payload["outputs"])
+        return _emit(args, payload, "\n".join(lines))
+    directory = export_book(
+        project,
+        _backend(bool(args.mock)) if args.sound else None,
+        formats=formats,
+        sound=bool(args.sound),
+        export_to=args.export_dir,
+    )
+    outputs = _output_paths(directory, formats, sound=bool(args.sound))
+    payload = {
+        "ok": True,
+        "command": "export",
+        "dry_run": False,
+        "code": 0,
+        "project": str(project.root.resolve()),
+        "export_dir": str(directory.resolve()),
+        "outputs": outputs,
+    }
+    return _emit(args, payload, "\n".join(outputs))
 
 
 def _scenario_mars(args: argparse.Namespace) -> int:
+    _check_export_dir(args.export_dir)
+    if not args.mock and not args.main_gguf:
+        raise PlotweaverError(
+            "scenario-mars on a GPU needs --main-gguf. "
+            "Use --mock to exercise the same path without a model."
+        )
+    formats = _export_formats(args)
+    export_root = args.export_dir or (args.project / "export")
+    if args.dry_run:
+        mars_request()
+        actions = [
+            "create the Mars scenario project",
+            "generate the short Russian story",
+            "write the export files, including book.vxbook",
+        ]
+        payload: dict[str, Any] = {
+            "ok": True,
+            "command": "scenario-mars",
+            "dry_run": True,
+            "code": 0,
+            "project": str(args.project.resolve()),
+            "mock": bool(args.mock),
+            "actions": actions,
+            "outputs": _output_paths(export_root, formats, sound=bool(args.sound)),
+        }
+        lines = ["dry-run", *[f"action: {item}" for item in actions]]
+        lines.extend(f"output: {item}" for item in payload["outputs"])
+        return _emit(args, payload, "\n".join(lines))
     request = mars_request()
     request.main_gguf = args.main_gguf
     request.least_censored_gguf = args.least_censored_gguf
@@ -330,24 +655,38 @@ def _scenario_mars(args: argparse.Namespace) -> int:
     request.author = args.author
     request.export_formats = _export_formats(args)
     request.sound_markup = bool(args.sound)
-    if not args.mock and not request.main_gguf:
-        raise PlotweaverError(
-            "scenario-mars on a GPU needs --main-gguf. "
-            "Use --mock to exercise the same path without a model."
-        )
     project = Project.open_or_create(args.project, request)
     project.save_request(request)
+    progress = _progress(args)
     result = run_book(
         project,
         _backend(bool(args.mock)),
         yes=bool(args.yes),
-        on_progress=print,
+        on_progress=progress,
         export_to=args.export_dir,
     )
-    print(f"status={result.status} swaps={result.swaps}")
+    code = 0 if result.status == "completed" else 3
+    published = result.export_dir or project.export_dir
+    outputs = (
+        _output_paths(published, formats, sound=bool(args.sound))
+        if result.export_dir is not None
+        else []
+    )
+    body: dict[str, Any] = {
+        "ok": code == 0,
+        "command": "scenario-mars",
+        "dry_run": False,
+        "code": code,
+        "status": result.status,
+        "swaps": result.swaps,
+        "project": str(project.root.resolve()),
+        "export_dir": str(result.export_dir.resolve()) if result.export_dir else None,
+        "outputs": outputs,
+    }
+    text = f"status={result.status} swaps={result.swaps}"
     if result.export_dir is not None:
-        print(result.export_dir / "book.vxbook")
-    return 0 if result.status == "completed" else 3
+        text = f"{text}\n{result.export_dir / 'book.vxbook'}"
+    return _emit(args, body, text)
 
 
 def _bakeoff(args: argparse.Namespace) -> int:
@@ -369,9 +708,14 @@ def _gui(args: argparse.Namespace) -> int:
         os.environ["PLOTWEAVER_UI_PROJECT"] = tempfile.mkdtemp(prefix="plotweaver-selftest-")
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])
+    splash = Splash()
+    splash.show()
+    app.processEvents()
     window = MainWindow(mock=bool(args.mock or args.selftest))
     window.show()
     if args.selftest:
+        splash.close()
         window.run_selftest()
         return 0
+    QTimer.singleShot(900, splash.close)
     return int(app.exec())

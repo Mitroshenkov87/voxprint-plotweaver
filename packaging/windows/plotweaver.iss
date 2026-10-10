@@ -3,7 +3,7 @@
 ; Start menu group is Voxprint. Windows 11 24H2 is the minimum.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.0rc1"
+  #error BUILD.json supplies MyAppVersion. packaging/windows/build-installer.ps1 passes /DMyAppVersion.
 #endif
 #ifndef StageDir
   #define StageDir "..\..\build\stage"

@@ -79,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         check=True,
         env=env,
     )
+    _stamp_packaged_build(py, dest, env)
     print(dest)
     return 0
 
@@ -132,6 +133,20 @@ def _uv(*args: str) -> None:
         subprocess.run(["uv", *args], check=True)
         return
     raise SystemExit("uv is not installed")
+
+
+def _stamp_packaged_build(py: Path, dest: Path, env: dict[str, str]) -> None:
+    """CI build number is GITHUB_RUN_NUMBER + BUILD.json offset. Local stays dev."""
+    run = os.environ.get("GITHUB_RUN_NUMBER", "")
+    if not run.isdigit():
+        return
+    script = (
+        "import os, sys\n"
+        "from pathlib import Path\n"
+        "from plotweaver.appinfo import stamp_build\n"
+        "print(stamp_build(Path(sys.argv[1]), int(os.environ['GITHUB_RUN_NUMBER'])))\n"
+    )
+    subprocess.run([str(py), "-c", script, str(dest / "BUILD.json")], check=True, env=env)
 
 
 def _copy_payload(dest: Path) -> None:
