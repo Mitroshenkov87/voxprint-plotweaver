@@ -665,7 +665,7 @@ def _escape_text(text: str, *, leading: bool) -> str:
         return line
     ordered = re.match(r"^(\d{1,9})([.)]) ", line)
     if ordered is not None:
-        return f"{ordered.group(1)}\\{ordered.group(2)}{line[ordered.end(2):]}"
+        return f"{ordered.group(1)}\\{ordered.group(2)}{line[ordered.end(2) :]}"
     if _needs_leading_escape(line):
         return "\\" + line
     return line
