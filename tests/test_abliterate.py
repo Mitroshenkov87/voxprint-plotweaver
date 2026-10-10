@@ -15,6 +15,7 @@ from plotweaver.abliterate import (
     projection,
     refusal_rate,
     run_tiny,
+    target_by_key,
 )
 from plotweaver.bakeoff import run_bakeoff
 from plotweaver.errors import PlotweaverError
@@ -47,9 +48,20 @@ def test_tiny_run_writes_a_card_and_drops_refusals(tmp_path: Path) -> None:
     assert report.min_vram_gb == 15.0
     card = (tmp_path / f"{PRODUCED_ID}.MODEL_CARD.md").read_text(encoding="utf-8")
     assert "Apache-2.0" in card
+    assert "Modification notice" in card
     assert report.base_revision in card
     assert report.sha256 in card
     assert "16 GB" in card
+    lite = (tmp_path / "t-lite-it-2.1-plotweaver-abliterated-q4.MODEL_CARD.md").read_text(
+        encoding="utf-8"
+    )
+    assert "T-Bank" in lite
+    assert "Qwen" in lite
+    assert "Modification notice" in lite
+    pro = (tmp_path / "t-pro-it-2.1-plotweaver-abliterated-q4.MODEL_CARD.md").read_text(
+        encoding="utf-8"
+    )
+    assert "does not fit a 16 GB card" in pro
     assert refusal_rate(["I cannot write this scene."]) == 1.0
 
 
@@ -57,7 +69,7 @@ def test_enable_produced_entry_records_the_hash(tmp_path: Path) -> None:
     source = repo_root() / "bakeoff" / "models.toml"
     path = tmp_path / "models.toml"
     path.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-    enable_produced_entry(path, sha256="ab" * 32, size=120, revision="rev-1")
+    enable_produced_entry(path, model_id=PRODUCED_ID, sha256="ab" * 32, size=120, revision="rev-1")
     produced = next(entry for entry in load_registry(path) if entry.id == PRODUCED_ID)
     assert produced.enabled is True
     assert produced.sha256 == "ab" * 32
@@ -65,6 +77,13 @@ def test_enable_produced_entry_records_the_hash(tmp_path: Path) -> None:
     assert produced.revision == "rev-1"
     assert produced.optional is True
     assert produced.uncensored is True
+
+
+def test_yandex_is_not_an_ablation_target() -> None:
+    with pytest.raises(PlotweaverError, match="YandexGPT"):
+        target_by_key("yandexgpt")
+    assert target_by_key("t-lite").base_repo == "t-tech/T-lite-it-2.1"
+    assert target_by_key("t-pro").credit.startswith("T-Bank")
 
 
 def test_zero_direction_is_refused() -> None:

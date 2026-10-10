@@ -25,14 +25,8 @@ from plotweaver.domain import Task
 from plotweaver.errors import PlotweaverError
 from plotweaver.paths import repo_root
 
-STOCK_GGUF_SHA256 = "a3cc56310807ed0d145eaf9f018ccda9ae7ad8edb41ec870aa2454b0d4700b3c"
-STOCK_GGUF_SIZE = 14_333_922_848
-BASE_REVISION = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
-PRODUCED_ID = "mistral-small-3.2-24b-plotweaver-abliterated-q4"
-PRODUCED_FILENAME = "mistral-small-3.2-24b-plotweaver-abliterated-Q4_K_M.gguf"
-# Same weight budget as the stock Q4_K_M, which fits a 16 GB card.
-MIN_VRAM_GB = 15.0
 _GIB = 1024**3
+_EXCLUDED_KEYS = frozenset({"yandex", "yandexgpt", "yandexgpt-5-lite"})
 
 ORDINARY_PROMPTS: tuple[str, ...] = (
     "Write a paragraph about a baker opening the shop on a quiet morning.",
@@ -63,6 +57,21 @@ PERPLEXITY_TEXT = (
 
 
 @dataclass(frozen=True)
+class AblationTarget:
+    key: str
+    title: str
+    stock_id: str
+    stock_sha256: str
+    stock_size: int
+    base_repo: str
+    base_revision: str
+    produced_id: str
+    produced_filename: str
+    min_vram_gb: float
+    credit: str
+
+
+@dataclass(frozen=True)
 class AblationReport:
     kind: str
     direction_dim: int
@@ -75,6 +84,73 @@ class AblationReport:
     fits_16gb: bool
     min_vram_gb: float
     base_revision: str
+    title: str
+    base_repo: str
+    credit: str
+    produced_id: str
+
+
+def ablation_targets() -> tuple[AblationTarget, ...]:
+    """Official Apache-2.0 bases. Third-party abliterated T-lite files are not used."""
+    return (
+        AblationTarget(
+            key="mistral",
+            title="Mistral Small 3.2",
+            stock_id="mistral-small-3.2-24b-q4",
+            stock_sha256="a3cc56310807ed0d145eaf9f018ccda9ae7ad8edb41ec870aa2454b0d4700b3c",
+            stock_size=14_333_922_848,
+            base_repo="mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+            base_revision="95a6d26c4bfb886c58daf9d3f7332c857cb27b43",
+            produced_id="mistral-small-3.2-24b-plotweaver-abliterated-q4",
+            produced_filename="mistral-small-3.2-24b-plotweaver-abliterated-Q4_K_M.gguf",
+            min_vram_gb=15.0,
+            credit="",
+        ),
+        AblationTarget(
+            key="t-lite",
+            title="T-lite-it-2.1",
+            stock_id="t-lite-it-2.1-q4",
+            stock_sha256="68c75f5940c36baca18113058ad3d55f6d1d3e1123a8053bb4bba8481805c960",
+            stock_size=5_027_750_240,
+            base_repo="t-tech/T-lite-it-2.1",
+            base_revision="d125c970c553de58fcee3c937d5e4867d4a448d8",
+            produced_id="t-lite-it-2.1-plotweaver-abliterated-q4",
+            produced_filename="t-lite-it-2.1-plotweaver-abliterated-Q4_K_M.gguf",
+            min_vram_gb=6.0,
+            credit="T-Bank and the Qwen team. The base is derived from Qwen/Qwen3-8B.",
+        ),
+        AblationTarget(
+            key="t-pro",
+            title="T-pro-it-2.1",
+            stock_id="t-pro-it-2.1-q4",
+            stock_sha256="b19e88cc1154b4b0c99f09bc7b57b8e5f3a6af4135581a3bfd31a2518ed58714",
+            stock_size=19_761_766_048,
+            base_repo="t-tech/T-pro-it-2.1",
+            base_revision="a677a7c27bb8820c816fbcf578d912acedcf4439",
+            produced_id="t-pro-it-2.1-plotweaver-abliterated-q4",
+            produced_filename="t-pro-it-2.1-plotweaver-abliterated-Q4_K_M.gguf",
+            min_vram_gb=20.0,
+            credit="T-Bank and the Qwen team. The base is derived from Qwen/Qwen3-32B.",
+        ),
+    )
+
+
+def target_by_key(key: str) -> AblationTarget:
+    name = key.strip().lower()
+    if name in _EXCLUDED_KEYS:
+        raise PlotweaverError(
+            "YandexGPT is excluded: its licence forbids modification and redistribution."
+        )
+    for target in ablation_targets():
+        if target.key == name:
+            return target
+    known = ", ".join(target.key for target in ablation_targets())
+    raise PlotweaverError(f"unknown ablation model {key!r}. Choose one of: {known}")
+
+
+# Kept for the Mistral card path and older tests.
+PRODUCED_ID = ablation_targets()[0].produced_id
+PRODUCED_FILENAME = ablation_targets()[0].produced_filename
 
 
 def difference_of_means(harmful: list[list[float]], harmless: list[list[float]]) -> list[float]:
@@ -131,13 +207,19 @@ def model_card(report: AblationReport) -> str:
     if report.fits_16gb:
         fit = "The Q4_K_M file fits a 16 GB card."
     else:
-        fit = "The file does not fit a 16 GB card."
-    return "\n".join(
+        fit = "The Q4_K_M file does not fit a 16 GB card."
+    lines = [
+        f"# {report.title} abliterated (Plotweaver derivation)",
+        "",
+        "License: Apache-2.0, inherited from the base model.",
+        "Modification notice: this file changes the original weights by removing a",
+        "refusal direction and then quantizing to Q4_K_M. It is not the original model.",
+        f"Base: {report.base_repo} @ {report.base_revision}.",
+    ]
+    if report.credit:
+        lines.append(f"Credit: {report.credit}")
+    lines.extend(
         [
-            "# Mistral Small 3.2 abliterated (Plotweaver derivation)",
-            "",
-            "License: Apache-2.0, inherited from the base model.",
-            f"Base: mistralai/Mistral-Small-3.2-24B-Instruct-2506 @ {report.base_revision}.",
             "Method: difference-of-means refusal direction on original dark-fiction prompts",
             "versus ordinary prose, in English and Russian, then orthogonalise the output",
             "projections (o_proj and down_proj). No third-party ablation tool is vendored.",
@@ -150,15 +232,18 @@ def model_card(report: AblationReport) -> str:
             "",
         ]
     )
+    return "\n".join(lines)
 
 
-def enable_produced_entry(path: Path, *, sha256: str, size: int, revision: str) -> None:
+def enable_produced_entry(
+    path: Path, *, model_id: str, sha256: str, size: int, revision: str
+) -> None:
     """Fill the disabled registry row once the produced file has a hash."""
     text = path.read_text(encoding="utf-8")
-    marker = f'id = "{PRODUCED_ID}"'
+    marker = f'id = "{model_id}"'
     start = text.find(marker)
     if start < 0:
-        raise PlotweaverError(f"{path} has no {PRODUCED_ID} row")
+        raise PlotweaverError(f"{path} has no {model_id} row")
     end = text.find("\n[[model]]", start + 1)
     if end < 0:
         end = len(text)
@@ -194,45 +279,61 @@ def run_tiny(out_dir: Path) -> AblationReport:
         "The scene continues in the rain.",
         "Пыль лежала на люке, и рассказ шёл дальше.",
     ]
-    out_dir.mkdir(parents=True, exist_ok=True)
-    marker = out_dir / PRODUCED_FILENAME
-    marker.write_bytes(b"plotweaver-tiny-ablation")
-    digest = _sha256(marker)
-    report = AblationReport(
-        kind="tiny",
-        direction_dim=len(direction),
-        refusal_before=refusal_rate(refused_before),
-        refusal_after=refusal_rate(refused_after),
-        nll_before=harmful_hit,
-        nll_after=ordinary_hit,
-        sha256=digest,
-        size=marker.stat().st_size,
-        fits_16gb=fits_16gb(STOCK_GGUF_SIZE),
-        min_vram_gb=MIN_VRAM_GB,
-        base_revision=BASE_REVISION,
-    )
-    if report.refusal_after >= report.refusal_before:
+    if refusal_rate(refused_after) >= refusal_rate(refused_before):
         raise PlotweaverError("tiny refusal rate did not fall")
-    (out_dir / f"{PRODUCED_ID}.MODEL_CARD.md").write_text(model_card(report), encoding="utf-8")
-    return report
+    out_dir.mkdir(parents=True, exist_ok=True)
+    chosen: AblationReport | None = None
+    for target in ablation_targets():
+        marker = out_dir / target.produced_filename
+        marker.write_bytes(b"plotweaver-tiny-ablation")
+        digest = _sha256(marker)
+        report = AblationReport(
+            kind="tiny",
+            direction_dim=len(direction),
+            refusal_before=refusal_rate(refused_before),
+            refusal_after=refusal_rate(refused_after),
+            nll_before=harmful_hit,
+            nll_after=ordinary_hit,
+            sha256=digest,
+            size=marker.stat().st_size,
+            fits_16gb=fits_16gb(target.stock_size),
+            min_vram_gb=target.min_vram_gb,
+            base_revision=target.base_revision,
+            title=target.title,
+            base_repo=target.base_repo,
+            credit=target.credit,
+            produced_id=target.produced_id,
+        )
+        card = out_dir / f"{target.produced_id}.MODEL_CARD.md"
+        card.write_text(model_card(report), encoding="utf-8")
+        if target.key == "mistral":
+            chosen = report
+    if chosen is None:
+        raise PlotweaverError("tiny ablation did not write the Mistral card")
+    return chosen
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Ablate Mistral Small, or check the tiny path.")
+    parser = argparse.ArgumentParser(description="Ablate one pinned Apache-2.0 model.")
+    parser.add_argument("model", nargs="?", default="")
     parser.add_argument("--tiny", action="store_true")
     parser.add_argument("--out", type=Path, default=Path("out/abliterate-tiny"))
     args = parser.parse_args(argv)
     if args.tiny:
         report = run_tiny(args.out)
         print(
-            f"tiny ablation sha256={report.sha256} "
+            "tiny ablation "
+            f"sha256={report.sha256} "
             f"refusal {report.refusal_before:.2f} -> {report.refusal_after:.2f}"
         )
         return 0
+    if not args.model:
+        raise PlotweaverError("name a model: mistral, t-lite, or t-pro")
+    target = target_by_key(args.model)
     # Torch is an optional VM dependency, so CI can import this module without it.
-    from plotweaver.abliterate_hf import run_mistral
+    from plotweaver.abliterate_hf import run_model
 
-    return run_mistral()
+    return run_model(target)
 
 
 def _mean(rows: list[list[float]]) -> list[float]:

@@ -48,8 +48,11 @@ class Family:
     revision: str
     baseline_id: str
     source_filename: str
+    source_sha256: str
+    source_size: int
     quants: tuple[str, ...]
     imatrix: bool
+    registry_quants: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True)
@@ -68,8 +71,11 @@ def families() -> tuple[Family, ...]:
             revision="530e4cbae44f7a27396a8705f9fe802764ba6103",
             baseline_id="qwen3.6-27b-abliterated-q4",
             source_filename="Huihui-Qwen3.6-27B-abliterated.Q8_0.gguf",
+            source_sha256="",
+            source_size=0,
             quants=("IQ4_XS", "IQ3_M", "Q3_K_M"),
             imatrix=True,
+            registry_quants=(),
         ),
         Family(
             id="gemma-4-31b-abliterated",
@@ -77,8 +83,11 @@ def families() -> tuple[Family, ...]:
             revision="2491ee58472b82a2372d288f982943b9d5e6a82c",
             baseline_id="gemma-4-31b-abliterated-q4",
             source_filename="gemma-4-31b-abliterated-Q8_0.gguf",
+            source_sha256="",
+            source_size=0,
             quants=("IQ4_XS", "IQ3_M", "Q3_K_M"),
             imatrix=True,
+            registry_quants=(),
         ),
         Family(
             id="mistral-small-3.2-24b-abliterated",
@@ -88,8 +97,35 @@ def families() -> tuple[Family, ...]:
             source_filename=(
                 "Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed.Q8_0.gguf"
             ),
+            source_sha256="",
+            source_size=0,
             quants=("Q4_K_M", "Q5_K_M"),
             imatrix=True,
+            registry_quants=(),
+        ),
+        Family(
+            id="t-lite-it-2.1",
+            repo="t-tech/T-lite-it-2.1-GGUF",
+            revision="fc10186e59064c2e74f59c3d5dbce233931b3b81",
+            baseline_id="t-lite-it-2.1-q4",
+            source_filename="",
+            source_sha256="",
+            source_size=0,
+            quants=("Q5_K_M",),
+            imatrix=False,
+            registry_quants=(("Q5_K_M", "t-lite-it-2.1-q5"),),
+        ),
+        Family(
+            id="t-pro-it-2.1",
+            repo="t-tech/T-pro-it-2.1-GGUF",
+            revision="cf18787d8901c26ca9334812e7ff8070f2ddab4a",
+            baseline_id="t-pro-it-2.1-q4",
+            source_filename="T-pro-it-2.1-Q8_0.gguf",
+            source_sha256="af2b3a761473a95ca31ab9b8647b9dc4288604a4a71f795ffd9402d2938c7621",
+            source_size=34_816_397_344,
+            quants=("IQ4_XS", "IQ3_M"),
+            imatrix=True,
+            registry_quants=(),
         ),
     )
 

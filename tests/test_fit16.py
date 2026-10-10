@@ -29,7 +29,14 @@ def test_families_cover_the_requested_quants() -> None:
     assert found["qwen3.6-27b-abliterated"].quants == ("IQ4_XS", "IQ3_M", "Q3_K_M")
     assert found["gemma-4-31b-abliterated"].quants == ("IQ4_XS", "IQ3_M", "Q3_K_M")
     assert found["mistral-small-3.2-24b-abliterated"].quants == ("Q4_K_M", "Q5_K_M")
-    assert all(family.imatrix for family in found.values())
+    assert found["t-lite-it-2.1"].quants == ("Q5_K_M",)
+    assert found["t-lite-it-2.1"].imatrix is False
+    assert found["t-lite-it-2.1"].registry_quants == (("Q5_K_M", "t-lite-it-2.1-q5"),)
+    pro = found["t-pro-it-2.1"]
+    assert pro.quants == ("IQ4_XS", "IQ3_M")
+    assert pro.imatrix is True
+    assert pro.source_sha256.startswith("af2b3a76")
+    assert pro.source_size == 34_816_397_344
 
 
 def test_budget_is_thirteen_gib_and_a_spill_fails() -> None:

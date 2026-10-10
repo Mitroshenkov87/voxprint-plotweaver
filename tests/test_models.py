@@ -38,9 +38,12 @@ def test_registry_lists_confirmed_apache_models() -> None:
         "t-pro-it-2.1-q4",
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
+        "t-lite-it-2.1-q5",
         "mistral-small-3.2-24b-q4",
         "mistral-small-3.2-24b-abliterated-q4",
         "mistral-small-3.2-24b-plotweaver-abliterated-q4",
+        "t-lite-it-2.1-plotweaver-abliterated-q4",
+        "t-pro-it-2.1-plotweaver-abliterated-q4",
         "qwen3.6-27b-abliterated-q4",
         "gemma-4-31b-abliterated-q4",
     ]
@@ -49,19 +52,26 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert shared.revision.startswith("fc034cff")
     assert shared.size == 7_121_861_440
     assert shared.card == "16gb"
-    lite = entries[2]
+    lite = next(entry for entry in entries if entry.id == "t-lite-it-2.1-q4")
     assert lite.role == "main"
     assert lite.card == "16gb"
     assert lite.filename == "T-lite-it-2.1-Q4_K_M.gguf"
     assert lite.size == 5_027_750_240
     assert lite.sha256.startswith("68c75f59")
-    mistral = entries[3]
+    lite_q5 = next(entry for entry in entries if entry.id == "t-lite-it-2.1-q5")
+    assert lite_q5.role == "main"
+    assert lite_q5.card == "16gb"
+    assert lite_q5.filename == "T-lite-it-2.1-Q5_K_M.gguf"
+    assert lite_q5.size == 5_850_952_544
+    assert lite_q5.sha256.startswith("5ff7c6c3")
+    assert lite_q5.revision == lite.revision
+    mistral = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-q4")
     assert mistral.role == "least-censored"
     assert mistral.default is True
     assert mistral.card == "16gb"
     assert mistral.filename == "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
     assert mistral.size == 14_333_922_848
-    ablated = entries[4]
+    ablated = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-abliterated-q4")
     assert ablated.enabled is True
     assert ablated.optional is True
     assert ablated.uncensored is True
@@ -143,6 +153,7 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert stock_16 == [
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
+        "t-lite-it-2.1-q5",
         "mistral-small-3.2-24b-q4",
     ]
     assert uncensored_offer_allowed(16) is False
@@ -195,7 +206,7 @@ def test_uncensored_download_is_separate_from_the_default_install(
         return target
 
     monkeypatch.setattr("plotweaver.install.download_model", fake_download)
-    assert ensure_default_install(free_gb=22, store=tmp_path) == 4
+    assert ensure_default_install(free_gb=22, store=tmp_path) == 5
     assert "qwen3.6-27b-abliterated-q4" not in downloaded
     assert "t-pro-it-2.1-q4" in downloaded
     with pytest.raises(PlotweaverError, match="20 GB"):

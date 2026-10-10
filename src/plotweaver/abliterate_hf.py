@@ -25,15 +25,11 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from plotweaver.abliterate import (
-    BASE_REVISION,
     DARK_PROMPTS,
-    MIN_VRAM_GB,
     ORDINARY_PROMPTS,
     PERPLEXITY_TEXT,
-    PRODUCED_FILENAME,
-    PRODUCED_ID,
-    STOCK_GGUF_SHA256,
     AblationReport,
+    AblationTarget,
     enable_produced_entry,
     fits_16gb,
     model_card,
@@ -46,20 +42,17 @@ from plotweaver.llama_release import LLAMA_BUILD
 from plotweaver.paths import gguf_dir, llama_runtime_dir
 from plotweaver.registry import download_model, load_registry, registry_path
 
-_BASE_REPO = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
-_STOCK_ID = "mistral-small-3.2-24b-q4"
 
-
-def run_mistral() -> int:
-    stock = _stock_entry()
-    if stock.sha256 != STOCK_GGUF_SHA256 or stock.base_revision != BASE_REVISION:
-        raise PlotweaverError("stock Mistral Small pin does not match the ablation constants")
-    print("Checking the pinned stock GGUF.")
+def run_model(target: AblationTarget) -> int:
+    stock = _stock_entry(target.stock_id)
+    if stock.sha256 != target.stock_sha256 or stock.base_revision != target.base_revision:
+        raise PlotweaverError(f"stock pin for {target.key} does not match the ablation constants")
+    print(f"Checking the pinned stock GGUF for {target.key}.")
     download_model(stock)
-    work = gguf_dir() / "abliterate-work"
+    work = gguf_dir() / "abliterate-work" / target.key
     work.mkdir(parents=True, exist_ok=True)
     print("Loading the base in chunks (20 GB GPU cap, CPU and disk offload).")
-    tokenizer, model = _load_chunked(work / "offload")
+    tokenizer, model = _load_chunked(target, work / "offload")
     before_refusal, before_nll = _measure(tokenizer, model)
     direction = _direction(tokenizer, model)
     _ablate(model, direction)
@@ -71,44 +64,54 @@ def run_mistral() -> int:
     exported = work / "hf-ablated"
     model.save_pretrained(exported)
     tokenizer.save_pretrained(exported)
-    quant = _convert_and_quantize(exported, work)
+    quant = _convert_and_quantize(exported, work, target.produced_filename)
     digest = _hash_file(quant)
-    target = gguf_dir() / PRODUCED_FILENAME
-    if quant.resolve() != target.resolve():
-        target.write_bytes(quant.read_bytes())
+    produced = gguf_dir() / target.produced_filename
+    if quant.resolve() != produced.resolve():
+        produced.write_bytes(quant.read_bytes())
     report = AblationReport(
-        kind="mistral",
+        kind=target.key,
         direction_dim=int(direction.shape[0]),
         refusal_before=before_refusal,
         refusal_after=after_refusal,
         nll_before=before_nll,
         nll_after=after_nll,
         sha256=digest,
-        size=target.stat().st_size,
-        fits_16gb=fits_16gb(target.stat().st_size),
-        min_vram_gb=MIN_VRAM_GB,
-        base_revision=BASE_REVISION,
+        size=produced.stat().st_size,
+        fits_16gb=fits_16gb(produced.stat().st_size),
+        min_vram_gb=target.min_vram_gb,
+        base_revision=target.base_revision,
+        title=target.title,
+        base_repo=target.base_repo,
+        credit=target.credit,
+        produced_id=target.produced_id,
     )
-    card = gguf_dir() / f"{PRODUCED_ID}.MODEL_CARD.md"
+    card = gguf_dir() / f"{target.produced_id}.MODEL_CARD.md"
     card.write_text(model_card(report), encoding="utf-8")
-    enable_produced_entry(registry_file(), sha256=digest, size=report.size, revision=BASE_REVISION)
-    print(f"wrote {target} sha256={digest} fits_16gb={report.fits_16gb}")
+    enable_produced_entry(
+        registry_file(),
+        model_id=target.produced_id,
+        sha256=digest,
+        size=report.size,
+        revision=target.base_revision,
+    )
+    print(f"wrote {produced} sha256={digest} fits_16gb={report.fits_16gb}")
     return 0
 
 
-def _stock_entry():
+def _stock_entry(stock_id: str):
     for entry in load_registry(registry_path()):
-        if entry.id == _STOCK_ID:
+        if entry.id == stock_id:
             return entry
-    raise PlotweaverError("stock Mistral Small is not in the registry")
+    raise PlotweaverError(f"{stock_id} is not in the registry")
 
 
-def _load_chunked(offload: Path) -> tuple[Any, Any]:
+def _load_chunked(target: AblationTarget, offload: Path) -> tuple[Any, Any]:
     offload.mkdir(parents=True, exist_ok=True)
-    tokenizer = AutoTokenizer.from_pretrained(_BASE_REPO, revision=BASE_REVISION)
+    tokenizer = AutoTokenizer.from_pretrained(target.base_repo, revision=target.base_revision)
     model = AutoModelForCausalLM.from_pretrained(
-        _BASE_REPO,
-        revision=BASE_REVISION,
+        target.base_repo,
+        revision=target.base_revision,
         torch_dtype=torch.bfloat16,
         device_map="auto",
         max_memory={0: "20GiB", "cpu": "64GiB"},
@@ -179,11 +182,11 @@ def _nll(tokenizer: Any, model: Any, text: str) -> float:
     return float(loss.float().cpu())
 
 
-def _convert_and_quantize(exported: Path, work: Path) -> Path:
+def _convert_and_quantize(exported: Path, work: Path, filename: str) -> Path:
     convert = _convert_script()
     quantize = _quantize_bin()
-    f16 = work / "mistral-ablated-f16.gguf"
-    q4 = gguf_dir() / PRODUCED_FILENAME
+    f16 = work / "ablated-f16.gguf"
+    q4 = gguf_dir() / filename
     subprocess.run(
         ["python", str(convert), str(exported), "--outfile", str(f16), "--outtype", "f16"],
         check=True,

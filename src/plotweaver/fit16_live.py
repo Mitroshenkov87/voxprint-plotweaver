@@ -35,7 +35,7 @@ from plotweaver.fit16 import (
 )
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.paths import gguf_dir, repo_root
-from plotweaver.registry import download_model, load_registry, registry_path
+from plotweaver.registry import download_model, load_registry, registry_path, verify_file
 
 _USER_AGENT = "plotweaver"
 
@@ -77,30 +77,35 @@ def _family(
     quantize_bin: Path,
     calibration: Path,
 ) -> list[dict[str, object]]:
-    baseline = _baseline_file(family)
+    baseline = _registry_file(family.baseline_id)
+    pinned = dict(family.registry_quants)
+    needs_build = any(quant not in pinned and quant != "Q4_K_M" for quant in family.quants)
     source = baseline
-    if any(quant != "Q4_K_M" for quant in family.quants):
-        source = _source_file(family, out / "sources.json")
     imatrix = out / f"{family.id}.imatrix.dat"
-    if family.imatrix and not imatrix.is_file():
-        _run(
-            [
-                str(imatrix_bin),
-                "-m",
-                str(source),
-                "-f",
-                str(calibration),
-                "-o",
-                str(imatrix),
-                "-c",
-                "512",
-                "--chunks",
-                "32",
-            ]
-        )
+    if needs_build:
+        source = _source_file(family, out / "sources.json")
+        if family.imatrix and not imatrix.is_file():
+            _run(
+                [
+                    str(imatrix_bin),
+                    "-m",
+                    str(source),
+                    "-f",
+                    str(calibration),
+                    "-o",
+                    str(imatrix),
+                    "-c",
+                    "512",
+                    "--chunks",
+                    "32",
+                ]
+            )
     files: dict[str, Path] = {"Q4_K_M": baseline}
     for quant in family.quants:
         if quant == "Q4_K_M":
+            continue
+        if quant in pinned:
+            files[quant] = _registry_file(pinned[quant])
             continue
         files[quant] = _quant_file(family, quant, source, imatrix, quantize_bin)
     base_quality = _quality(out, family.id, "Q4_K_M", baseline, cli, perplexity, calibration)
@@ -314,15 +319,18 @@ def _quant_file(
     return dest
 
 
-def _baseline_file(family: Family) -> Path:
+def _registry_file(model_id: str) -> Path:
     for entry in load_registry(registry_path()):
-        if entry.id == family.baseline_id:
+        if entry.id == model_id:
             return download_model(entry)
-    raise PlotweaverError(f"registry has no baseline {family.baseline_id}")
+    raise PlotweaverError(f"registry has no {model_id}")
 
 
 def _source_file(family: Family, manifest: Path) -> Path:
     dest = gguf_dir() / "fit16-src" / family.source_filename
+    if family.source_sha256 and dest.is_file():
+        verify_file(dest, size=family.source_size, sha256=family.source_sha256)
+        return dest
     known = _known_hash(manifest, family)
     if dest.is_file() and known and _sha256(dest) == known:
         return dest
@@ -344,6 +352,10 @@ def _source_file(family: Family, manifest: Path) -> Path:
             for chunk in response.iter_bytes(1024 * 1024):
                 handle.write(chunk)
     partial.replace(dest)
+    if family.source_sha256:
+        verify_file(dest, size=family.source_size, sha256=family.source_sha256)
+        _remember_hash(manifest, family, family.source_sha256, family.source_size)
+        return dest
     digest = _sha256(dest)
     if known and digest != known:
         dest.unlink()

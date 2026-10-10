@@ -40,7 +40,7 @@ Write a one-chapter book without a GPU:
 .venv/bin/plotweaver run --mock --yes --project out/demo --synopsis scenarios/mars-e2e/synopsis.md --chapters 1 --target-words 800
 ```
 
-A real book needs a GGUF and a supported GPU. The first real run downloads the stock models that fit into the shared suite folder `~/.local/share/voxprint/models/llm`. On a 16 GB card that set is Gemma 4 12B, T-lite-it-2.1, and Mistral Small 3.2. Abliterated models are not in it. Settings offers that separate download when the GPU has at least 20 GB of VRAM. A dark-theme book uses an installed abliterated model when one is present, and otherwise stock Mistral Small. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`. An empty licence tag is refused either way.
+A real book needs a GGUF and a supported GPU. The first real run downloads the stock models that fit into the shared suite folder `~/.local/share/voxprint/models/llm`. On a 16 GB card that set is Gemma 4 12B, T-lite-it-2.1 Q4_K_M and Q5_K_M, and Mistral Small 3.2. Abliterated models are not in it. Settings offers that separate download when the GPU has at least 20 GB of VRAM. A dark-theme book uses an installed abliterated model when one is present, and otherwise stock Mistral Small. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`. An empty licence tag is refused either way.
 
 ```bash
 plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf /path/to/model.gguf
@@ -56,7 +56,7 @@ The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (
 bash scripts/bakeoff.sh
 ```
 
-The script installs dependencies if needed, downloads every finished candidate that fits (stock and abliterated), runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path. It also records a refusal rate for each candidate. The app's default install stays stock-only. `bash scripts/abliterate_mistral.sh --bakeoff` derives an abliterated Mistral Small on the GPU VM and then runs this bake-off. `bash scripts/abliterate_mistral.sh --tiny` checks that derivation on a tiny model. `bash scripts/fit16gb.sh` is the 16 GB fit experiment for the same VM; `--tiny` checks it without weights. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
+The script installs dependencies if needed, downloads every finished candidate that fits (stock and abliterated), runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path. It also records a refusal rate for each candidate. The app's default install stays stock-only. `bash scripts/abliterate.sh mistral --bakeoff` derives an abliterated model (`mistral`, `t-lite`, or `t-pro`) on the GPU VM and then runs this bake-off. `bash scripts/abliterate.sh --tiny` checks that derivation on a tiny model. `bash scripts/fit16gb.sh` is the 16 GB fit experiment for the same VM; `--tiny` checks it without weights. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
 
 CI runs the same harness without a GPU:
 
