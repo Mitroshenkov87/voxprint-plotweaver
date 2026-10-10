@@ -91,16 +91,24 @@ def _install_python(dest: Path) -> Path:
         shutil.rmtree(parent)
     parent.mkdir(parents=True)
     _uv("python", "install", "3.14", "--install-dir", str(parent), "--no-bin")
-    matches = [
-        item
-        for item in parent.iterdir()
-        if item.is_dir() and not item.is_symlink() and item.name.startswith("cpython-")
-    ]
-    if len(matches) != 1:
-        raise SystemExit(f"expected one CPython install in {parent}, found {matches}")
-    shutil.copytree(matches[0], dest, symlinks=True)
+    matches = [item for item in parent.iterdir() if item.name.startswith("cpython-")]
+    if not matches:
+        raise SystemExit(f"no CPython install in {parent}")
+    shutil.copytree(choose_cpython(matches), dest, symlinks=True)
     shutil.rmtree(parent)
     return dest
+
+
+def choose_cpython(candidates: list[Path]) -> Path:
+    """Pick the concrete install when uv also writes a shorter version alias."""
+
+    def rank(item: Path) -> tuple[tuple[int, ...], int]:
+        version = item.name.split("-", 2)[1]
+        parts = tuple(int(piece) for piece in version.split(".") if piece.isdigit())
+        concrete = 0 if item.is_symlink() else 1
+        return (parts, concrete)
+
+    return max(candidates, key=rank)
 
 
 def _base_python(prefix: Path) -> Path:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,20 @@ def test_version_is_shared() -> None:
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     assert f'version = "{APP_VERSION}"' in project
     assert f'#define MyAppVersion "{APP_VERSION}"' in installer
+
+
+def test_choose_cpython_prefers_the_patch_install(tmp_path: Path) -> None:
+    alias = tmp_path / "cpython-3.14-windows-x86_64-none"
+    concrete = tmp_path / "cpython-3.14.8-windows-x86_64-none"
+    alias.mkdir()
+    concrete.mkdir()
+    spec = importlib.util.spec_from_file_location(
+        "assemble", repo_root() / "packaging" / "assemble.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.choose_cpython([alias, concrete]) == concrete
 
 
 def test_marked_root_needs_both_markers(tmp_path: Path) -> None:

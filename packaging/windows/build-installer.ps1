@@ -2,6 +2,7 @@
 # Python, dependencies, and llama.cpp b11476 are inside the setup.
 # Model weights are not.
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $true
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $Root
 
