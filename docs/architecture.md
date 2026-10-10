@@ -1,6 +1,6 @@
 # Architecture
 
-Plotweaver turns a synopsis into a book on one machine. Version 0.2.0rc1 (Bereshit) is the engine, the bake-off harness, and a desktop shell. Cloud writing APIs are not called.
+Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Sefer, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called.
 
 ## Pipeline
 

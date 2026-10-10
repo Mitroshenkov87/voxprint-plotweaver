@@ -5,7 +5,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
-VERSION="$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' "$ROOT/src/plotweaver/appinfo.py")"
 DIST="$ROOT/dist"
 PKG="$ROOT/packaging/linux/pkg"
 STAGE="$ROOT/build/stage"
@@ -22,6 +21,7 @@ else
   echo "python is required" >&2
   exit 1
 fi
+VERSION="$("$PY" -c 'import sys; sys.path.insert(0, "src"); from plotweaver.appinfo import APP_VERSION; print(APP_VERSION)')"
 if ! "$PY" -m uv --version >/dev/null 2>&1; then
   "$PY" -m pip install -q "uv==0.13.0"
 fi

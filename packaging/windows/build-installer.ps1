@@ -18,7 +18,9 @@ Pop-Location
 
 $Iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $Iscc)) { throw "Inno Setup 6 is not installed" }
-& $Iscc "packaging\windows\plotweaver.iss"
+$Version = python -c "import sys; sys.path.insert(0, 'src'); from plotweaver.appinfo import APP_VERSION; print(APP_VERSION)"
+if ($LASTEXITCODE -ne 0) { throw "could not read the version from BUILD.json" }
+& $Iscc "/DMyAppVersion=$Version" "packaging\windows\plotweaver.iss"
 if ($LASTEXITCODE -ne 0) { throw "ISCC exited $LASTEXITCODE" }
 
 $Output = Join-Path $Root "packaging\windows\Output"

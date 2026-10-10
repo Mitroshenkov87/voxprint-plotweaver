@@ -5,11 +5,12 @@ and on a worker thread for a normal click, so the window can repaint.
 from __future__ import annotations
 
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import assert_never
 
-from PySide6.QtCore import QThread, QUrl, Signal
+from PySide6.QtCore import QSize, QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QStandardItemModel
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from plotweaver.appinfo import version_label
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
 from plotweaver.hardware import query_gpu, require_supported_gpu
@@ -55,7 +57,8 @@ from plotweaver.settings import (
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.ui.i18n import tr
-from plotweaver.ui.theme import build_style, enable_acrylic
+from plotweaver.ui.icons import suite_icon
+from plotweaver.ui.theme import TEXT, TEXT_ON_PRIMARY, build_style, enable_acrylic
 from plotweaver.update_check import check_for_update
 
 HOME, FORM, PROGRESS, RESULT, SETTINGS = 0, 1, 2, 3, 4
@@ -163,6 +166,9 @@ class MainWindow(QMainWindow):
         title.setObjectName("title")
         title.mousePressEvent = self._logo_click  # type: ignore[method-assign]
         layout.addWidget(title)
+        version = QLabel(version_label())
+        version.setObjectName("faint")
+        layout.addWidget(version)
         muted = QLabel(tr("subtitle"))
         muted.setObjectName("muted")
         layout.addWidget(muted)
@@ -180,11 +186,24 @@ class MainWindow(QMainWindow):
         settings = QPushButton(tr("settings"))
         settings.clicked.connect(self._open_settings)
         layout.addWidget(settings)
+        about = QPushButton(tr("about"))
+        about.clicked.connect(self._show_about)
+        layout.addWidget(about)
         outer.addWidget(card)
         self._egg = QLabel("")
         self._egg.setObjectName("muted")
         outer.addWidget(self._egg)
         return page
+
+    def about_text(self) -> str:
+        return version_label()
+
+    def _show_about(self) -> None:
+        box = QMessageBox(self)
+        box.setWindowTitle(tr("about"))
+        box.setText(tr("app"))
+        box.setInformativeText(self.about_text())
+        box.exec()
 
     def _logo_click(self, event: object) -> None:
         del event
@@ -295,11 +314,10 @@ class MainWindow(QMainWindow):
         self.settings_status.setObjectName("faint")
         self.settings_status.setWordWrap(True)
         layout.addWidget(self.settings_status)
-        save = QPushButton(tr("settings_save"))
-        save.setObjectName("primary")
+        save = self._icon_button(tr("settings_save"), "save", primary=True)
         save.clicked.connect(self._save_settings)
         layout.addWidget(save)
-        self.download_uncensored = QPushButton(tr("settings_download"))
+        self.download_uncensored = self._icon_button(tr("settings_download"), "download")
         self.download_uncensored.clicked.connect(self._download_uncensored)
         layout.addWidget(self.download_uncensored)
         back = QPushButton(tr("back"))
@@ -473,21 +491,69 @@ class MainWindow(QMainWindow):
         card, layout = self._card()
         self.result_label = QLabel(tr("done"))
         self.result_label.setWordWrap(True)
-        open_button = QPushButton(tr("result"))
-        open_button.setObjectName("primary")
+        open_button = self._icon_button(tr("result"), "export", primary=True)
         open_button.clicked.connect(self._open_export)
+        save_as = self._icon_button(tr("save_as"), "save-as")
+        save_as.clicked.connect(self._save_as)
+        save_copy = self._icon_button(tr("save_copy"), "save-copy")
+        save_copy.clicked.connect(self._save_copy)
         self.sound_button = QPushButton(tr("sound_markup"))
         self.sound_button.clicked.connect(self._add_sound)
         layout.addWidget(self.result_label)
         layout.addWidget(open_button)
+        layout.addWidget(save_as)
+        layout.addWidget(save_copy)
         layout.addWidget(self.sound_button)
         outer.addWidget(card)
         return page
+
+    def _icon_button(self, text: str, icon: str, *, primary: bool = False) -> QPushButton:
+        button = QPushButton(text)
+        color = TEXT_ON_PRIMARY if primary else TEXT
+        button.setIcon(suite_icon(icon, color))
+        button.setIconSize(QSize(22, 22))
+        if primary:
+            button.setObjectName("primary")
+        return button
 
     def _open_export(self) -> None:
         if self._project is None:
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._project.export_dir)))
+
+    def _save_as(self) -> None:
+        if self._project is None:
+            return
+        folder = QFileDialog.getExistingDirectory(self, tr("save_as"))
+        if not folder:
+            return
+        dest = Path(folder) / self._project.root.name
+        self._copy_project(dest)
+
+    def _save_copy(self) -> None:
+        if self._project is None:
+            return
+        src = self._project.root
+        dest = src.with_name(f"{src.name}-copy")
+        index = 2
+        while dest.exists():
+            dest = src.with_name(f"{src.name}-copy-{index}")
+            index += 1
+        self._copy_project(dest)
+
+    def _copy_project(self, dest: Path) -> None:
+        if self._project is None:
+            return
+        src = self._project.root.resolve()
+        target = dest.resolve()
+        if target == src or src in target.parents:
+            QMessageBox.warning(self, tr("app"), tr("save_as"))
+            return
+        if target.exists():
+            QMessageBox.warning(self, tr("app"), str(target))
+            return
+        shutil.copytree(src, target)
+        self.result_label.setText(f"{tr('done')}\n{target}")
 
     def request_from_form(self) -> BookRequest:
         chapters = self.chapters.value()

@@ -3,21 +3,37 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
 
-from plotweaver.appinfo import APP_VERSION
+from plotweaver.appinfo import APP_VERSION, release_title, version_label
 from plotweaver.llama_release import LLAMA_BUILD, bundled_runtime_dir, ensure_llama_server
 from plotweaver.paths import _marked_root, repo_root
 
 
 def test_version_is_shared() -> None:
     root = repo_root()
+    payload = json.loads((root / "BUILD.json").read_text(encoding="utf-8"))
+    assert payload["version"] == "0.2.0"
+    assert payload["prerelease"] == "rc1"
+    assert payload["codename"] == "Sefer"
+    assert payload["build"] is None
+    assert APP_VERSION == "0.2.0rc1"
+    assert version_label() == '0.2.0 RC · build dev "Sefer"'
+    assert release_title(52) == '0.2.0 RC · build 52 "Sefer"'
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
-    assert f'version = "{APP_VERSION}"' in project
-    assert f'#define MyAppVersion "{APP_VERSION}"' in installer
+    windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
+    linux = (root / "packaging" / "linux" / "build-package.sh").read_text(encoding="utf-8")
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert 'version = {attr = "plotweaver.appinfo.APP_VERSION"}' in project
+    assert 'MyAppVersion "0.2.0rc1"' not in installer
+    assert "BUILD.json supplies MyAppVersion" in installer
+    assert "APP_VERSION" in windows
+    assert "APP_VERSION" in linux
+    assert "release_title" in workflow
 
 
 def test_choose_cpython_prefers_the_patch_install(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 [project]
 name = "voxprint-plotweaver"
-version = "0.2.0rc1"
+dynamic = ["version"]
 description = "Voxprint AI Plotweaver writes a whole novel from a synopsis with local LLMs."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -33,6 +33,9 @@ plotweaver = "plotweaver.cli:main"
 Homepage = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
 Repository = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
 
+[tool.setuptools.dynamic]
+version = {attr = "plotweaver.appinfo.APP_VERSION"}
+
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
@@ -41,7 +44,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-plotweaver = ["data/fb2/*"]
+plotweaver = ["data/fb2/*", "ui/icons/*.svg"]
 
 [tool.ruff]
 target-version = "py314"

@@ -468,6 +468,29 @@ def bind_rendered(
     return vx_chapters, with_given_aliases([*people, *extras])
 
 
+def export_output_names(formats: Collection[str] | None, *, sound: bool) -> list[str]:
+    """Files a generate or export run writes. Paths are relative to the export directory."""
+    names = ["book.vxbook", "overlap-report.json"]
+    for kind in _selected_formats(formats):
+        match kind:
+            case ExportFormat.EPUB:
+                names.append("book.epub")
+            case ExportFormat.FB2:
+                names.append("book.fb2")
+            case ExportFormat.DOCX:
+                names.append("book.docx")
+            case ExportFormat.MARKDOWN:
+                names.append("book.md")
+            case ExportFormat.SPEAKER_MARKS:
+                names.append("audiobook/book.md")
+                names.append("audiobook/speaker-marks.txt")
+            case _ as unreachable:
+                assert_never(unreachable)
+    if sound:
+        names.append("book.sound.vxbook")
+    return names
+
+
 def _selected_formats(formats: Collection[str] | None) -> list[ExportFormat]:
     names = ["epub"]
     if formats:

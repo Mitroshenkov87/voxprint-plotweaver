@@ -14,7 +14,7 @@ from typing import Any
 from plotweaver.atomic import write_json
 from plotweaver.checks import chapter_problems, is_refusal, is_sanitised
 from plotweaver.domain import BookMode, BookRequest, Gender, ModelTier, parse_gender
-from plotweaver.errors import ModelOutputError, assert_never
+from plotweaver.errors import ModelOutputError, PlotweaverError, assert_never
 from plotweaver.export import (
     RenderedChapter,
     RenderedParagraph,
@@ -83,6 +83,58 @@ def run_book(
     job = f"book:{project.request().title}"
     with gpu_job(job, eta_s=10 * 3600):
         return engine.run()
+
+
+def export_book(
+    project: Project,
+    backend: LLMBackend | None,
+    *,
+    formats: list[str],
+    sound: bool,
+    export_to: Path | None,
+) -> Path:
+    """Write the export bundle for a project that already has an outline.
+
+    This does not draft. Sound markup is the only step that calls a model.
+    """
+    request = project.request()
+    request.export_formats = list(formats)
+    request.sound_markup = sound
+    if not (project.artefacts / "outline.json").is_file():
+        raise PlotweaverError("the project has no outline to export")
+    outline = _obj(project.read_artefact("outline.json"))
+    chapters = [item for item in _list(outline.get("chapters")) if isinstance(item, dict)]
+    if not chapters:
+        raise PlotweaverError("the outline has no chapters")
+    if sound and backend is None:
+        raise PlotweaverError("sound markup needs a model")
+    if not request.created:
+        request.created = even_utc_now()
+    project.save_request(request)
+    overlap_path = project.artefacts / "overlap.json"
+    overlap = _obj(project.read_artefact("overlap.json")) if overlap_path.is_file() else {}
+    rendered = _render(project, request, chapters)
+    directory = project.export_dir
+    write_bundle(
+        directory,
+        request.title,
+        request.language.value,
+        rendered,
+        overlap,
+        author=request.author,
+        genre=request.genre,
+        synopsis=request.synopsis,
+        formats=request.export_formats,
+        created=request.created,
+        speakers=build_character_speakers(_character_rows(project)),
+    )
+    if sound:
+        assert backend is not None
+        add_sound(directory / "book.vxbook", directory / "book.sound.vxbook", backend)
+    if export_to is not None:
+        publish_exports(directory, export_to)
+        return export_to
+    return directory
 
 
 class _Engine:
