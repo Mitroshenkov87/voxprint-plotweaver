@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PLOTWEAVER_NO_UPDATE_CHECK: "1"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Qt libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libglib2.0-0 libdbus-1-3 libxkbcommon0 libfontconfig1 libx11-xcb1 libxcb1
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+          mypy src
+          bandit -c pyproject.toml -r src -ll
+      - name: Tests
+        run: pytest
+      - name: Mock bake-off and Mars scripts
+        if: runner.os == 'Linux'
+        run: |
+          PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --mock --limit 1 --results "$RUNNER_TEMP/bakeoff"
+          PLOTWEAVER_MOCK=1 PLOTWEAVER_MARS_OUT="$RUNNER_TEMP/mars" bash scripts/e2e_mars.sh
+      - name: pip-audit
+        run: pip-audit --skip-editable
+      - name: gitleaks
+        if: runner.os == 'Linux'
+        run: |
+          curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --source . --config .gitleaks.toml --redact --exit-code 1
+
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inno Setup
+        run: choco install innosetup -y
+      - name: Compile installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\plotweaver.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup
+          path: packaging/windows/Output/*.exe
+
+  linux-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package
+        run: bash packaging/linux/build-package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            dist/*.tar.gz
+            dist/*.deb

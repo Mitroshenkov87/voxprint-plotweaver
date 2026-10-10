@@ -1,0 +1,5 @@
+title = "plotweaver"
+
+[allowlist]
+description = "The README ends with the public suite donation block copied from Movie Dubber."
+paths = ['''README\.md''']
