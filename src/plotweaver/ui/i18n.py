@@ -1,0 +1,119 @@
+"""UI strings. English is the default. Russian and German cover the same keys."""
+
+from __future__ import annotations
+
+import os
+
+STRINGS: dict[str, dict[str, str]] = {
+    "en": {
+        "app": "Voxprint AI Plotweaver",
+        "new": "New book",
+        "subtitle": "A synopsis in. A novel out. Local models only.",
+        "title": "Title",
+        "author": "Author",
+        "language": "Language",
+        "synopsis": "Synopsis",
+        "references": "Reference books (structure and style only)",
+        "add_ref": "Add reference",
+        "dark": "Dark/mature themes",
+        "tier": "Model tier",
+        "tier_standard": "Standard",
+        "tier_low": "Low-refusal",
+        "words": "Target words",
+        "chapters": "Chapters (0 = automatic)",
+        "formats": "Export",
+        "export_epub": "EPUB 3 (default)",
+        "export_fb2": "FictionBook 2.1",
+        "export_docx": "DOCX",
+        "export_markdown": "Markdown",
+        "mode": "Mode",
+        "start": "Write the book",
+        "approve": "Approve and continue",
+        "progress": "Progress",
+        "result": "Result",
+        "back": "Back",
+        "mock": "Mock model (no GPU)",
+        "waiting": "Waiting for approval",
+        "done": "Export is ready",
+        "egg": "The loom is awake.",
+        "gpu_note": "A real run needs an NVIDIA RTX 40-series GPU or newer.",
+    },
+    "ru": {
+        "app": "Voxprint AI Plotweaver",
+        "new": "Новая книга",
+        "subtitle": "Синопсис на входе. Роман на выходе. Только локальные модели.",
+        "title": "Название",
+        "author": "Автор",
+        "language": "Язык",
+        "synopsis": "Синопсис",
+        "references": "Книги-образцы (только структура и стиль)",
+        "add_ref": "Добавить образец",
+        "dark": "Тёмные и взрослые темы",
+        "tier": "Класс модели",
+        "tier_standard": "Обычная",
+        "tier_low": "С низкой отказностью",
+        "words": "Объём, слов",
+        "chapters": "Глав (0 = само)",
+        "formats": "Экспорт",
+        "export_epub": "EPUB 3 (по умолчанию)",
+        "export_fb2": "FictionBook 2.1",
+        "export_docx": "DOCX",
+        "export_markdown": "Markdown",
+        "mode": "Режим",
+        "start": "Написать книгу",
+        "approve": "Утвердить и продолжить",
+        "progress": "Ход работы",
+        "result": "Результат",
+        "back": "Назад",
+        "mock": "Учебная модель (без GPU)",
+        "waiting": "Ждёт утверждения",
+        "done": "Экспорт готов",
+        "egg": "Станок проснулся.",
+        "gpu_note": "Настоящий запуск требует NVIDIA RTX 40-й серии или новее.",
+    },
+    "de": {
+        "app": "Voxprint AI Plotweaver",
+        "new": "Neues Buch",
+        "subtitle": "Eine Synopsis hinein. Ein Roman heraus. Nur lokale Modelle.",
+        "title": "Titel",
+        "author": "Autor",
+        "language": "Sprache",
+        "synopsis": "Synopsis",
+        "references": "Referenzbücher (nur Struktur und Stil)",
+        "add_ref": "Referenz hinzufügen",
+        "dark": "Düstere und erwachsene Themen",
+        "tier": "Modellstufe",
+        "tier_standard": "Standard",
+        "tier_low": "Wenig Ablehnung",
+        "words": "Zielwörter",
+        "chapters": "Kapitel (0 = automatisch)",
+        "formats": "Export",
+        "export_epub": "EPUB 3 (Standard)",
+        "export_fb2": "FictionBook 2.1",
+        "export_docx": "DOCX",
+        "export_markdown": "Markdown",
+        "mode": "Modus",
+        "start": "Buch schreiben",
+        "approve": "Freigeben und weiter",
+        "progress": "Fortschritt",
+        "result": "Ergebnis",
+        "back": "Zurück",
+        "mock": "Ersatzmodell (ohne GPU)",
+        "waiting": "Wartet auf Freigabe",
+        "done": "Export ist fertig",
+        "egg": "Der Webstuhl ist wach.",
+        "gpu_note": "Ein echter Lauf braucht eine NVIDIA RTX 40 oder neuer.",
+    },
+}
+
+
+def ui_language() -> str:
+    raw = os.environ.get("PLOTWEAVER_LANG", "en").lower()
+    if raw in STRINGS:
+        return raw
+    return "en"
+
+
+def tr(key: str, language: str | None = None) -> str:
+    catalog = STRINGS[language or ui_language()]
+    return catalog.get(key, STRINGS["en"][key])
