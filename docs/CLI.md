@@ -3,7 +3,7 @@
 `plotweaver --version` and `plotweaver version` print the display label and nothing else:
 
 ```text
-0.2.0 RC · build dev "Sefer"
+0.2.0 RC · build dev "Rikmah"
 ```
 
 `BUILD.json` at the repository root is the source for the version, the prerelease, the codename, and the build offset. A packaged CI build replaces `dev` with `GITHUB_RUN_NUMBER + offset`. A final release (`prerelease` null or empty) drops ` RC`.

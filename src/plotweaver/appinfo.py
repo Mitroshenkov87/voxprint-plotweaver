@@ -48,7 +48,7 @@ def load_build() -> dict[str, Any]:
 
 
 def package_version(info: dict[str, Any] | None = None) -> str:
-    """PEP 440 version. A prerelease of rc1 on 0.2.0 is 0.2.0rc1."""
+    """PEP 440 version. A prerelease of rc2 on 0.2.0 is 0.2.0rc2."""
     payload = load_build() if info is None else info
     version = str(payload["version"])
     pre = payload.get("prerelease")
@@ -76,7 +76,7 @@ def _build_marker(info: dict[str, Any]) -> str:
 
 
 def version_label(info: dict[str, Any] | None = None) -> str:
-    """Display form: `X.Y.Z RC · build N "Sefer"`. Final releases drop RC."""
+    """Display form: `X.Y.Z RC · build N "Codename"`. Final releases drop RC."""
     payload = load_build() if info is None else info
     version = str(payload["version"])
     codename = str(payload["codename"])

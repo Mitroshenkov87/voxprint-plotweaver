@@ -134,7 +134,7 @@ def test_suite_icons_and_splash() -> None:
     assert splash.version_text == version_label()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Sefer"'
+    assert window.about_text() == '0.2.0 RC · build dev "Rikmah"'
     save = next(
         button
         for button in window.findChildren(type(window.download_uncensored))

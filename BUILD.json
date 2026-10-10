@@ -1,8 +1,8 @@
 {
   "version": "0.2.0",
-  "prerelease": "rc1",
-  "codename": "Sefer",
+  "prerelease": "rc2",
+  "codename": "Rikmah",
   "offset": 0,
   "build": null,
-  "offset_note": "CI stamps build = GITHUB_RUN_NUMBER + offset into the packaged BUILD.json. A null build is a local dev build and displays as dev. A null or empty prerelease is a final release and drops RC from the label. The package version is version + prerelease, for example 0.2.0rc1."
+  "offset_note": "CI stamps build = GITHUB_RUN_NUMBER + offset into the packaged BUILD.json. A null build is a local dev build and displays as dev. A null or empty prerelease is a final release and drops RC from the label. The package version is version + prerelease, for example 0.2.0rc2."
 }
