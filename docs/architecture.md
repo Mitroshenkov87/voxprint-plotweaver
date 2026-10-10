@@ -27,9 +27,9 @@ The toggle is chosen when the book is created.
 
 Off: the main model does every step. A refusal is kept as a narrator paragraph and counted. There is no swap.
 
-On: pass 1 drafts the book. A scene beat marked dark, or a refusal on a dark scene, becomes a placeholder (beats, point of view, emotional goal, links to the neighbouring scenes). Pass 2 loads the low-refusal model once, fills every placeholder from the neighbouring text, and proofreads the book before unloading. There is no second verification model and no rollback loop.
+On: pass 1 drafts the book. A scene beat marked dark, or a refusal on a dark scene, becomes a placeholder (beats, point of view, emotional goal, links to the neighbouring scenes). Pass 2 loads the least-censored model once, fills every placeholder from the neighbouring text, and proofreads the book before unloading. There is no second verification model and no rollback loop. Least censored means the most permissive model that fits the card. It is not necessarily an abliterated tune. Plotweaver downloads finished GGUF files pinned by revision and SHA-256. Abliteration and quantization belong in Voxprint Model Forge, not in this repo. A forge file that is not published yet stays a disabled registry row. Models that need 20 GB of VRAM are optional downloads, controlled from Settings.
 
-If the tier is low-refusal and no separate low-refusal file is set, both passes are the same model and nothing is swapped.
+If the tier is least censored and no separate file is set, both passes are the same model and nothing is swapped.
 
 ## References
 

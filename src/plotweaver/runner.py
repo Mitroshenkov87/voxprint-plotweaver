@@ -2,7 +2,7 @@
 
 Dark-themes OFF: the main model plans, drafts, checks, and proofreads. No swap.
 Dark-themes ON: pass 1 leaves dark or refused scenes as placeholders. Pass 2 loads the
-low-refusal model once, fills every placeholder, and proofreads while that model is loaded.
+least-censored model once, fills every placeholder, and proofreads while that model is loaded.
 """
 
 from __future__ import annotations
@@ -590,17 +590,17 @@ class _Engine:
 
 def _specs(request: BookRequest) -> tuple[ModelSpec, ModelSpec]:
     main_id = request.main_model_id or "mock-main"
-    low_id = request.low_refusal_model_id or "mock-low"
+    low_id = request.least_censored_model_id or "mock-low"
     main_path = Path(request.main_gguf) if request.main_gguf else Path(f"{main_id}.gguf")
     low_path = (
-        Path(request.low_refusal_gguf) if request.low_refusal_gguf else Path(f"{low_id}.gguf")
+        Path(request.least_censored_gguf) if request.least_censored_gguf else Path(f"{low_id}.gguf")
     )
-    if request.tier is ModelTier.LOW_REFUSAL and not request.low_refusal_gguf:
+    if request.tier is ModelTier.LEAST_CENSORED and not request.least_censored_gguf:
         low_id = main_id
         low_path = main_path
     main = ModelSpec(main_id, main_path, license="Apache-2.0")
     low = ModelSpec(low_id, low_path, license="Apache-2.0")
-    if request.tier is ModelTier.LOW_REFUSAL and main.id == low.id:
+    if request.tier is ModelTier.LEAST_CENSORED and main.id == low.id:
         return main, low
     return main, low
 

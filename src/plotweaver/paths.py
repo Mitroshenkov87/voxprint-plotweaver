@@ -32,6 +32,10 @@ def models_dir() -> Path:
 
 
 def suite_state_dir() -> Path:
+    """Suite settings folder. Override with PLOTWEAVER_STATE."""
+    override = os.environ.get("PLOTWEAVER_STATE")
+    if override:
+        return Path(override)
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA")
         root = Path(base) if base else Path.home() / "AppData" / "Local"

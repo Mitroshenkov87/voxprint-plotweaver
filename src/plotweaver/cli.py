@@ -50,9 +50,9 @@ def main(argv: list[str] | None = None) -> int:
     scenario.add_argument("--mock", action="store_true")
     scenario.add_argument("--yes", action="store_true", help="Skip bible and outline approval.")
     scenario.add_argument("--main-gguf", default="")
-    scenario.add_argument("--low-refusal-gguf", default="")
+    scenario.add_argument("--least-censored-gguf", default="")
     scenario.add_argument("--main-model-id", default="")
-    scenario.add_argument("--low-refusal-model-id", default="")
+    scenario.add_argument("--least-censored-model-id", default="")
     _add_export_args(scenario)
     scenario.set_defaults(func=_scenario_mars)
 
@@ -112,7 +112,12 @@ def _add_book_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--chapters", type=int, default=0)
     parser.add_argument("--scenes-per-chapter", type=int, default=2)
     parser.add_argument("--dark-themes", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--tier", choices=["standard", "low-refusal"], default="standard")
+    parser.add_argument(
+        "--tier",
+        choices=[ModelTier.STANDARD.value, ModelTier.LEAST_CENSORED.value],
+        default=ModelTier.STANDARD.value,
+        help="standard, or least-censored (the most permissive model that fits).",
+    )
     parser.add_argument("--mode", choices=["autopilot", "copilot", "manual"], default="autopilot")
     parser.add_argument("--reference", action="append", default=[])
     parser.add_argument("--mock", action="store_true")
@@ -122,9 +127,9 @@ def _add_book_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--export-dir", type=Path)
     parser.add_argument("--main-gguf", default="")
-    parser.add_argument("--low-refusal-gguf", default="")
+    parser.add_argument("--least-censored-gguf", default="")
     parser.add_argument("--main-model-id", default="")
-    parser.add_argument("--low-refusal-model-id", default="")
+    parser.add_argument("--least-censored-model-id", default="")
     _add_export_args(parser)
 
 
@@ -212,11 +217,13 @@ def _apply_models(request: BookRequest, args: argparse.Namespace) -> None:
         request.main_model_id = args.main_model_id or Path(args.main_gguf).stem
     elif args.main_model_id:
         request.main_model_id = args.main_model_id
-    if args.low_refusal_gguf:
-        request.low_refusal_gguf = args.low_refusal_gguf
-        request.low_refusal_model_id = args.low_refusal_model_id or Path(args.low_refusal_gguf).stem
-    elif args.low_refusal_model_id:
-        request.low_refusal_model_id = args.low_refusal_model_id
+    if args.least_censored_gguf:
+        request.least_censored_gguf = args.least_censored_gguf
+        request.least_censored_model_id = (
+            args.least_censored_model_id or Path(args.least_censored_gguf).stem
+        )
+    elif args.least_censored_model_id:
+        request.least_censored_model_id = args.least_censored_model_id
     if not args.mock and not request.main_gguf:
         raise PlotweaverError(
             "A real run needs --main-gguf PATH. "
@@ -255,9 +262,9 @@ def _run(args: argparse.Namespace) -> int:
         if not request.main_gguf:
             request.main_gguf = stored.main_gguf
             request.main_model_id = stored.main_model_id
-        if not request.low_refusal_gguf:
-            request.low_refusal_gguf = stored.low_refusal_gguf
-            request.low_refusal_model_id = stored.low_refusal_model_id
+        if not request.least_censored_gguf:
+            request.least_censored_gguf = stored.least_censored_gguf
+            request.least_censored_model_id = stored.least_censored_model_id
         project.save_request(request)
     result = run_book(
         project,
@@ -276,15 +283,17 @@ def _run(args: argparse.Namespace) -> int:
 def _scenario_mars(args: argparse.Namespace) -> int:
     request = mars_request()
     request.main_gguf = args.main_gguf
-    request.low_refusal_gguf = args.low_refusal_gguf
+    request.least_censored_gguf = args.least_censored_gguf
     if args.main_gguf:
         request.main_model_id = args.main_model_id or Path(args.main_gguf).stem
     elif args.main_model_id:
         request.main_model_id = args.main_model_id
-    if args.low_refusal_gguf:
-        request.low_refusal_model_id = args.low_refusal_model_id or Path(args.low_refusal_gguf).stem
-    elif args.low_refusal_model_id:
-        request.low_refusal_model_id = args.low_refusal_model_id
+    if args.least_censored_gguf:
+        request.least_censored_model_id = (
+            args.least_censored_model_id or Path(args.least_censored_gguf).stem
+        )
+    elif args.least_censored_model_id:
+        request.least_censored_model_id = args.least_censored_model_id
     request.author = args.author
     request.export_formats = _export_formats(args)
     request.sound_markup = bool(args.sound)

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
+from plotweaver.settings import optional_models_preference
 from plotweaver.ui.i18n import STRINGS
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
@@ -42,6 +43,20 @@ def test_catalogues_share_keys() -> None:
     english = set(STRINGS["en"])
     assert set(STRINGS["ru"]) == english
     assert set(STRINGS["de"]) == english
+
+
+def test_settings_page_saves_optional_models(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    window._open_settings()
+    assert window.stack.currentIndex() == 4
+    window.optional_models.setChecked(True)
+    window._save_settings()
+    assert optional_models_preference() is True
+    assert window.settings_status.text()
+    del app
 
 
 def test_window_selftest(tmp_path: Path) -> None:

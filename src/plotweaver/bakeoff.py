@@ -22,8 +22,9 @@ from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import ChatMessage, LLMBackend, MockBackend, ModelSpec
 from plotweaver.paths import repo_root
 from plotweaver.prompts import judge_prompt, system_message
-from plotweaver.registry import RegistryEntry, download_model, load_registry
+from plotweaver.registry import RegistryEntry, download_decision, download_model, load_registry
 from plotweaver.runner import run_book
+from plotweaver.settings import optional_models_preference
 from plotweaver.store import Project
 from plotweaver.vxbook import legacy_pair
 
@@ -143,7 +144,7 @@ def _split_roles(
     # Real ids from the registry are attached via spec.id. The download step stored role
     # in a sidecar next to the file name: we re-read the registry.
     entries = [entry for entry in load_registry(registry_path()) if _matches(entry, specs)]
-    low_ids = {entry.id for entry in entries if entry.role == "low-refusal"}
+    low_ids = {entry.id for entry in entries if entry.role == "least-censored"}
     main_ids = [entry.id for entry in entries if entry.role == "main"]
     low_specs = [spec for spec in specs if spec.id in low_ids]
     chosen = next((spec for spec in specs if spec.id == (main_ids[0] if main_ids else "")), None)
@@ -157,10 +158,18 @@ def _matches(entry: RegistryEntry, specs: list[ModelSpec]) -> bool:
 def _real_specs(allow_other: bool) -> list[ModelSpec]:
     gpu = query_gpu()
     free = gpu.free_gb if gpu else 0.0
+    total = gpu.total_gb if gpu else None
+    preference = optional_models_preference()
     specs: list[ModelSpec] = []
     for entry in load_registry(registry_path()):
-        if entry.min_vram_gb > free + 0.5:
-            print(f"skip {entry.id}: needs {entry.min_vram_gb} GB, {free:.1f} GB free")
+        reason = download_decision(
+            entry,
+            free_gb=free,
+            total_vram_gb=total,
+            optional_preference=preference,
+        )
+        if reason is not None:
+            print(f"skip {entry.id}: {reason}")
             continue
         path = download_model(entry, allow_other=allow_other)
         specs.append(
@@ -204,12 +213,14 @@ def _one_book(
         chapter_count=chapters,
         scenes_per_chapter=2,
         dark_themes=dark,
-        tier=ModelTier.LOW_REFUSAL if main.id == low.id and dark else ModelTier.STANDARD,
+        tier=ModelTier.LEAST_CENSORED if main.id == low.id and dark else ModelTier.STANDARD,
         mode=BookMode.AUTOPILOT,
         main_model_id=main.id,
-        low_refusal_model_id=low.id,
+        least_censored_model_id=low.id,
         main_gguf=str(main.path) if main.path.suffix == ".gguf" and main.path.is_file() else "",
-        low_refusal_gguf=str(low.path) if low.path.suffix == ".gguf" and low.path.is_file() else "",
+        least_censored_gguf=(
+            str(low.path) if low.path.suffix == ".gguf" and low.path.is_file() else ""
+        ),
     )
     project = Project.open_or_create(project_dir, request)
     started = time.monotonic()
@@ -220,7 +231,7 @@ def _one_book(
         {
             "status": result.status,
             "model_id": main.id,
-            "low_refusal_model_id": low.id,
+            "least_censored_model_id": low.id,
             "synopsis_id": story.id,
             "dark_themes": dark,
             "genre": story.genre,

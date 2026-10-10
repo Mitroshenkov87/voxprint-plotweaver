@@ -24,7 +24,7 @@ def _request(tmp: Path, *, dark: bool, chapters: int = 2) -> BookRequest:
         tier=ModelTier.STANDARD,
         mode=BookMode.AUTOPILOT,
         main_model_id="mock-main",
-        low_refusal_model_id="mock-low",
+        least_censored_model_id="mock-low",
     )
 
 

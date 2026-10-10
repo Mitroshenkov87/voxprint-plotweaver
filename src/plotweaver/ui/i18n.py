@@ -18,7 +18,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "dark": "Dark/mature themes",
         "tier": "Model tier",
         "tier_standard": "Standard",
-        "tier_low": "Low-refusal",
+        "tier_least_censored": "Least censored",
         "words": "Target words",
         "chapters": "Chapters (0 = automatic)",
         "formats": "Export",
@@ -39,6 +39,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "done": "Export is ready",
         "egg": "The loom is awake.",
         "gpu_note": "A real run needs an NVIDIA RTX 40-series GPU or newer.",
+        "settings": "Settings",
+        "settings_optional": "Download models that need 20 GB of VRAM",
+        "settings_optional_note": (
+            "With no saved choice, models that need 20 GB of VRAM download only on a 20 GB GPU."
+        ),
+        "settings_save": "Save",
+        "settings_saved": "Saved.",
     },
     "ru": {
         "app": "Voxprint AI Plotweaver",
@@ -53,7 +60,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "dark": "Тёмные и взрослые темы",
         "tier": "Класс модели",
         "tier_standard": "Обычная",
-        "tier_low": "С низкой отказностью",
+        "tier_least_censored": "Наименее цензурированная",
         "words": "Объём, слов",
         "chapters": "Глав (0 = само)",
         "formats": "Экспорт",
@@ -74,6 +81,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "done": "Экспорт готов",
         "egg": "Станок проснулся.",
         "gpu_note": "Настоящий запуск требует NVIDIA RTX 40-й серии или новее.",
+        "settings": "Настройки",
+        "settings_optional": "Скачивать модели, которым нужно 20 ГБ видеопамяти",
+        "settings_optional_note": (
+            "Без сохранённого выбора такие модели скачиваются только на GPU от 20 ГБ."
+        ),
+        "settings_save": "Сохранить",
+        "settings_saved": "Сохранено.",
     },
     "de": {
         "app": "Voxprint AI Plotweaver",
@@ -88,7 +102,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "dark": "Düstere und erwachsene Themen",
         "tier": "Modellstufe",
         "tier_standard": "Standard",
-        "tier_low": "Wenig Ablehnung",
+        "tier_least_censored": "Am wenigsten zensiert",
         "words": "Zielwörter",
         "chapters": "Kapitel (0 = automatisch)",
         "formats": "Export",
@@ -109,6 +123,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "done": "Export ist fertig",
         "egg": "Der Webstuhl ist wach.",
         "gpu_note": "Ein echter Lauf braucht eine NVIDIA RTX 40 oder neuer.",
+        "settings": "Einstellungen",
+        "settings_optional": "Modelle laden, die 20 GB Videospeicher brauchen",
+        "settings_optional_note": (
+            "Ohne gespeicherte Wahl laden diese Modelle nur auf einer GPU ab 20 GB."
+        ),
+        "settings_save": "Speichern",
+        "settings_saved": "Gespeichert.",
     },
 }
 

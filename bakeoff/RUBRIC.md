@@ -1,6 +1,6 @@
 # Bake-off rubric
 
-The GPU machine writes ten Russian synopses, three chapters each, once per candidate, then writes the same synopses again with dark themes on: the main model drafts, and one low-refusal model fills the dark placeholders in a single swap. An AI judge scores each export. A person then reads a blind packet.
+The GPU machine writes ten Russian synopses, three chapters each, once per candidate, then writes the same synopses again with dark themes on: the main model drafts, and one least-censored model fills the dark placeholders in a single swap. Least censored means the most permissive model that fits, not necessarily an abliterated tune. An AI judge scores each export, including that Russian prose. A person then reads a blind packet.
 
 Scores are integers from 1 to 5. The judge prompt in `plotweaver.prompts` asks for the same axes. A human reader uses this page and does not open `assignment-key.json` until the notes are written.
 

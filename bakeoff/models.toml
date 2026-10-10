@@ -45,8 +45,64 @@ moe = false
 notes = "16 GB standard drafter. Same file Audiobook Builder stores at <models>/llm/gemma-4-12b-it-Q4_K_M.gguf."
 
 [[model]]
+id = "t-lite-it-2.1-q4"
+role = "main"
+card = "16gb"
+repo = "t-tech/T-lite-it-2.1-GGUF"
+revision = "fc10186e59064c2e74f59c3d5dbce233931b3b81"
+filename = "T-lite-it-2.1-Q4_K_M.gguf"
+sha256 = "68c75f5940c36baca18113058ad3d55f6d1d3e1123a8053bb4bba8481805c960"
+size = 5027750240
+license = "apache-2.0"
+base_repo = "t-tech/T-lite-it-2.1"
+base_revision = "d125c970c553de58fcee3c937d5e4867d4a448d8"
+base_license = "apache-2.0"
+min_vram_gb = 6
+context = 8192
+moe = false
+notes = "16 GB stock Russian candidate. Official T-lite-it-2.1 and this Q4_K_M quant are Apache-2.0."
+
+[[model]]
+id = "mistral-small-3.2-24b-q4"
+role = "least-censored"
+card = "16gb"
+default = true
+repo = "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF"
+revision = "b750ec2299225e492f1bd27cab88a0a595fa848f"
+filename = "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
+sha256 = "a3cc56310807ed0d145eaf9f018ccda9ae7ad8edb41ec870aa2454b0d4700b3c"
+size = 14333922848
+license = "apache-2.0"
+base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
+base_license = "apache-2.0"
+min_vram_gb = 15
+context = 8192
+moe = false
+notes = "16 GB least-censored default. Newest 24B Mistral Small (3.2, Instruct 2506). Official card and this quant are Apache-2.0. Stock instruct model, not an abliteration."
+
+[[model]]
+id = "mistral-small-3.2-24b-abliterated-q4"
+role = "least-censored"
+card = "16gb"
+enabled = false
+repo = "Mitroshenkov87/voxprint-model-forge"
+revision = ""
+filename = "mistral-small-3.2-24b-abliterated-Q4_K_M.gguf"
+sha256 = ""
+size = 0
+license = ""
+base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
+base_license = "apache-2.0"
+min_vram_gb = 15
+context = 8192
+moe = false
+notes = "Disabled placeholder. Voxprint Model Forge has not published this file. Plotweaver does not abliterate or quantize."
+
+[[model]]
 id = "qwen3.6-27b-abliterated-q4"
-role = "low-refusal"
+role = "least-censored"
 card = "24gb"
 repo = "mradermacher/Huihui-Qwen3.6-27B-abliterated-GGUF"
 revision = "530e4cbae44f7a27396a8705f9fe802764ba6103"
@@ -60,11 +116,11 @@ base_license = "apache-2.0"
 min_vram_gb = 18
 context = 8192
 moe = false
-notes = "24 GB low-refusal pass. Quant and base cards are both Apache-2.0."
+notes = "24 GB least-censored pass. Quant and base cards are both Apache-2.0. Abliterated, so it is one candidate, not the definition of the tier."
 
 [[model]]
 id = "gemma-4-31b-abliterated-q4"
-role = "low-refusal"
+role = "least-censored"
 card = "24gb"
 repo = "paperscarecrow/Gemma-4-31B-it-abliterated"
 revision = "2491ee58472b82a2372d288f982943b9d5e6a82c"
@@ -78,4 +134,4 @@ base_license = "apache-2.0"
 min_vram_gb = 20
 context = 8192
 moe = false
-notes = "24 GB low-refusal pass. Base google/gemma-4-31b-it is Apache-2.0, and this quant's card is Apache-2.0."
+notes = "24 GB least-censored pass. Base google/gemma-4-31b-it is Apache-2.0, and this quant's card is Apache-2.0."

@@ -32,18 +32,20 @@ from PySide6.QtWidgets import (
 
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
-from plotweaver.hardware import require_supported_gpu
+from plotweaver.hardware import query_gpu, require_supported_gpu
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend, MockBackend
+from plotweaver.registry import OPTIONAL_VRAM_GB
 from plotweaver.runner import RunResult, run_book
+from plotweaver.settings import optional_models_preference, save_optional_models
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.ui.i18n import tr
 from plotweaver.ui.theme import build_style, enable_acrylic
 from plotweaver.update_check import check_for_update
 
-HOME, FORM, PROGRESS, RESULT = 0, 1, 2, 3
+HOME, FORM, PROGRESS, RESULT, SETTINGS = 0, 1, 2, 3, 4
 
 
 class _RunThread(QThread):
@@ -103,6 +105,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self._form())
         self.stack.addWidget(self._progress())
         self.stack.addWidget(self._result())
+        self.stack.addWidget(self._settings())
         self.setStyleSheet(build_style(glass=False))
 
     def showEvent(self, event: object) -> None:
@@ -138,6 +141,9 @@ class MainWindow(QMainWindow):
         button.setObjectName("primary")
         button.clicked.connect(lambda: self.stack.setCurrentIndex(FORM))
         layout.addWidget(button)
+        settings = QPushButton(tr("settings"))
+        settings.clicked.connect(self._open_settings)
+        layout.addWidget(settings)
         outer.addWidget(card)
         self._egg = QLabel("")
         self._egg.setObjectName("muted")
@@ -169,7 +175,7 @@ class MainWindow(QMainWindow):
         self.synopsis.setMinimumHeight(160)
         self.tier = QComboBox()
         self.tier.addItem(tr("tier_standard"), ModelTier.STANDARD.value)
-        self.tier.addItem(tr("tier_low"), ModelTier.LOW_REFUSAL.value)
+        self.tier.addItem(tr("tier_least_censored"), ModelTier.LEAST_CENSORED.value)
         self.mode = QComboBox()
         for mode in (BookMode.AUTOPILOT, BookMode.COPILOT, BookMode.MANUAL):
             self.mode.addItem(mode.value, mode.value)
@@ -225,6 +231,46 @@ class MainWindow(QMainWindow):
         layout.addWidget(start)
         outer.addWidget(card)
         return page
+
+    def _settings(self) -> QWidget:
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        card, layout = self._card()
+        title = QLabel(tr("settings"))
+        title.setObjectName("title")
+        layout.addWidget(title)
+        note = QLabel(tr("settings_optional_note"))
+        note.setObjectName("muted")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self.optional_models = QCheckBox(tr("settings_optional"))
+        layout.addWidget(self.optional_models)
+        self.settings_status = QLabel("")
+        self.settings_status.setObjectName("faint")
+        layout.addWidget(self.settings_status)
+        save = QPushButton(tr("settings_save"))
+        save.setObjectName("primary")
+        save.clicked.connect(self._save_settings)
+        layout.addWidget(save)
+        back = QPushButton(tr("back"))
+        back.clicked.connect(lambda: self.stack.setCurrentIndex(HOME))
+        layout.addWidget(back)
+        outer.addWidget(card)
+        return page
+
+    def _open_settings(self) -> None:
+        preference = optional_models_preference()
+        if preference is None:
+            gpu = query_gpu()
+            self.optional_models.setChecked(gpu is not None and gpu.total_gb >= OPTIONAL_VRAM_GB)
+        else:
+            self.optional_models.setChecked(preference)
+        self.settings_status.setText("")
+        self.stack.setCurrentIndex(SETTINGS)
+
+    def _save_settings(self) -> None:
+        save_optional_models(self.optional_models.isChecked())
+        self.settings_status.setText(tr("settings_saved"))
 
     def _add_ref(self) -> None:
         path, _selected = QFileDialog.getOpenFileName(
