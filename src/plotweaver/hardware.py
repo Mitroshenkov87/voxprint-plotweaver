@@ -36,6 +36,8 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 
 
 @dataclass(frozen=True)
 class GpuInfo:
+    """Name, compute capability, and memory of one NVIDIA GPU."""
+
     name: str
     compute_cap: float
     total_mib: float
@@ -111,6 +113,7 @@ def is_supported(info: GpuInfo) -> bool:
 
 
 def require_supported_gpu() -> GpuInfo:
+    """Return the GPU, or raise when it is not an RTX 40-series card or newer."""
     info = query_gpu()
     if info is None or not is_supported(info):
         found = info.name if info else "no NVIDIA GPU"

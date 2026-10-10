@@ -37,10 +37,12 @@ _SLOP = (
 
 
 def is_refusal(text: str) -> bool:
+    """True when the prose contains a model refusal."""
     return _REFUSAL.search(text) is not None
 
 
 def is_sanitised(text: str) -> bool:
+    """True when the prose contains a softening phrase."""
     lowered = text.lower()
     return any(phrase in lowered for phrase in _SANITISING)
 

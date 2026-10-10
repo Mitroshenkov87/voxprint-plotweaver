@@ -24,6 +24,12 @@ dev = [
   "mypy>=1.17",
   "bandit>=1.8",
   "pip-audit>=2.9",
+  "interrogate>=1.7",
+]
+docs = [
+  "mkdocs>=1.6,<2",
+  "mkdocs-material>=9.6",
+  "mkdocstrings[python]>=0.28",
 ]
 
 [project.scripts]
@@ -32,6 +38,7 @@ plotweaver = "plotweaver.cli:main"
 [project.urls]
 Homepage = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
 Repository = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
+Documentation = "https://mitroshenkov87.github.io/voxprint-plotweaver/"
 
 [tool.setuptools.dynamic]
 version = {attr = "plotweaver.appinfo.APP_VERSION"}
@@ -85,3 +92,17 @@ addopts = "-q"
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B101"]
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-private = true
+ignore-semiprivate = true
+ignore-nested-functions = true
+ignore-nested-classes = true
+ignore-module = false
+# 75.6% after the public one-line docstrings. The gate stays in the 60–70 band.
+fail-under = 70
+verbose = 1
+color = false

@@ -71,6 +71,8 @@ Severity = Literal["error", "warning"]
 
 @dataclass(frozen=True)
 class SoundIssue:
+    """One sound-markup problem, as an error or a warning."""
+
     severity: Severity
     message: str
 

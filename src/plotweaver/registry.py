@@ -34,6 +34,8 @@ TierOverride = Literal["auto", "16gb", "24gb"]
 
 @dataclass(frozen=True)
 class RegistryEntry:
+    """One published model row from the registry file."""
+
     id: str
     role: str
     repo: str
@@ -59,6 +61,7 @@ class RegistryEntry:
 
 
 def load_registry(path: Path) -> list[RegistryEntry]:
+    """Read the model rows from a registry TOML file."""
     payload = tomllib.loads(path.read_text(encoding="utf-8"))
     rows = payload.get("model") or []
     if not isinstance(rows, list):
@@ -185,6 +188,7 @@ def claim_user(store: Path, user: str = "plotweaver") -> None:
 
 
 def registry_path() -> Path:
+    """Path to the bundled bakeoff/models.toml registry."""
     return repo_root() / "bakeoff" / "models.toml"
 
 
@@ -214,6 +218,7 @@ def usable_vram_gb(total_gb: float, free_gb: float) -> float:
 
 
 def detected_tier(total_gb: float) -> TierName:
+    """Pick the 16 GB or 24 GB tier from the card size."""
     if total_gb >= 24:
         return TIER_24
     return TIER_16
@@ -330,6 +335,7 @@ def bakeoff_skip_reason(entry: RegistryEntry, *, free_gb: float) -> str | None:
 def download_model(
     entry: RegistryEntry, store: Path | None = None, *, allow_other: bool = False
 ) -> Path:
+    """Download one enabled registry file into the shared model folder and check it."""
     if not entry.enabled:
         raise PlotweaverError(
             f"{entry.id} is disabled until Voxprint Model Forge publishes it "

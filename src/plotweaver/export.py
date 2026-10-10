@@ -80,6 +80,8 @@ _GENRE_ALIASES = {
 
 @dataclass
 class RenderedParagraph:
+    """One paragraph ready to write into an export."""
+
     text: str
     speaker: str
     gender: Gender
@@ -88,6 +90,8 @@ class RenderedParagraph:
 
 @dataclass
 class RenderedChapter:
+    """One chapter of rendered paragraphs."""
+
     title: str
     paragraphs: list[RenderedParagraph]
     id: str = ""
@@ -127,6 +131,7 @@ def render_markdown(chapters: list[RenderedChapter]) -> tuple[str, str]:
 
 
 def write_docx(path: Path, chapters: list[RenderedChapter]) -> None:
+    """Write the chapters to a DOCX file."""
     document = Document()
     for chapter in chapters:
         document.add_heading(chapter.title.strip() or "Chapter", level=1)

@@ -37,6 +37,7 @@ def uncensored_models_preference() -> bool:
 
 
 def save_uncensored_models(enabled: bool) -> None:
+    """Save whether Settings should download abliterated models."""
     data = _load()
     data[_KEY] = enabled
     write_json(_path(), data)
@@ -51,6 +52,7 @@ def model_tier_override() -> str:
 
 
 def save_model_tier_override(value: str) -> None:
+    """Save the advanced VRAM tier choice: auto, 16gb, or 24gb."""
     if value not in _TIER_VALUES:
         raise PlotweaverError(f"VRAM tier override must be one of {sorted(_TIER_VALUES)}")
     data = _load()

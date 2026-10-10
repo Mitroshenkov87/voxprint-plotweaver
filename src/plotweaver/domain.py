@@ -8,11 +8,15 @@ from pathlib import Path
 
 
 class Language(StrEnum):
+    """Book language: Russian or English."""
+
     RU = "ru"
     EN = "en"
 
 
 class BookMode(StrEnum):
+    """How far the user stops the pipeline: autopilot, copilot, or manual."""
+
     AUTOPILOT = "autopilot"
     COPILOT = "copilot"
     MANUAL = "manual"
@@ -29,6 +33,8 @@ class ModelTier(StrEnum):
 
 
 class Gender(StrEnum):
+    """Character gender used for speakers and voice."""
+
     MALE = "male"
     FEMALE = "female"
     UNSPECIFIED = "unspecified"
@@ -62,6 +68,7 @@ class Task(StrEnum):
 
 
 def parse_gender(value: object) -> Gender:
+    """Map a model value to male, female, or unspecified."""
     if value == Gender.MALE or value == "male":
         return Gender.MALE
     if value == Gender.FEMALE or value == "female":
@@ -111,6 +118,7 @@ class BookRequest:
 
 
 def request_to_dict(req: BookRequest) -> dict[str, object]:
+    """Serialise a book request for project.json."""
     return {
         "title": req.title,
         "language": req.language.value,
@@ -160,6 +168,7 @@ def _optional_int(value: object) -> int | None:
 
 
 def request_from_dict(data: dict[str, object]) -> BookRequest:
+    """Read a book request back from project.json."""
     refs = data.get("reference_paths") or []
     if not isinstance(refs, list):
         refs = []

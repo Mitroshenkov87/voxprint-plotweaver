@@ -97,6 +97,8 @@ Severity = Literal["error", "warning"]
 
 
 class BlockKind(StrEnum):
+    """A block in a Voxprint Book: paragraph, quote, scene, or subhead."""
+
     PARAGRAPH = "paragraph"
     QUOTE = "quote"
     SCENE = "scene"
@@ -134,6 +136,8 @@ class VxBlock:
 
 @dataclass
 class VxChapter:
+    """One chapter in a Voxprint Book."""
+
     id: str
     title: str
     blocks: list[VxBlock] = field(default_factory=list)
@@ -141,6 +145,8 @@ class VxChapter:
 
 @dataclass(frozen=True)
 class VxSpeaker:
+    """One speaker record in a Voxprint Book."""
+
     id: str
     role: str
     name: str = ""
@@ -224,6 +230,7 @@ def speaker_slug(name: str) -> str:
 
 
 def narrator_speaker() -> VxSpeaker:
+    """The narrator speaker every book includes."""
     return VxSpeaker(id="narrator", role="narrator")
 
 
@@ -275,6 +282,7 @@ def make_character(
     aliases: tuple[str, ...] = (),
     voice_hints: dict[str, str] | None = None,
 ) -> VxSpeaker:
+    """Build a character speaker whose id does not collide with ids already used."""
     cleaned = display_name(name)
     chosen = gender if gender in _GENDERS else "unspecified"
     group = age_group if age_group in _AGES else "unspecified"

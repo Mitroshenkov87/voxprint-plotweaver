@@ -41,10 +41,12 @@ def _header(task: Task, req: BookRequest, extra: list[str]) -> str:
 
 
 def system_message() -> str:
+    """Return the ghostwriter system message sent with every model call."""
     return SYSTEM
 
 
 def bible_prompt(req: BookRequest) -> str:
+    """Ask for the story bible as one JSON object."""
     body = _header(Task.BIBLE, req, [])
     return (
         f"{body}\n\n"
@@ -60,6 +62,7 @@ def bible_prompt(req: BookRequest) -> str:
 
 
 def outline_prompt(req: BookRequest, bible: dict[str, object]) -> str:
+    """Ask for the chapter outline as JSON."""
     body = _header(Task.OUTLINE, req, [])
     return (
         f"{body}\n\n"
@@ -78,6 +81,7 @@ def beats_prompt(
     chapter: dict[str, object],
     chapter_index: int,
 ) -> str:
+    """Ask for the scene beats of one chapter."""
     body = _header(
         Task.BEATS,
         req,
@@ -102,6 +106,7 @@ def draft_prompt(
     previous_tail: str,
     style_card: str,
 ) -> str:
+    """Ask for the prose of one scene."""
     _chapters, _scenes, per_scene = req.shape()
     body = _header(Task.DRAFT, req, [f"scene_id: {scene.get('id', '')}"])
     style = f"\nSTYLE CARD:\n{style_card}\n" if style_card else ""
@@ -131,6 +136,7 @@ def fill_prompt(
     previous_text: str,
     next_text: str,
 ) -> str:
+    """Ask a second model to write a scene the first model left blank."""
     body = _header(Task.FILL, req, [f"scene_id: {placeholder.get('scene_id', '')}"])
     return (
         f"{body}\n\n"
@@ -145,6 +151,7 @@ def fill_prompt(
 
 
 def extract_prompt(req: BookRequest, chapter_id: str, prose: str) -> str:
+    """Ask for the canon facts stated in one chapter."""
     body = _header(Task.EXTRACT, req, [f"chapter_id: {chapter_id}"])
     return (
         f"{body}\n\n"
@@ -156,6 +163,7 @@ def extract_prompt(req: BookRequest, chapter_id: str, prose: str) -> str:
 
 
 def rewrite_prompt(req: BookRequest, prose: str, problems: list[str]) -> str:
+    """Ask for one rewrite that fixes the listed problems."""
     body = _header(Task.REWRITE, req, [])
     joined = "\n".join(f"- {item}" for item in problems)
     return (
@@ -169,6 +177,7 @@ def rewrite_prompt(req: BookRequest, prose: str, problems: list[str]) -> str:
 
 
 def proofread_prompt(req: BookRequest, chapter_title: str, prose: str) -> str:
+    """Ask for a spelling pass that keeps the plot."""
     body = _header(Task.PROOFREAD, req, [])
     return (
         f"{body}\n\n"
@@ -179,6 +188,7 @@ def proofread_prompt(req: BookRequest, chapter_title: str, prose: str) -> str:
 
 
 def style_prompt(req: BookRequest, measured: str, excerpt: str) -> str:
+    """Ask for a neutral style card from a reference excerpt."""
     body = _header(Task.STYLE, req, [])
     return (
         f"{body}\n\n"
@@ -189,6 +199,7 @@ def style_prompt(req: BookRequest, measured: str, excerpt: str) -> str:
 
 
 def judge_prompt(packet: str) -> str:
+    """Ask the judge model to score a prose packet."""
     return (
         f"TASK: {Task.JUDGE.value}\n"
         "You are a fiction editor scoring Russian prose. Return JSON "

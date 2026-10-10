@@ -184,6 +184,7 @@ STRINGS: dict[str, dict[str, str]] = {
 
 
 def ui_language() -> str:
+    """UI language from PLOTWEAVER_LANG, or English."""
     raw = os.environ.get("PLOTWEAVER_LANG", "en").lower()
     if raw in STRINGS:
         return raw
@@ -191,5 +192,6 @@ def ui_language() -> str:
 
 
 def tr(key: str, language: str | None = None) -> str:
+    """Look up one UI string in the active language."""
     catalog = STRINGS[language or ui_language()]
     return catalog.get(key, STRINGS["en"][key])

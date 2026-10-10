@@ -13,10 +13,12 @@ MARS_CHAPTERS = 6
 
 
 def mars_synopsis_path(root: Path | None = None) -> Path:
+    """Path to the Mars scenario synopsis."""
     return (root or repo_root()) / "scenarios" / "mars-e2e" / "synopsis.md"
 
 
 def mars_outline_path(root: Path | None = None) -> Path:
+    """Path to the Mars scenario outline."""
     return (root or repo_root()) / "scenarios" / "mars-e2e" / "outline.md"
 
 
