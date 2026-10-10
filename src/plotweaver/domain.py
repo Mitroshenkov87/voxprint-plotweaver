@@ -29,6 +29,15 @@ class Gender(StrEnum):
     UNSPECIFIED = "unspecified"
 
 
+class ExportFormat(StrEnum):
+    """User-facing book files. EPUB is always written; the others are optional."""
+
+    EPUB = "epub"
+    FB2 = "fb2"
+    DOCX = "docx"
+    MARKDOWN = "markdown"
+
+
 class Task(StrEnum):
     """Routing label on every model call. The mock backend switches on it."""
 
@@ -74,6 +83,8 @@ class BookRequest:
     main_gguf: str = ""
     low_refusal_gguf: str = ""
     scene_words: int | None = None
+    author: str = ""
+    export_formats: list[str] = field(default_factory=lambda: [ExportFormat.EPUB.value])
 
     def shape(self) -> tuple[int, int, int]:
         """Return (chapters, scenes per chapter, words per scene)."""
@@ -109,6 +120,8 @@ def request_to_dict(req: BookRequest) -> dict[str, object]:
         "main_gguf": req.main_gguf,
         "low_refusal_gguf": req.low_refusal_gguf,
         "scene_words": req.scene_words,
+        "author": req.author,
+        "export_formats": normalize_formats(req.export_formats),
     }
 
 
@@ -157,7 +170,21 @@ def request_from_dict(data: dict[str, object]) -> BookRequest:
         main_gguf=str(data.get("main_gguf") or ""),
         low_refusal_gguf=str(data.get("low_refusal_gguf") or ""),
         scene_words=_optional_int(data.get("scene_words")),
+        author=str(data.get("author") or ""),
+        export_formats=normalize_formats(data.get("export_formats")),
     )
+
+
+def normalize_formats(value: object) -> list[str]:
+    """EPUB 3 is always included. Unknown names are dropped."""
+    allowed = {item.value for item in ExportFormat}
+    raw: list[object] = list(value) if isinstance(value, list) else []
+    chosen: list[str] = []
+    for item in [ExportFormat.EPUB.value, *raw]:
+        text = str(item)
+        if text in allowed and text not in chosen:
+            chosen.append(text)
+    return chosen
 
 
 def repo_file(name: str) -> Path:

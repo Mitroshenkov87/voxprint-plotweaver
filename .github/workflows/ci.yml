@@ -36,6 +36,13 @@ jobs:
           ruff format --check src tests
           mypy src
           bandit -c pyproject.toml -r src -ll
+      - name: EPUBCheck
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y default-jre-headless
+          curl -sSfL -o epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.4.0/epubcheck-5.4.0.zip
+          unzip -q epubcheck.zip
+          echo "EPUBCHECK=$GITHUB_WORKSPACE/epubcheck-5.4.0/epubcheck.jar" >> "$GITHUB_ENV"
       - name: Tests
         run: pytest
       - name: Mock bake-off and Mars scripts

@@ -9,6 +9,11 @@ Not covered by that licence (each has its own terms):
     weights only. Each file keeps the licence recorded in its manifest.
   * llama.cpp (MIT), used as an external llama-server binary. Plotweaver does not
     vendor its source. https://github.com/ggml-org/llama.cpp
+  * FictionBook 2.1 XML Schema (BSD-2-Clause), Copyright 2004 Dmitry Gribov.
+    Vendored at src/plotweaver/data/fb2/ from https://github.com/gribuser/fb2.
+    The copyright notice and disclaimer stay in those files and in LICENSE.md
+    beside them. The schema namespace is http://www.gribuser.ru/xml/fictionbook/2.0;
+    this is the 2.1 edition (genre match, share instructions).
   * Third-party Python packages (PySide6/Qt, python-docx, ebooklib, datasketch,
     pymorphy3, httpx, and their dependencies) keep their own licences.
 

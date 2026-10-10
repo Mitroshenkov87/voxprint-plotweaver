@@ -276,6 +276,8 @@ def _blind(results: Path) -> None:
             code = next(name for name, value in key.items() if value == model_id)
         story_id = metrics_path.parent.name
         source = metrics_path.parent / "export" / "book.md"
+        if not source.is_file():
+            source = metrics_path.parent / "export" / "audiobook" / "book.md"
         if source.is_file():
             target = reader / code
             target.mkdir(exist_ok=True)

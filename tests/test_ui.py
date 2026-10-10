@@ -51,4 +51,10 @@ def test_window_selftest(tmp_path: Path) -> None:
     window.show()
     window.run_selftest()
     assert "speaker-marks" in window.result_label.text()
+    assert window._project is not None
+    export = window._project.export_dir
+    assert (export / "book.epub").is_file()
+    assert (export / "book.fb2").is_file()
+    assert (export / "audiobook" / "speaker-marks.txt").is_file()
+    assert not (export / "book.docx").is_file()
     del app

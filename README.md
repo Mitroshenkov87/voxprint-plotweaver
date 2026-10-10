@@ -14,6 +14,7 @@ Not in this build, on purpose:
 - Embedding cosine (bge-m3). The anti-copy check is lexical and writes an overlap report.
 - LoRA training and any cloud model API.
 - The full yo and stress normaliser. Audiobook Builder owns that. Plotweaver applies a short unambiguous yo dictionary and stress marks taken from the story bible.
+- A suite-native `.vxbook` package. EPUB 3 is the default book file.
 
 ## Platforms
 
@@ -47,6 +48,8 @@ plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf
 ```
 
 `--yes` skips the bible and outline gates. Omit it, read `bible.json` and `outline.json` in the project folder, then continue with `--approve`.
+
+The finished book is EPUB 3 (`book.epub`), with a navigation document and the suite cover. Add `--fb2` for FictionBook 2.1, `--docx` for Word, or `--markdown` for a Markdown file. The window has the same checkboxes. The Audiobook Builder folder is always written. `--author` sets the name stored in the EPUB and in FictionBook title-info.
 
 ## Bake-off (RTX 4090 Linux VM)
 

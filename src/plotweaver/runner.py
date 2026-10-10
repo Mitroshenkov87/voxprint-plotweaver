@@ -440,7 +440,17 @@ class _Engine:
     ) -> Path:
         rendered = _render(self.project, request, chapters)
         directory = self.project.export_dir
-        write_bundle(directory, request.title, request.language.value, rendered, overlap)
+        write_bundle(
+            directory,
+            request.title,
+            request.language.value,
+            rendered,
+            overlap,
+            author=request.author,
+            genre=request.genre,
+            synopsis=request.synopsis,
+            formats=request.export_formats,
+        )
         if self.export_to is not None:
             publish_exports(directory, self.export_to)
             return self.export_to

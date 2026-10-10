@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
         card, layout = self._card()
         form = QFormLayout()
         self.title = QLineEdit()
+        self.author = QLineEdit()
         self.language = QComboBox()
         self.language.addItem("Russian", Language.RU.value)
         self.language.addItem("English", Language.EN.value)
@@ -177,6 +178,17 @@ class MainWindow(QMainWindow):
         self.chapters = QSpinBox()
         self.chapters.setRange(0, 40)
         self.chapters.setValue(0)
+        self.export_epub = QCheckBox(tr("export_epub"))
+        self.export_epub.setChecked(True)
+        self.export_epub.setEnabled(False)
+        self.export_fb2 = QCheckBox(tr("export_fb2"))
+        self.export_docx = QCheckBox(tr("export_docx"))
+        self.export_md = QCheckBox(tr("export_markdown"))
+        formats = QHBoxLayout()
+        formats.addWidget(self.export_epub)
+        formats.addWidget(self.export_fb2)
+        formats.addWidget(self.export_docx)
+        formats.addWidget(self.export_md)
         self.dark = QCheckBox(tr("dark"))
         self.mock = QCheckBox(tr("mock"))
         self.mock.setChecked(self.mock_default)
@@ -189,12 +201,14 @@ class MainWindow(QMainWindow):
         refs.addWidget(self.ref_label)
         refs.addWidget(add)
         form.addRow(tr("title"), self.title)
+        form.addRow(tr("author"), self.author)
         form.addRow(tr("language"), self.language)
         form.addRow(tr("synopsis"), self.synopsis)
         form.addRow(tr("tier"), self.tier)
         form.addRow(tr("mode"), self.mode)
         form.addRow(tr("words"), self.words)
         form.addRow(tr("chapters"), self.chapters)
+        form.addRow(tr("formats"), formats)
         form.addRow("", self.dark)
         form.addRow("", self.mock)
         form.addRow("", self.confirm)
@@ -256,8 +270,16 @@ class MainWindow(QMainWindow):
 
     def request_from_form(self) -> BookRequest:
         chapters = self.chapters.value()
+        formats = ["epub"]
+        if self.export_fb2.isChecked():
+            formats.append("fb2")
+        if self.export_docx.isChecked():
+            formats.append("docx")
+        if self.export_md.isChecked():
+            formats.append("markdown")
         return BookRequest(
             title=self.title.text().strip() or "Untitled",
+            author=self.author.text().strip(),
             language=Language(str(self.language.currentData())),
             synopsis=self.synopsis.toPlainText().strip(),
             target_words=self.words.value(),
@@ -266,6 +288,7 @@ class MainWindow(QMainWindow):
             tier=ModelTier(str(self.tier.currentData())),
             mode=BookMode(str(self.mode.currentData())),
             reference_paths=list(self._refs),
+            export_formats=formats,
         )
 
     def start(self, *, synchronous: bool, approve: bool = False) -> None:
@@ -337,6 +360,8 @@ class MainWindow(QMainWindow):
         """Fill the form and write a one-chapter book with the mock backend."""
         self.stack.setCurrentIndex(FORM)
         self.title.setText("Self-test")
+        self.author.setText("Илья Воронов")
+        self.export_fb2.setChecked(True)
         self.language.setCurrentIndex(0)
         self.synopsis.setPlainText(
             "Короткий синопсис для проверки окна. Ещё одна фраза про корабль и пыль."

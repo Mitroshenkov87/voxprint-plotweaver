@@ -44,8 +44,10 @@ def test_mock_export_aligns_marks_and_keeps_yo(tmp_path: Path) -> None:
     assert any(line.startswith("FEMALE:") for line in marks)
     assert "ё" in book or "Ё" in book
     assert "\u0301" in book
-    assert (result.export_dir / "book.docx").is_file()
     assert (result.export_dir / "book.epub").is_file()
+    assert not (result.export_dir / "book.docx").is_file()
+    assert not (result.export_dir / "book.fb2").is_file()
+    assert not (result.export_dir / "book.md").is_file()
 
 
 def test_dark_toggle_swaps_once_and_fills(tmp_path: Path) -> None:
@@ -81,7 +83,7 @@ def test_refusal_becomes_a_placeholder_only_when_dark_is_on(tmp_path: Path) -> N
     book = kept.export_dir or Path()
     text = ""
     if kept.export_dir is not None:
-        text = (kept.export_dir / "book.md").read_text(encoding="utf-8")
+        text = (kept.export_dir / "audiobook" / "book.md").read_text(encoding="utf-8")
     assert "cannot write" in text.lower() or "I cannot" in text
     del book
 

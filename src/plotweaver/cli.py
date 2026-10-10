@@ -51,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     scenario.add_argument("--low-refusal-gguf", default="")
     scenario.add_argument("--main-model-id", default="")
     scenario.add_argument("--low-refusal-model-id", default="")
+    _add_export_args(scenario)
     scenario.set_defaults(func=_scenario_mars)
 
     bake = sub.add_parser("bakeoff", help="Run the Russian 10x3 bake-off, or a mock slice of it.")
@@ -103,6 +104,29 @@ def _add_book_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--low-refusal-gguf", default="")
     parser.add_argument("--main-model-id", default="")
     parser.add_argument("--low-refusal-model-id", default="")
+    _add_export_args(parser)
+
+
+def _add_export_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--author",
+        default="",
+        help="Author stored in EPUB and FictionBook title-info.",
+    )
+    parser.add_argument("--fb2", action="store_true", help="Also write FictionBook 2.1.")
+    parser.add_argument("--docx", action="store_true", help="Also write DOCX.")
+    parser.add_argument("--markdown", action="store_true", help="Also write Markdown.")
+
+
+def _export_formats(args: argparse.Namespace) -> list[str]:
+    chosen = ["epub"]
+    if args.fb2:
+        chosen.append("fb2")
+    if args.docx:
+        chosen.append("docx")
+    if args.markdown:
+        chosen.append("markdown")
+    return chosen
 
 
 def _version(_args: argparse.Namespace) -> int:
@@ -168,6 +192,8 @@ def _run(args: argparse.Namespace) -> int:
         tier=ModelTier(args.tier),
         mode=BookMode(args.mode),
         reference_paths=list(args.reference or []),
+        author=args.author,
+        export_formats=_export_formats(args),
     )
     _apply_models(request, args)
     project = Project.open_or_create(args.project, request)
@@ -208,6 +234,8 @@ def _scenario_mars(args: argparse.Namespace) -> int:
         request.low_refusal_model_id = args.low_refusal_model_id or Path(args.low_refusal_gguf).stem
     elif args.low_refusal_model_id:
         request.low_refusal_model_id = args.low_refusal_model_id
+    request.author = args.author
+    request.export_formats = _export_formats(args)
     if not args.mock and not request.main_gguf:
         raise PlotweaverError(
             "scenario-mars on a GPU needs --main-gguf. "
