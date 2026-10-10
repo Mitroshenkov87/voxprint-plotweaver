@@ -1,6 +1,6 @@
 # Voxprint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Machashavah. `plotweaver --version` prints `0.2.0 RC · build N "Machashavah"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Tzaruf. `plotweaver --version` prints `0.2.0 RC · build N "Tzaruf"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -12,19 +12,19 @@ The installer includes the app, Python 3.14, the Python dependencies, and the pi
 
 ## Download and install
 
-Release files are on the [v0.2.0-rc3 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc3). Download `SHA256SUMS` with the installer and check it before you run anything.
+Release files are on the [v0.2.0-rc4 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc4). Download `SHA256SUMS` with the installer and check it before you run anything.
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc3-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc3-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc3-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc4-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc4-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc4-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver` and adds a Voxprint entry to the Start menu. Administrator rights are not required.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc3_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc4_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -34,7 +34,7 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf voxprint-plotweaver-0.2.0rc3-linux-x86_64.tar.gz
+tar -xzf voxprint-plotweaver-0.2.0rc4-linux-x86_64.tar.gz
 ./voxprint-plotweaver/plotweaver-gui.sh
 ```
 
@@ -47,7 +47,7 @@ Open the app on the NVIDIA machine. The first real book reads the GPU, selects t
 
 A card under 24 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card also installs T-pro-it-2.1. A model file already downloaded by Audiobook Builder is reused. Each file is checked by revision, size, and SHA-256.
 
-Least-censored models are a separate download from Settings, and only when a published file fits the card. On 24 GB those are the pinned abliterated Qwen 27B and Gemma 31B quants. On 16 GB they are the fit quants Model Forge publishes. A Russian book prefers the forge abliterated T-lite when that file is installed. Until a forge manifest fills a placeholder, that row stays disabled. Plotweaver does not abliterate or quantize weights.
+Least-censored models are a separate download from Settings, and only when a published file fits the card. On 16 GB those are the Forge Qwen 27B Q3_K_M and the Forge abliterated T-lite IQ4_XS and Q5_K_M. On 24 GB the card also offers the Forge Qwen 27B Q5 and the Forge Gemma 31B Q4_K_M. The Gemma 31B IQ3_XXS row stays disabled until `plotweaver models import-forge-manifest` fills it. A Russian book prefers the larger installed Forge T-lite. Plotweaver does not abliterate or quantize weights.
 
 Settings also has an advanced VRAM-tier override (Auto, 16 GB, 24 GB). The 24 GB choice stays disabled when the card cannot run a published 24 GB model.
 
@@ -103,7 +103,7 @@ python -m venv .venv
 .venv/bin/plotweaver gui --mock --selftest
 ```
 
-`docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
+`docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `docs/vm-test.md` is the short RTX 4090 check, `bash scripts/vm_test.sh`. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
 
 ## Documentation
 

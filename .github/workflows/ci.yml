@@ -51,6 +51,7 @@ jobs:
         run: |
           PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --mock --limit 1 --results "$RUNNER_TEMP/bakeoff"
           PLOTWEAVER_MOCK=1 PLOTWEAVER_MARS_OUT="$RUNNER_TEMP/mars" bash scripts/e2e_mars.sh
+          bash scripts/vm_test.sh --mock --out "$RUNNER_TEMP/vm-test"
       - name: pip-audit
         run: pip-audit --skip-editable
       - name: gitleaks

@@ -42,6 +42,7 @@ nav:
   - Command line: CLI.md
   - Command reference: cli-reference.md
   - Bake-off: bakeoff.md
+  - VM test: vm-test.md
   - Architecture: architecture.md
   - Audiobook export: audiobook-export.md
   - API: api.md

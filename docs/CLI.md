@@ -3,7 +3,7 @@
 `plotweaver --version` and `plotweaver version` print the display label and nothing else:
 
 ```text
-0.2.0 RC · build dev "Machashavah"
+0.2.0 RC · build dev "Tzaruf"
 ```
 
 `BUILD.json` at the repository root is the source for the version, the prerelease, the codename, and the build offset. A packaged CI build replaces `dev` with `GITHUB_RUN_NUMBER + offset`. A final release (`prerelease` null or empty) drops ` RC`.
@@ -225,7 +225,7 @@ plotweaver models import-forge-manifest FILE [--registry PATH] [--json] [--dry-r
   "code": 0,
   "registry": "/absolute/bakeoff/models.toml",
   "manifest": "/absolute/forge.json",
-  "models": ["t-lite-it-2.1-forge-abliterated-q4"],
+  "models": ["gemma-4-31b-abliterated-iq3-xxs"],
   "writes": false,
   "actions": ["validate the Model Forge manifest", "leave the registry unchanged"]
 }
