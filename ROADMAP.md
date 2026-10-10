@@ -14,6 +14,8 @@ The command line will cover the same actions as the window, including the choice
 
 Real-world grounding is optional and off by default. Plotweaver stays fully usable offline. When you turn it on, Help me write the brief also reads your notes for real-world topics. Notes about spaceflight can bring in real launches. A present-day setting can bring in current events, places, prices, and weather. The app searches news and reference sites and keeps the key facts. Those facts go into the story bible as a Real-world context section, each with a source link and the date it was retrieved. Every chapter can draw on that list, including a future-set book that looks back on history, so the draft can use the facts where the local model has a gap. You review the list and can strike any item before writing starts. An optional filter drops political topics.
 
+The same switch covers a historical setting. Everyday-life fiction set in a past decade, with characters facing hardship and persecution, can gather period detail: daily life, prices, rationing, laws, and documented real events and places. Those details come from reference and archive sources, so the plot can be woven around real moments. You can add footnotes or a short Historical notes appendix to the book, with the sources named. The facts stay in the story bible with their source links. Real living people are never used as characters.
+
 ## Later
 
 Large writing models should run well on a 16 GB card. Memory will be placed on purpose. Mixture-of-experts layers that do not fit on the card move to RAM and run on the CPU. The KV cache for a long context can live in RAM. Weights the card will need next are fetched ahead of the step that uses them.
