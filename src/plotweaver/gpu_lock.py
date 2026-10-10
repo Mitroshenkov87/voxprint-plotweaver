@@ -7,6 +7,7 @@ The same process may re-enter; the inner block does not release the outer lock.
 
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import tempfile
@@ -53,6 +54,19 @@ def _parse(value: object) -> datetime | None:
     return parsed
 
 
+def _windows_pid_alive(pid: int) -> bool:
+    """PROCESS_QUERY_LIMITED_INFORMATION. os.kill(pid, 0) is Ctrl+C on Windows."""
+    windll = getattr(ctypes, "windll", None)
+    if windll is None:
+        return False
+    kernel = windll.kernel32
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return False
+    kernel.CloseHandle(handle)
+    return True
+
+
 def _pid_alive(pid: object) -> bool:
     if isinstance(pid, bool) or not isinstance(pid, int | str):
         return False
@@ -62,6 +76,8 @@ def _pid_alive(pid: object) -> bool:
         return False
     if number <= 0:
         return False
+    if os.name == "nt":
+        return _windows_pid_alive(number)
     try:
         os.kill(number, 0)
     except ProcessLookupError:
