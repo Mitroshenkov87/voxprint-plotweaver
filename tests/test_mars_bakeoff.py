@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from plotweaver.paths import repo_root
 from plotweaver.scenarios import MARS_CHAPTERS, MARS_TITLE, mars_request
 from plotweaver.vxbook import legacy_pair, validate_vxbook
@@ -79,6 +81,7 @@ def test_mars_mock_cli_exports_audiobook(tmp_path: Path) -> None:
         assert name not in book
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="scripts/e2e_mars.sh is a bash script")
 def test_mars_script_writes_sound_markup(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PLOTWEAVER_NO_UPDATE_CHECK"] = "1"
