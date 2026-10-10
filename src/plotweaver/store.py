@@ -229,6 +229,17 @@ class Canon:
         pairs.sort(key=lambda item: len(item[0]), reverse=True)
         return pairs
 
+    def characters(self) -> list[dict[str, str]]:
+        """Story-bible characters in insertion order."""
+        rows = self._db.execute(
+            """
+            SELECT name, gender, role, goals, secrets, voice, arc, pronunciation
+            FROM characters ORDER BY rowid
+            """
+        ).fetchall()
+        keys = ("name", "gender", "role", "goals", "secrets", "voice", "arc", "pronunciation")
+        return [{key: str(row[index]) for index, key in enumerate(keys)} for row in rows]
+
     def commit_extraction(self, chapter_id: str, payload: dict[str, Any]) -> None:
         for fact in _dicts(payload.get("facts")):
             self._db.execute(

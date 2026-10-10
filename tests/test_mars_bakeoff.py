@@ -9,6 +9,7 @@ from pathlib import Path
 
 from plotweaver.paths import repo_root
 from plotweaver.scenarios import MARS_CHAPTERS, MARS_TITLE, mars_request
+from plotweaver.vxbook import legacy_pair, validate_vxbook
 
 _FORBIDDEN = (
     "Musk",
@@ -58,8 +59,11 @@ def test_mars_mock_cli_exports_audiobook(tmp_path: Path) -> None:
         text=True,
     )
     assert proc.returncode == 0, proc.stderr
-    book = (export / "audiobook" / "book.md").read_text(encoding="utf-8")
-    marks = (export / "audiobook" / "speaker-marks.txt").read_text(encoding="utf-8").splitlines()
+    assert "book.vxbook" in proc.stdout
+    vxbook = export / "book.vxbook"
+    assert not [issue for issue in validate_vxbook(vxbook) if issue.severity == "error"]
+    book, marks_text = legacy_pair(vxbook)
+    marks = marks_text.splitlines()
     paragraphs = [
         block for block in book.split("\n\n") if block.strip() and not block.startswith("# ")
     ]
@@ -67,6 +71,7 @@ def test_mars_mock_cli_exports_audiobook(tmp_path: Path) -> None:
     assert len(marks) == len(paragraphs)
     assert "ё" in book or "Ё" in book
     assert "\u0301" in book
+    assert not (export / "audiobook" / "speaker-marks.txt").is_file()
     stored = (export / "project" / "project.json").read_text(encoding="utf-8")
     assert "SpaceX" in stored
     for name in _FORBIDDEN:

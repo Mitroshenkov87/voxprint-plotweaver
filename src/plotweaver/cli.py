@@ -22,6 +22,7 @@ from plotweaver.runner import run_book
 from plotweaver.scenarios import mars_request
 from plotweaver.store import Project
 from plotweaver.ui.window import MainWindow
+from plotweaver.vxbook import validate_vxbook
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -70,6 +71,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     gui.set_defaults(func=_gui)
 
+    vxbook = sub.add_parser("vxbook", help="Check or inspect a Voxprint Book.")
+    vx = vxbook.add_subparsers(dest="vx_command", required=True)
+    validate = vx.add_parser("validate", help="Run the Voxprint Book validation checklist.")
+    validate.add_argument("file", type=Path)
+    validate.set_defaults(func=_vxbook_validate)
+
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
@@ -116,6 +123,11 @@ def _add_export_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--fb2", action="store_true", help="Also write FictionBook 2.1.")
     parser.add_argument("--docx", action="store_true", help="Also write DOCX.")
     parser.add_argument("--markdown", action="store_true", help="Also write Markdown.")
+    parser.add_argument(
+        "--speaker-marks",
+        action="store_true",
+        help="Also write the legacy numbered speaker-marks pair.",
+    )
 
 
 def _export_formats(args: argparse.Namespace) -> list[str]:
@@ -126,7 +138,18 @@ def _export_formats(args: argparse.Namespace) -> list[str]:
         chosen.append("docx")
     if args.markdown:
         chosen.append("markdown")
+    if args.speaker_marks:
+        chosen.append("speaker-marks")
     return chosen
+
+
+def _vxbook_validate(args: argparse.Namespace) -> int:
+    issues = validate_vxbook(args.file)
+    for issue in issues:
+        print(f"{issue.severity}: {issue.message}")
+    if not issues:
+        print("ok")
+    return 1 if any(issue.severity == "error" for issue in issues) else 0
 
 
 def _version(_args: argparse.Namespace) -> int:
@@ -252,7 +275,7 @@ def _scenario_mars(args: argparse.Namespace) -> int:
     )
     print(f"status={result.status} swaps={result.swaps}")
     if result.export_dir is not None:
-        print(result.export_dir / "audiobook" / "speaker-marks.txt")
+        print(result.export_dir / "book.vxbook")
     return 0 if result.status == "completed" else 3
 
 

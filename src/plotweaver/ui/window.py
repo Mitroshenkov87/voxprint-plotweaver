@@ -184,11 +184,13 @@ class MainWindow(QMainWindow):
         self.export_fb2 = QCheckBox(tr("export_fb2"))
         self.export_docx = QCheckBox(tr("export_docx"))
         self.export_md = QCheckBox(tr("export_markdown"))
+        self.export_marks = QCheckBox(tr("export_marks"))
         formats = QHBoxLayout()
         formats.addWidget(self.export_epub)
         formats.addWidget(self.export_fb2)
         formats.addWidget(self.export_docx)
         formats.addWidget(self.export_md)
+        formats.addWidget(self.export_marks)
         self.dark = QCheckBox(tr("dark"))
         self.mock = QCheckBox(tr("mock"))
         self.mock.setChecked(self.mock_default)
@@ -277,6 +279,8 @@ class MainWindow(QMainWindow):
             formats.append("docx")
         if self.export_md.isChecked():
             formats.append("markdown")
+        if self.export_marks.isChecked():
+            formats.append("speaker-marks")
         return BookRequest(
             title=self.title.text().strip() or "Untitled",
             author=self.author.text().strip(),
@@ -347,7 +351,7 @@ class MainWindow(QMainWindow):
             return
         marks = ""
         if result.export_dir is not None:
-            path = result.export_dir / "audiobook" / "speaker-marks.txt"
+            path = result.export_dir / "book.vxbook"
             marks = str(path)
         self.result_label.setText(f"{tr('done')}\n{marks}")
         self.stack.setCurrentIndex(RESULT)
@@ -374,5 +378,5 @@ class MainWindow(QMainWindow):
         self.start(synchronous=True)
         if self.stack.currentIndex() != RESULT:
             raise RuntimeError("self-test did not reach the result screen")
-        if "speaker-marks" not in self.result_label.text():
-            raise RuntimeError("self-test result has no speaker-marks path")
+        if "book.vxbook" not in self.result_label.text():
+            raise RuntimeError("self-test result has no book.vxbook path")

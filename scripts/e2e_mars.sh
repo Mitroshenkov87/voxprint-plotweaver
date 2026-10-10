@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Write the short Russian Mars story and the Audiobook Builder export.
+# Write the short Russian Mars story and book.vxbook for Audiobook Builder.
 # Default output is ./out/mars-e2e/. Override with PLOTWEAVER_MARS_OUT.
 # PLOTWEAVER_MOCK=1 or --mock skips the GPU. A real run needs --main-gguf
 # or PLOTWEAVER_MAIN_GGUF.
