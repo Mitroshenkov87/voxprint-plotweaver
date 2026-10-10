@@ -7,9 +7,10 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from typing import assert_never
 
 from PySide6.QtCore import QThread, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QStandardItemModel
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -33,12 +34,24 @@ from PySide6.QtWidgets import (
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
 from plotweaver.hardware import query_gpu, require_supported_gpu
+from plotweaver.install import ensure_uncensored_models, prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend, MockBackend
-from plotweaver.registry import OPTIONAL_VRAM_GB
+from plotweaver.registry import (
+    TierName,
+    detected_tier,
+    resolve_tier,
+    tier_option_enabled,
+    uncensored_offer_allowed,
+)
 from plotweaver.runner import RunResult, run_book
-from plotweaver.settings import optional_models_preference, save_optional_models
+from plotweaver.settings import (
+    model_tier_override,
+    save_model_tier_override,
+    save_uncensored_models,
+    uncensored_models_preference,
+)
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.ui.i18n import tr
@@ -46,6 +59,24 @@ from plotweaver.ui.theme import build_style, enable_acrylic
 from plotweaver.update_check import check_for_update
 
 HOME, FORM, PROGRESS, RESULT, SETTINGS = 0, 1, 2, 3, 4
+
+
+class _DownloadThread(QThread):
+    finished_ok = Signal(int)
+    failed = Signal(str)
+
+    def __init__(self, total_vram_gb: float, free_gb: float) -> None:
+        super().__init__()
+        self.total_vram_gb = total_vram_gb
+        self.free_gb = free_gb
+
+    def run(self) -> None:
+        try:
+            count = ensure_uncensored_models(total_vram_gb=self.total_vram_gb, free_gb=self.free_gb)
+        except Exception as exc:  # noqa: BLE001 - show the message, keep the window
+            self.failed.emit(str(exc))
+            return
+        self.finished_ok.emit(count)
 
 
 class _RunThread(QThread):
@@ -62,6 +93,10 @@ class _RunThread(QThread):
 
     def run(self) -> None:
         try:
+            if not self.request_mock:
+                request = self.project.request()
+                prepare_real_models(request, on_progress=self.progressed.emit)
+                self.project.save_request(request)
             backend = _backend(self.request_mock)
             result = run_book(
                 self.project,
@@ -93,6 +128,7 @@ class MainWindow(QMainWindow):
         self._clicks: list[float] = []
         self._egg_shown = False
         self._thread: _RunThread | None = None
+        self._download: _DownloadThread | None = None
         self._project: Project | None = None
         self._refs: list[str] = []
         root = QWidget()
@@ -239,38 +275,167 @@ class MainWindow(QMainWindow):
         title = QLabel(tr("settings"))
         title.setObjectName("title")
         layout.addWidget(title)
-        note = QLabel(tr("settings_optional_note"))
-        note.setObjectName("muted")
-        note.setWordWrap(True)
-        layout.addWidget(note)
-        self.optional_models = QCheckBox(tr("settings_optional"))
-        layout.addWidget(self.optional_models)
+        self.vram_note = QLabel(tr("settings_vram_note").format(detected="—", chosen="—"))
+        self.vram_note.setObjectName("muted")
+        self.vram_note.setWordWrap(True)
+        layout.addWidget(self.vram_note)
+        self.vram_tier = QComboBox()
+        self.vram_tier.addItem(tr("settings_vram_auto"), "auto")
+        self.vram_tier.addItem(tr("settings_vram_16"), "16gb")
+        self.vram_tier.addItem(tr("settings_vram_24"), "24gb")
+        layout.addWidget(self.vram_tier)
+        self.settings_note = QLabel(tr("settings_uncensored_note"))
+        self.settings_note.setObjectName("muted")
+        self.settings_note.setWordWrap(True)
+        layout.addWidget(self.settings_note)
+        self.uncensored_models = QCheckBox(tr("settings_uncensored"))
+        self.uncensored_models.toggled.connect(self._uncensored_toggled)
+        layout.addWidget(self.uncensored_models)
         self.settings_status = QLabel("")
         self.settings_status.setObjectName("faint")
+        self.settings_status.setWordWrap(True)
         layout.addWidget(self.settings_status)
         save = QPushButton(tr("settings_save"))
         save.setObjectName("primary")
         save.clicked.connect(self._save_settings)
         layout.addWidget(save)
+        self.download_uncensored = QPushButton(tr("settings_download"))
+        self.download_uncensored.clicked.connect(self._download_uncensored)
+        layout.addWidget(self.download_uncensored)
         back = QPushButton(tr("back"))
         back.clicked.connect(lambda: self.stack.setCurrentIndex(HOME))
         layout.addWidget(back)
         outer.addWidget(card)
         return page
 
+    def _gpu_total(self) -> float | None:
+        gpu = query_gpu()
+        if gpu is None:
+            return None
+        return gpu.total_gb
+
+    def _gpu_free(self) -> float | None:
+        gpu = query_gpu()
+        if gpu is None:
+            return None
+        return gpu.free_gb
+
+    def _tier_label(self, tier: TierName) -> str:
+        match tier:
+            case "16gb":
+                return tr("settings_vram_16")
+            case "24gb":
+                return tr("settings_vram_24")
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    def _can_use_24(self) -> bool:
+        total = self._gpu_total()
+        free = self._gpu_free()
+        if total is None or free is None:
+            return False
+        return tier_option_enabled("24gb", total_gb=total, free_gb=free)
+
+    def _set_tier_item_enabled(self, index: int, enabled: bool) -> None:
+        model = self.vram_tier.model()
+        if not isinstance(model, QStandardItemModel):
+            return
+        item = model.item(index)
+        if item is not None:
+            item.setEnabled(enabled)
+
+    def _refresh_vram_tier(self) -> None:
+        total = self._gpu_total()
+        free = self._gpu_free()
+        can_24 = self._can_use_24()
+        self._set_tier_item_enabled(2, can_24)
+        saved = model_tier_override()
+        if saved == "24gb" and not can_24:
+            saved = "auto"
+        match saved:
+            case "auto":
+                index = 0
+            case "16gb":
+                index = 1
+            case "24gb":
+                index = 2
+            case _:
+                index = 0
+        self.vram_tier.setCurrentIndex(index)
+        if total is None or free is None:
+            self.vram_note.setText(tr("settings_vram_blocked"))
+            return
+        chosen = resolve_tier(total, saved)
+        self.vram_note.setText(
+            tr("settings_vram_note").format(
+                detected=self._tier_label(detected_tier(total)),
+                chosen=self._tier_label(chosen),
+            )
+        )
+
+    def _selected_override(self) -> str:
+        value = self.vram_tier.currentData()
+        if value == "auto":
+            return "auto"
+        if value == "16gb":
+            return "16gb"
+        if value == "24gb":
+            return "24gb"
+        return "auto"
+
     def _open_settings(self) -> None:
-        preference = optional_models_preference()
-        if preference is None:
-            gpu = query_gpu()
-            self.optional_models.setChecked(gpu is not None and gpu.total_gb >= OPTIONAL_VRAM_GB)
-        else:
-            self.optional_models.setChecked(preference)
+        self._refresh_vram_tier()
+        allowed = uncensored_offer_allowed(self._gpu_total())
+        self.uncensored_models.setEnabled(allowed)
+        self.uncensored_models.setChecked(uncensored_models_preference() if allowed else False)
+        self.download_uncensored.setEnabled(allowed and self.uncensored_models.isChecked())
+        self.settings_note.setText(
+            tr("settings_uncensored_note") if allowed else tr("settings_uncensored_blocked")
+        )
         self.settings_status.setText("")
         self.stack.setCurrentIndex(SETTINGS)
 
+    def _uncensored_toggled(self, checked: bool) -> None:
+        allowed = uncensored_offer_allowed(self._gpu_total())
+        self.download_uncensored.setEnabled(allowed and checked)
+
     def _save_settings(self) -> None:
-        save_optional_models(self.optional_models.isChecked())
+        choice = self._selected_override()
+        if choice == "24gb" and not self._can_use_24():
+            choice = "auto"
+        save_model_tier_override(choice)
+        self._refresh_vram_tier()
+        allowed = uncensored_offer_allowed(self._gpu_total())
+        enabled = bool(self.uncensored_models.isChecked()) and allowed
+        save_uncensored_models(enabled)
+        if not allowed:
+            self.uncensored_models.setChecked(False)
+            self.settings_status.setText(tr("settings_uncensored_blocked"))
+            return
         self.settings_status.setText(tr("settings_saved"))
+
+    def _download_uncensored(self) -> None:
+        total = self._gpu_total()
+        if not uncensored_offer_allowed(total):
+            self.settings_status.setText(tr("settings_uncensored_blocked"))
+            return
+        save_uncensored_models(True)
+        self.settings_status.setText(tr("settings_downloading"))
+        self.download_uncensored.setEnabled(False)
+        assert total is not None
+        free = self._gpu_free()
+        self._download = _DownloadThread(total, total if free is None else free)
+        self._download.finished_ok.connect(self._download_done)
+        self._download.failed.connect(self._download_failed)
+        self._download.start()
+
+    def _download_done(self, count: int) -> None:
+        self.settings_status.setText(f"{tr('settings_saved')} {count}")
+        self.download_uncensored.setEnabled(True)
+
+    def _download_failed(self, message: str) -> None:
+        self.settings_status.setText(message)
+        self.download_uncensored.setEnabled(uncensored_offer_allowed(self._gpu_total()))
 
     def _add_ref(self) -> None:
         path, _selected = QFileDialog.getOpenFileName(
@@ -378,6 +543,10 @@ class MainWindow(QMainWindow):
     def _run_sync(self, mock: bool, yes: bool, approve: bool) -> None:
         assert self._project is not None
         try:
+            if not mock:
+                request = self._project.request()
+                prepare_real_models(request, on_progress=self._on_progress)
+                self._project.save_request(request)
             result = run_book(
                 self._project,
                 _backend(mock),

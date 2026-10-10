@@ -58,6 +58,7 @@ class Task(StrEnum):
     STYLE = "style"
     JUDGE = "judge"
     SOUND = "sound"
+    PROBE = "probe"
 
 
 def parse_gender(value: object) -> Gender:

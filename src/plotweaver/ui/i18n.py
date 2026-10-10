@@ -40,10 +40,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "egg": "The loom is awake.",
         "gpu_note": "A real run needs an NVIDIA RTX 40-series GPU or newer.",
         "settings": "Settings",
-        "settings_optional": "Download models that need 20 GB of VRAM",
-        "settings_optional_note": (
-            "With no saved choice, models that need 20 GB of VRAM download only on a 20 GB GPU."
+        "settings_vram_tier": "VRAM tier",
+        "settings_vram_auto": "Auto",
+        "settings_vram_16": "16 GB",
+        "settings_vram_24": "24 GB",
+        "settings_vram_note": (
+            "Detected {detected}. Active tier: {chosen}. "
+            "A card under 24 GB keeps 2 GB free. A 24 GB card keeps 3 GB free."
         ),
+        "settings_vram_blocked": "The 24 GB tier needs a card that can run it.",
+        "settings_uncensored": "Download abliterated models",
+        "settings_uncensored_note": (
+            "The default install is stock models only. Abliterated models are a separate download."
+        ),
+        "settings_uncensored_blocked": (
+            "Abliterated models need a GPU with at least 20 GB of VRAM."
+        ),
+        "settings_download": "Download",
+        "settings_downloading": "Downloading…",
         "settings_save": "Save",
         "settings_saved": "Saved.",
     },
@@ -82,10 +96,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "egg": "Станок проснулся.",
         "gpu_note": "Настоящий запуск требует NVIDIA RTX 40-й серии или новее.",
         "settings": "Настройки",
-        "settings_optional": "Скачивать модели, которым нужно 20 ГБ видеопамяти",
-        "settings_optional_note": (
-            "Без сохранённого выбора такие модели скачиваются только на GPU от 20 ГБ."
+        "settings_vram_tier": "Уровень видеопамяти",
+        "settings_vram_auto": "Авто",
+        "settings_vram_16": "16 ГБ",
+        "settings_vram_24": "24 ГБ",
+        "settings_vram_note": (
+            "Обнаружено {detected}. Активный уровень: {chosen}. "
+            "На карте меньше 24 ГБ остаётся 2 ГБ. На карте 24 ГБ остаётся 3 ГБ."
         ),
+        "settings_vram_blocked": "Уровень 24 ГБ доступен только на карте, которая его тянет.",
+        "settings_uncensored": "Скачать аблитерированные модели",
+        "settings_uncensored_note": (
+            "По умолчанию только обычные модели. Аблитерированные скачиваются отдельно."
+        ),
+        "settings_uncensored_blocked": (
+            "Аблитерированные модели доступны на GPU от 20 ГБ видеопамяти."
+        ),
+        "settings_download": "Скачать",
+        "settings_downloading": "Скачивание…",
         "settings_save": "Сохранить",
         "settings_saved": "Сохранено.",
     },
@@ -124,10 +152,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "egg": "Der Webstuhl ist wach.",
         "gpu_note": "Ein echter Lauf braucht eine NVIDIA RTX 40 oder neuer.",
         "settings": "Einstellungen",
-        "settings_optional": "Modelle laden, die 20 GB Videospeicher brauchen",
-        "settings_optional_note": (
-            "Ohne gespeicherte Wahl laden diese Modelle nur auf einer GPU ab 20 GB."
+        "settings_vram_tier": "VRAM-Stufe",
+        "settings_vram_auto": "Automatisch",
+        "settings_vram_16": "16 GB",
+        "settings_vram_24": "24 GB",
+        "settings_vram_note": (
+            "Erkannt: {detected}. Aktive Stufe: {chosen}. "
+            "Unter 24 GB bleiben 2 GB frei. Ab 24 GB bleiben 3 GB frei."
         ),
+        "settings_vram_blocked": "Die 24-GB-Stufe braucht eine Karte, die sie ausführen kann.",
+        "settings_uncensored": "Abliterierte Modelle herunterladen",
+        "settings_uncensored_note": (
+            "Standard sind nur die Originalmodelle. Abliterierte Modelle sind ein eigener Download."
+        ),
+        "settings_uncensored_blocked": (
+            "Abliterierte Modelle brauchen eine GPU mit mindestens 20 GB Videospeicher."
+        ),
+        "settings_download": "Herunterladen",
+        "settings_downloading": "Wird geladen…",
         "settings_save": "Speichern",
         "settings_saved": "Gespeichert.",
     },

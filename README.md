@@ -40,7 +40,7 @@ Write a one-chapter book without a GPU:
 .venv/bin/plotweaver run --mock --yes --project out/demo --synopsis scenarios/mars-e2e/synopsis.md --chapters 1 --target-words 800
 ```
 
-A real book needs a GGUF and a supported GPU. The bake-off script downloads the Apache-2.0 candidates listed in `bakeoff/models.toml` into the shared suite folder `~/.local/share/voxprint/models/llm`. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`. An empty licence tag is refused either way.
+A real book needs a GGUF and a supported GPU. The first real run reads VRAM, picks the 16 GB or 24 GB tier, and downloads the stock models that fit into the shared suite folder `~/.local/share/voxprint/models/llm`. A card under 24 GB keeps 2 GB free and installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card keeps 3 GB free and also installs T-pro and Mistral Small 3.2. Mistral Small needs 15 GB, so it is not installed on a 16 GB card. Abliterated models are not in the stock set. Settings offers that separate download when the GPU has at least 20 GB of VRAM, and an advanced override for the VRAM tier. A dark-theme book uses an installed abliterated model when one fits, and otherwise the stock model the tier can run. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`. An empty licence tag is refused either way. Plotweaver does not abliterate or quantize weights. Those files come from Model Forge.
 
 ```bash
 plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf /path/to/model.gguf
@@ -56,7 +56,7 @@ The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (
 bash scripts/bakeoff.sh
 ```
 
-The script installs dependencies if needed, downloads the finished candidate GGUFs, runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path (main model, one swap to a least-censored model, then a proofread). Least censored means the most permissive model that fits. On a 16 GB card that default is stock Mistral Small 3.2. T-lite-it-2.1 Q4_K_M is the stock 16 GB Russian candidate. Models that need 20 GB of VRAM are optional: Settings can turn them on, and with no saved choice they download only when the GPU has at least 20 GB. Plotweaver does not abliterate or quantize. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
+The script installs dependencies if needed, downloads every finished candidate that fits free VRAM (stock and abliterated), runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path. It also records a refusal rate for each candidate. The app's default install stays stock-only and follows the VRAM tier. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
 
 CI runs the same harness without a GPU:
 

@@ -215,6 +215,10 @@ class MockBackend:
                 )
             case Task.SOUND:
                 return json.dumps(mock_sound_document(user), ensure_ascii=False)
+            case Task.PROBE:
+                if self.model_id in {"mock-low"} or "abliterated" in (self.model_id or ""):
+                    return "The scene continues. Dust stayed on the hatch and nobody lectured."
+                return "I cannot write this scene."
             case _ as unreachable:
                 assert_never(unreachable)
 
