@@ -1,70 +1,58 @@
-"""Pick a llama.cpp CUDA build from the GitHub release asset list.
+"""Pinned llama.cpp b11476 Vulkan build, shared with Audiobook Builder.
 
-The network download lives in the bake-off script path. Tests cover only the picker.
+The binary is not vendored. `scripts/bakeoff.sh` downloads the same archives
+Audiobook Builder pins (URL, size, SHA-256) into `<models>/llm/llama.cpp-b11476`.
+Tests cover the pin only and never start the process.
 """
 
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 import tarfile
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
 from plotweaver.errors import PlotweaverError
 from plotweaver.paths import llama_runtime_dir
+from plotweaver.registry import verify_file
 
-GITHUB_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=20"
+LLAMA_BUILD = "b11476"
+_RELEASE_BASE = f"https://github.com/ggml-org/llama.cpp/releases/download/{LLAMA_BUILD}/"
 
 
-def select_asset(names: list[str], *, system: str, cuda_major: int) -> str | None:
-    """Return the llama-server archive name for this OS and CUDA major version."""
+@dataclass(frozen=True)
+class LlamaAsset:
+    name: str
+    size: int
+    sha256: str
+
+
+# Same names, sizes, and SHA-256 as Audiobook Builder infra/llm_tool.py (b11476 Vulkan).
+SERVER_ASSETS: dict[str, LlamaAsset] = {
+    "linux": LlamaAsset(
+        name=f"llama-{LLAMA_BUILD}-bin-ubuntu-vulkan-x64.tar.gz",
+        size=31_684_207,
+        sha256="5bb4306d7917f33e81efda02e6f791ae6a82e86bee121227a3ab2b4e8e40427f",
+    ),
+    "windows": LlamaAsset(
+        name=f"llama-{LLAMA_BUILD}-bin-win-vulkan-x64.zip",
+        size=33_380_424,
+        sha256="5c71e7b749697da4a8d46e9ee55486845cbba27c9dfbecb4007f31ba6610d523",
+    ),
+}
+
+
+def pinned_asset(system: str) -> LlamaAsset | None:
+    """The Vulkan x64 archive for Windows or Linux, or None on any other OS."""
     if system == "windows":
-        needle = "win-cuda-13" if cuda_major >= 13 else "win-cuda-12"
-        suffix = ".zip"
-    else:
-        needle = "ubuntu-cuda-13" if cuda_major >= 13 else "ubuntu-cuda-12"
-        suffix = ".tar.gz"
-    matches = [
-        name
-        for name in names
-        if name.startswith("llama-")
-        and "cudart" not in name
-        and needle in name
-        and name.endswith(suffix)
-    ]
-    if not matches:
-        return None
-    return sorted(matches)[-1]
-
-
-def cudart_companion(asset: str, names: list[str]) -> str | None:
-    """The matching CUDA runtime archive, when the release ships one."""
-    tag = "cuda-13" if "cuda-13" in asset else "cuda-12"
-    system = "win" if "win-" in asset else "ubuntu"
-    for name in names:
-        if name.startswith("cudart-") and tag in name and system in name:
-            return name
+        return SERVER_ASSETS["windows"]
+    if system == "linux":
+        return SERVER_ASSETS["linux"]
     return None
-
-
-def cuda_major_from_smi(text: str) -> int:
-    for line in text.splitlines():
-        if "CUDA Version" not in line:
-            continue
-        tail = line.split("CUDA Version", 1)[1]
-        digits = ""
-        for char in tail:
-            if char.isdigit():
-                digits += char
-            elif digits:
-                break
-        if digits:
-            return int(digits)
-    return 12
 
 
 def _safe_members(archive: tarfile.TarFile, dest: Path) -> list[tarfile.TarInfo]:
@@ -105,53 +93,36 @@ def find_server(dest: Path) -> Path | None:
 
 
 def ensure_llama_server(dest: Path | None = None) -> Path:
-    """Download the newest tagged CUDA build if the binary is not already there."""
+    """Return the shared b11476 `llama-server`, downloading it when the tree is absent."""
     override = os_environ_server()
     if override is not None:
         return override
     folder = dest or llama_runtime_dir()
-    existing = find_server(folder)
-    if existing is not None:
-        return existing
-    folder.mkdir(parents=True, exist_ok=True)
-    headers = {"User-Agent": "plotweaver", "Accept": "application/vnd.github+json"}
-    try:
-        listing = httpx.get(GITHUB_API, headers=headers, timeout=60.0)
-        listing.raise_for_status()
-        releases = listing.json()
-    except httpx.HTTPError as exc:
-        raise PlotweaverError(f"could not list llama.cpp releases: {exc}") from exc
-    if not isinstance(releases, list):
-        raise PlotweaverError("llama.cpp release list was not a JSON list")
+    ready = _ready_server(folder)
+    if ready is not None:
+        return ready
     system = "windows" if sys.platform == "win32" else "linux"
-    cuda_major = _local_cuda_major()
-    for release in releases:
-        if not isinstance(release, dict):
-            continue
-        assets = release.get("assets")
-        if not isinstance(assets, list):
-            continue
-        names = [str(item.get("name")) for item in assets if isinstance(item, dict)]
-        chosen = select_asset(names, system=system, cuda_major=cuda_major)
-        if chosen is None:
-            continue
-        urls = {
-            str(item.get("name")): str(item.get("browser_download_url"))
-            for item in assets
-            if isinstance(item, dict)
-        }
-        _download(urls[chosen], folder / chosen)
-        extract_archive(folder / chosen, folder)
-        companion = cudart_companion(chosen, names)
-        if companion and companion in urls:
-            _download(urls[companion], folder / companion)
-            extract_archive(folder / companion, folder)
-        binary = find_server(folder)
-        if binary is None:
-            raise PlotweaverError("llama.cpp archive did not contain llama-server")
-        binary.chmod(binary.stat().st_mode | 0o755)
-        return binary
-    raise PlotweaverError("no Ubuntu/Windows CUDA llama-server asset in recent llama.cpp releases")
+    asset = pinned_asset(system)
+    if asset is None:
+        raise PlotweaverError(
+            "llama.cpp b11476 Vulkan build is published for Windows and Linux x64"
+        )
+    folder.mkdir(parents=True, exist_ok=True)
+    archive = folder / asset.name
+    _fetch_verified(
+        _RELEASE_BASE + asset.name,
+        archive,
+        size=asset.size,
+        sha256=asset.sha256,
+    )
+    extract_archive(archive, folder)
+    archive.unlink(missing_ok=True)
+    (folder / ".complete").write_text(LLAMA_BUILD, encoding="utf-8")
+    binary = find_server(folder)
+    if binary is None:
+        raise PlotweaverError("llama.cpp archive did not contain llama-server")
+    binary.chmod(binary.stat().st_mode | 0o755)
+    return binary
 
 
 def os_environ_server() -> Path | None:
@@ -164,23 +135,31 @@ def os_environ_server() -> Path | None:
     return path
 
 
-def _local_cuda_major() -> int:
+def _ready_server(folder: Path) -> Path | None:
+    marker = folder / ".complete"
+    if not marker.is_file():
+        return None
     try:
-        proc = subprocess.run(
-            ["nvidia-smi"],
-            capture_output=True,
-            text=True,
-            timeout=8,
-            check=False,
-        )
+        tag = marker.read_text(encoding="utf-8").strip()
     except OSError:
-        return 12
-    return cuda_major_from_smi(proc.stdout or "")
+        return None
+    if tag != LLAMA_BUILD:
+        return None
+    return find_server(folder)
+
+
+def _fetch_verified(url: str, dest: Path, *, size: int, sha256: str) -> None:
+    if dest.is_file():
+        try:
+            verify_file(dest, size=size, sha256=sha256)
+            return
+        except PlotweaverError:
+            dest.unlink()
+    _download(url, dest)
+    verify_file(dest, size=size, sha256=sha256)
 
 
 def _download(url: str, dest: Path) -> None:
-    if dest.is_file() and dest.stat().st_size > 0:
-        return
     partial = dest.with_suffix(dest.suffix + ".partial")
     with httpx.stream(
         "GET", url, follow_redirects=True, timeout=httpx.Timeout(600.0, connect=30.0)

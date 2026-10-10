@@ -39,12 +39,20 @@ def suite_state_dir() -> Path:
     return Path.home() / ".local" / "share" / "voxprint" / "state"
 
 
+def gguf_dir() -> Path:
+    """Shared suite GGUF folder, `<models>/llm`.
+
+    Audiobook Builder stores Gemma 4 12B at this path, so one download serves both apps.
+    """
+    return models_dir() / "llm"
+
+
 def llama_runtime_dir() -> Path:
+    """Unpacked llama.cpp b11476 tree, `<models>/llm/llama.cpp-b11476`.
+
+    The same directory Audiobook Builder uses for its Vulkan `llama-server`.
+    """
     override = os.environ.get("PLOTWEAVER_LLAMA_DIR")
     if override:
         return Path(override)
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA")
-        root = Path(base) if base else Path.home() / "AppData" / "Local"
-        return root / "Voxprint" / "runtime" / "llama-cpp"
-    return Path.home() / ".local" / "share" / "voxprint" / "runtime" / "llama-cpp"
+    return gguf_dir() / "llama.cpp-b11476"

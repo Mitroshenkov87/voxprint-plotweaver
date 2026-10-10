@@ -6,7 +6,7 @@ The engine is a command-line pipeline with checkpoints. The window is a native P
 
 ## Status
 
-This build runs the pipeline on a deterministic mock model, which is what CI uses, and on `llama-server` from llama.cpp when an NVIDIA RTX 40-series GPU (or newer) is present. Python 3.14 is the required interpreter. The libraries this app imports publish 3.14 wheels (PySide6, httpx, python-docx, ebooklib, datasketch, pymorphy3, Pillow), so the line was not lowered.
+This build runs the pipeline on a deterministic mock model, which is what CI uses, and on `llama-server` from llama.cpp b11476 (the Vulkan build Audiobook Builder pins) when an NVIDIA RTX 40-series GPU (or newer) is present. Python 3.14 is the required interpreter. The libraries this app imports publish 3.14 wheels (PySide6, httpx, python-docx, ebooklib, datasketch, pymorphy3, Pillow), so the line was not lowered.
 
 Not in this build, on purpose:
 
@@ -40,7 +40,7 @@ Write a one-chapter book without a GPU:
 .venv/bin/plotweaver run --mock --yes --project out/demo --synopsis scenarios/mars-e2e/synopsis.md --chapters 1 --target-words 800
 ```
 
-A real book needs a GGUF and a supported GPU. The bake-off script downloads the Apache-2.0 candidates listed in `bakeoff/models.toml`. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`.
+A real book needs a GGUF and a supported GPU. The bake-off script downloads the Apache-2.0 candidates listed in `bakeoff/models.toml` into the shared suite folder `~/.local/share/voxprint/models/llm`. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`. An empty licence tag is refused either way.
 
 ```bash
 plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf /path/to/model.gguf
@@ -71,7 +71,7 @@ PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --limit 1
 On the GPU VM, after the weights are on disk:
 
 ```bash
-bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/T-pro-it-2.1-Q4_K_M.gguf"
+bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
 ```
 
 Output defaults to `./out/mars-e2e/`. The Audiobook Builder import is `book.vxbook`. The same run also writes `book.sound.vxbook` (VXBOOK v1.1 + sound extension v1) beside it. `--speaker-marks` also writes the legacy numbered pair under `audiobook/`. Override the folder with `PLOTWEAVER_MARS_OUT`.

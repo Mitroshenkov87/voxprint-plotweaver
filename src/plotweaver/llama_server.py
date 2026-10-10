@@ -1,7 +1,8 @@
 """llama.cpp llama-server as a worker process. One large model at a time.
 
-The binary is not vendored. The bake-off script downloads a CUDA build; tests use
-the mock backend and never start this process.
+The binary is not vendored. The bake-off script downloads llama.cpp b11476
+(Vulkan), the same build Audiobook Builder pins. Tests use the mock backend
+and never start this process.
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ class LlamaServer:
         if not self.binary.is_file():
             raise PlotweaverError(
                 f"llama-server not found at {self.binary}. "
-                "On the GPU machine, run scripts/bakeoff.sh so it can download the binary."
+                "On the GPU machine, run scripts/bakeoff.sh so it can download llama.cpp b11476."
             )
         gpu = query_gpu()
         if gpu is None:

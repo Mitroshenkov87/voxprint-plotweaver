@@ -17,7 +17,7 @@ Without `--yes`, autopilot stops after the bible and after the outline. Copilot 
 
 ## One model in memory
 
-`llama-server` from llama.cpp (MIT, not vendored) serves an OpenAI-compatible completion on localhost. The VRAM budget is free memory minus the larger of 2 GB and 8 percent of the card. If the weights do not fit, layers move to RAM; a mixture-of-experts model uses `--n-cpu-moe` instead. A spill halves context (floor 4096) and the batch. The KV cache is q8_0 only when the leftover after weights is above 3 GB and nothing spilled.
+`llama-server` from llama.cpp b11476 (MIT, Vulkan build, not vendored) serves an OpenAI-compatible completion on localhost. The binary and the GGUF files live under the shared suite folder `<models>/llm`, so a file Audiobook Builder already downloaded (Gemma 4 12B Q4_K_M) is not fetched again. `<models>/.users.json` records `plotweaver` next to the other suite apps. The VRAM budget is free memory minus the larger of 2 GB and 8 percent of the card. If the weights do not fit, layers move to RAM; a mixture-of-experts model uses `--n-cpu-moe` instead. A spill halves context (floor 4096) and the batch. The KV cache is q8_0 only when the leftover after weights is above 3 GB and nothing spilled.
 
 The suite lock `%TEMP%/voxprint-gpu.lock` is JSON `{owner, pid, job, started, eta}` in UTC. Owner is `plotweaver`. The same process may re-enter. The lock is stale when the pid is gone or the eta is more than two hours in the past. It is held for the whole book and released when the run returns, including a run that is waiting at a gate.
 

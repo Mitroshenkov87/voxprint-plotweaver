@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Write the short Russian Mars story, book.vxbook, and book.sound.vxbook.
 # Default output is ./out/mars-e2e/. Override with PLOTWEAVER_MARS_OUT.
-# PLOTWEAVER_MOCK=1 or --mock skips the GPU. A real run needs --main-gguf
-# or PLOTWEAVER_MAIN_GGUF.
+# PLOTWEAVER_MOCK=1 or --mock skips the GPU. A real run needs --main-gguf,
+# PLOTWEAVER_MAIN_GGUF, or the shared T-pro file under <models>/llm.
+# Heretic is not downloaded or started.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 OUT="${PLOTWEAVER_MARS_OUT:-./out/mars-e2e}"
+DEFAULT_GGUF="${HOME}/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
 MOCK=0
 ARGS=()
 for arg in "$@"; do
@@ -39,6 +41,8 @@ else
   done
   if [[ "$has_gguf" == "0" && -n "${PLOTWEAVER_MAIN_GGUF:-}" ]]; then
     ARGS+=("--main-gguf" "$PLOTWEAVER_MAIN_GGUF")
+  elif [[ "$has_gguf" == "0" && -f "$DEFAULT_GGUF" ]]; then
+    ARGS+=("--main-gguf" "$DEFAULT_GGUF")
   fi
 fi
 

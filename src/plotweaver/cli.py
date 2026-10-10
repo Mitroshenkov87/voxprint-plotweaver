@@ -220,7 +220,7 @@ def _apply_models(request: BookRequest, args: argparse.Namespace) -> None:
     if not args.mock and not request.main_gguf:
         raise PlotweaverError(
             "A real run needs --main-gguf PATH. "
-            "scripts/bakeoff.sh downloads the candidate weights on the GPU machine."
+            "scripts/bakeoff.sh downloads the registry GGUFs into the shared models/llm folder."
         )
 
 
