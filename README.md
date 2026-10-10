@@ -56,7 +56,7 @@ The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (
 bash scripts/bakeoff.sh
 ```
 
-The script installs dependencies if needed, downloads every finished candidate that fits (stock and abliterated), runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path. It also records a refusal rate for each candidate. The app's default install stays stock-only. `bash scripts/abliterate_mistral.sh --bakeoff` derives an abliterated Mistral Small on the GPU VM and then runs this bake-off. `bash scripts/abliterate_mistral.sh --tiny` checks that derivation on a tiny model. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
+The script installs dependencies if needed, downloads every finished candidate that fits (stock and abliterated), runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path. It also records a refusal rate for each candidate. The app's default install stays stock-only. `bash scripts/abliterate_mistral.sh --bakeoff` derives an abliterated Mistral Small on the GPU VM and then runs this bake-off. `bash scripts/abliterate_mistral.sh --tiny` checks that derivation on a tiny model. `bash scripts/fit16gb.sh` is the 16 GB fit experiment for the same VM; `--tiny` checks it without weights. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
 
 CI runs the same harness without a GPU:
 

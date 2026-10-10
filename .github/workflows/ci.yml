@@ -50,6 +50,7 @@ jobs:
         run: |
           PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --mock --limit 1 --results "$RUNNER_TEMP/bakeoff"
           bash scripts/abliterate_mistral.sh --tiny
+          bash scripts/fit16gb.sh --tiny
           PLOTWEAVER_MOCK=1 PLOTWEAVER_MARS_OUT="$RUNNER_TEMP/mars" bash scripts/e2e_mars.sh
       - name: pip-audit
         run: pip-audit --skip-editable

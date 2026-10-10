@@ -74,6 +74,27 @@ CI checks the same math on a tiny in-memory model and does not download weights:
 bash scripts/abliterate_mistral.sh --tiny
 ```
 
+## 16 GB fit experiment
+
+Run this on the RTX 4090 after the app tests, so the card is free. The goal is real headroom on a 16 GB card: weights plus KV cache at or under 13 GiB, leaving 2–3 GB free. The probe sets llama.cpp `--fit-target` to 13312 MiB, which is that budget, even though the machine has 24 GB. A variant fails when the model buffer spills to CPU or the measured sum exceeds 13 GiB.
+
+Candidates:
+
+- Huihui Qwen 3.6 27B abliterated and the abliterated Gemma 4 31B, at IQ4_XS, IQ3_M, and Q3_K_M. The importance matrix is computed with llama.cpp b11476 `llama-imatrix` on `bakeoff/calibration/ru-fiction.txt` (original Russian fiction, Apache-2.0, same licence as this repo), then `llama-quantize` applies it to the Q8_0 file from the same pinned revision. The Q8 hash is recorded on first download and checked after that.
+- Abliterated Mistral Small at the pinned Q4_K_M and at Q5_K_M built the same way.
+
+Each cell turns flash attention on and tries KV cache `q8_0` and `q4_0` at 8192 and 16384 context. Against that model's own Q4_K_M it records perplexity on the calibration text, a short score on the first two synopses, and the refusal rate. It also records prompt and generation tokens/s. Finished rows are skipped.
+
+```bash
+bash scripts/fit16gb.sh
+```
+
+The table is `out/fit16/summary.md` and `out/fit16/summary.csv`. The recommendation prefers a row that fits at 16384, then the smaller quality loss, then higher generation speed. CI does not download weights:
+
+```bash
+bash scripts/fit16gb.sh --tiny
+```
+
 ## Mars story
 
 Fiction only. SpaceX may be named as the company. The crew and mission control in `scenarios/mars-e2e/synopsis.md` are invented. `outline.md` is a human scene list and is not sent to the model.
