@@ -26,6 +26,7 @@ from plotweaver.ui.theme import (
     WHITE,
     contrast_ratio,
 )
+from plotweaver.ui.vm_shots import save_vm_shots
 from plotweaver.ui.window import MainWindow
 
 
@@ -49,7 +50,7 @@ def test_catalogues_share_keys() -> None:
     assert set(STRINGS["de"]) == english
 
 
-def test_settings_hides_abliterated_downloads_below_20gb(tmp_path: Path, monkeypatch) -> None:
+def test_settings_offers_abliterated_downloads_on_16gb(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
     monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4060 Ti,8.9,16384,14000")
     app = QApplication.instance() or QApplication([])
@@ -57,11 +58,10 @@ def test_settings_hides_abliterated_downloads_below_20gb(tmp_path: Path, monkeyp
     window.show()
     window._open_settings()
     assert window.stack.currentIndex() == 4
-    assert window.uncensored_models.isEnabled() is False
-    assert "published" in window.settings_note.text()
+    assert window.uncensored_models.isEnabled() is True
     window.uncensored_models.setChecked(True)
     window._save_settings()
-    assert uncensored_models_preference() is False
+    assert uncensored_models_preference() is True
     model = window.vram_tier.model()
     assert isinstance(model, QStandardItemModel)
     item = model.item(2)
@@ -77,7 +77,24 @@ def test_settings_hides_abliterated_downloads_below_20gb(tmp_path: Path, monkeyp
     del app
 
 
-def test_settings_offers_abliterated_downloads_at_20gb(tmp_path: Path, monkeypatch) -> None:
+def test_settings_hides_abliterated_downloads_when_nothing_fits(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
+    monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4060,8.9,8192,3072")
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    window._open_settings()
+    assert window.uncensored_models.isEnabled() is False
+    assert "published" in window.settings_note.text()
+    window.uncensored_models.setChecked(True)
+    window._save_settings()
+    assert uncensored_models_preference() is False
+    del app
+
+
+def test_settings_offers_abliterated_downloads_on_24gb(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
     monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4090,8.9,24576,20000")
     app = QApplication.instance() or QApplication([])
@@ -152,6 +169,19 @@ def test_brief_form_marks_guesses_and_shows_pov(tmp_path: Path) -> None:
     del app
 
 
+def test_vm_shots(tmp_path: Path) -> None:
+    paths = save_vm_shots(tmp_path / "shots")
+    assert [path.name for path in paths] == [
+        "brief-form.png",
+        "progress.png",
+        "result.png",
+        "settings-tier.png",
+    ]
+    for path in paths:
+        assert path.is_file()
+        assert path.stat().st_size > 1000
+
+
 def test_suite_icons_and_splash() -> None:
     app = QApplication.instance() or QApplication([])
     folder = Path(__file__).parents[1] / "src" / "plotweaver" / "ui" / "icons"
@@ -165,7 +195,7 @@ def test_suite_icons_and_splash() -> None:
     assert splash.version_text == version_label()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Machashavah"'
+    assert window.about_text() == '0.2.0 RC · build dev "Tzaruf"'
     save = next(
         button
         for button in window.findChildren(type(window.download_uncensored))

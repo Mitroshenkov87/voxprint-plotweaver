@@ -23,7 +23,7 @@ from plotweaver.export import export_output_names
 from plotweaver.hardware import require_supported_gpu, vram_budget_gb, vram_headroom_gb
 from plotweaver.install import prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
-from plotweaver.llama_server import LlamaServer
+from plotweaver.llama_server import LlamaServer, apply_vram_budget_cap
 from plotweaver.llm import LLMBackend, MockBackend
 from plotweaver.registry import (
     detected_tier,
@@ -411,7 +411,11 @@ def _doctor(args: argparse.Namespace) -> int:
         return 0
     info = require_supported_gpu()
     budget = vram_budget_gb(info.free_gb, info.total_gb)
+    capped = apply_vram_budget_cap(budget)
     chosen = resolve_tier(info.total_gb)
+    cap_note = ""
+    if capped < budget:
+        cap_note = f" Server budget capped at {capped:.1f} GB."
     print(
         f"{info.name}: compute {info.compute_cap}, "
         f"VRAM {info.free_gb:.1f} of {info.total_gb:.1f} GB free, "
@@ -419,6 +423,7 @@ def _doctor(args: argparse.Namespace) -> int:
         f"Model tier {chosen} (detected {detected_tier(info.total_gb)}), "
         f"usable {usable_vram_gb(info.total_gb, info.free_gb):.1f} GB "
         f"with {tier_headroom_gb(info.total_gb):.0f} GB held back."
+        f"{cap_note}"
     )
     return 0
 

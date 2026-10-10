@@ -1,0 +1,295 @@
+#!/usr/bin/env bash
+# Lean RTX 4090 check: cheap tests, then one short dark-theme book per tier.
+# Default output is ./out/vm-test. --mock skips the GPU and the model download.
+# Settings are written under the output directory, not the machine's saved settings.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+OUT="./out/vm-test"
+MOCK=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mock) MOCK=1; shift ;;
+    --out)
+      OUT="${2:-}"
+      if [[ -z "$OUT" ]]; then
+        echo "--out needs a directory" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+if [[ "${PLOTWEAVER_MOCK:-}" == "1" ]]; then
+  MOCK=1
+fi
+
+pick_python() {
+  if [[ -n "${PLOTWEAVER_PYTHON:-}" ]] && "$PLOTWEAVER_PYTHON" -c "import plotweaver" >/dev/null 2>&1; then
+    echo "$PLOTWEAVER_PYTHON"
+    return
+  fi
+  if [[ -x "$ROOT/.venv/bin/python" ]] && "$ROOT/.venv/bin/python" -c "import plotweaver" >/dev/null 2>&1; then
+    echo "$ROOT/.venv/bin/python"
+    return
+  fi
+  if command -v python3 >/dev/null 2>&1 && python3 -c "import plotweaver" >/dev/null 2>&1; then
+    command -v python3
+    return
+  fi
+  if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+  fi
+  uv venv --python 3.14 "$ROOT/.venv"
+  uv pip install --python "$ROOT/.venv/bin/python" -e "$ROOT[dev]"
+  echo "$ROOT/.venv/bin/python"
+}
+
+PY="$(pick_python)"
+if ! "$PY" -m pytest --version >/dev/null 2>&1; then
+  if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+  fi
+  uv pip install --python "$PY" -e "$ROOT[dev]"
+fi
+
+export PLOTWEAVER_NO_UPDATE_CHECK=1
+export QT_QPA_PLATFORM=offscreen
+export PLOTWEAVER_STATE="$OUT/state"
+mkdir -p "$OUT/checks" "$OUT/screenshots" "$OUT/16gb" "$OUT/24gb" "$OUT/mars" "$OUT/state"
+if [[ "$MOCK" == "1" ]]; then
+  echo 1 > "$OUT/mode.txt"
+else
+  echo 0 > "$OUT/mode.txt"
+fi
+
+status=0
+
+stamp_copy() {
+  local dest="$1"
+  "$PY" -c '
+import sys, time
+dest = sys.argv[1]
+with open(dest, "w", encoding="utf-8") as handle:
+    for line in sys.stdin:
+        handle.write(f"{time.time():.3f}\t{line}")
+        handle.flush()
+' "$dest"
+}
+
+start_vram_watch() {
+  local dest="$1"
+  echo 0 > "$dest"
+  (
+    peak=0
+    while true; do
+      used="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -n 1 | tr -d "[:space:]" || true)"
+      if [[ "$used" =~ ^[0-9]+$ ]] && (( used > peak )); then
+        peak=$used
+        echo "$peak" > "$dest"
+      fi
+      sleep 2
+    done
+  ) &
+  echo $!
+}
+
+save_shots() {
+  local export_dir="${1:-}"
+  PLOTWEAVER_VM_SHOTS="$OUT/screenshots" PLOTWEAVER_VM_EXPORT="$export_dir" "$PY" -c '
+import os
+from pathlib import Path
+from plotweaver.ui.vm_shots import save_vm_shots
+raw = os.environ.get("PLOTWEAVER_VM_EXPORT", "")
+export = Path(raw) if raw else None
+save_vm_shots(Path(os.environ["PLOTWEAVER_VM_SHOTS"]), export_dir=export)
+'
+}
+
+set_tier() {
+  local tier="$1"
+  PLOTWEAVER_VM_TIER="$tier" "$PY" -c '
+import os
+from plotweaver.settings import save_model_tier_override, save_uncensored_models
+save_uncensored_models(True)
+save_model_tier_override(os.environ["PLOTWEAVER_VM_TIER"])
+'
+}
+
+run_book() {
+  local tier="$1"
+  local dir="$OUT/$tier"
+  mkdir -p "$dir"
+  local -a mock_args=()
+  if [[ "$MOCK" == "1" ]]; then
+    mock_args=(--mock)
+    echo n/a > "$dir/vram-peak-mib.txt"
+  else
+    if [[ "$tier" == "16gb" ]]; then
+      export PLOTWEAVER_VRAM_BUDGET_CAP_GB=14
+      set_tier 16gb
+    else
+      unset PLOTWEAVER_VRAM_BUDGET_CAP_GB
+      set_tier 24gb
+    fi
+    "$PY" -m plotweaver doctor > "$dir/doctor.txt"
+  fi
+  export PLOTWEAVER_METRICS="$dir/metrics.jsonl"
+  : > "$dir/metrics.jsonl"
+  local watch=""
+  if [[ "$MOCK" != "1" ]]; then
+    watch="$(start_vram_watch "$dir/vram-peak-mib.txt")"
+  fi
+  local start end code
+  start="$(date +%s.%N)"
+  set +e
+  "$PY" -m plotweaver run \
+    --project "$dir/project" \
+    --brief "$ROOT/scripts/vm-brief.md" \
+    --chapters 2 \
+    --scenes-per-chapter 1 \
+    --dark-themes \
+    --yes \
+    --fb2 \
+    --sound \
+    --json \
+    "${mock_args[@]+"${mock_args[@]}"}" \
+    >"$dir/run.json" \
+    2> >(stamp_copy "$dir/stderr.log")
+  code=$?
+  set -e
+  end="$(date +%s.%N)"
+  printf '%s\tEND\n' "$end" >> "$dir/stderr.log"
+  VM_START="$start" VM_END="$end" "$PY" -c \
+    'import os; print(float(os.environ["VM_END"]) - float(os.environ["VM_START"]))' \
+    > "$dir/wall-seconds.txt"
+  if [[ -n "$watch" ]]; then
+    kill "$watch" 2>/dev/null || true
+    wait "$watch" 2>/dev/null || true
+  fi
+  if [[ "$code" -ne 0 ]]; then
+    return "$code"
+  fi
+  "$PY" -m plotweaver vxbook validate "$dir/project/export/book.vxbook" --json \
+    > "$dir/vxbook-validate.json"
+}
+
+echo "pytest subset"
+if ! "$PY" -m pytest \
+  tests/test_models.py \
+  tests/test_cli_machine.py \
+  tests/test_vxbook.py \
+  tests/test_ui.py::test_vm_shots \
+  -q >"$OUT/checks/pytest.log" 2>&1; then
+  status=1
+fi
+
+echo "CLI smoke"
+if ! "$PY" -m plotweaver run \
+  --project "$OUT/checks/dry-project" \
+  --brief "$ROOT/scripts/vm-brief.md" \
+  --chapters 2 \
+  --scenes-per-chapter 1 \
+  --dark-themes \
+  --yes --fb2 --sound --json --dry-run --mock \
+  >"$OUT/checks/run-dry.json"; then
+  status=1
+fi
+if ! "$PY" -m plotweaver vxbook validate \
+  "$ROOT/tests/fixtures/vxbook/manifest.json" \
+  --dry-run --json >"$OUT/checks/vxbook-dry.json"; then
+  status=1
+fi
+VM_ROOT="$ROOT" VM_OUT="$OUT/checks" "$PY" -c '
+import json, os
+from pathlib import Path
+root = Path(os.environ["VM_ROOT"])
+out = Path(os.environ["VM_OUT"])
+(out / "models.toml").write_text((root / "bakeoff" / "models.toml").read_text(encoding="utf-8"), encoding="utf-8")
+(out / "forge.json").write_text(json.dumps({"models": [{"id": "gemma-4-31b-abliterated-iq3-xxs", "revision": "pending", "sha256": "ab" * 32, "size": 1}]}), encoding="utf-8")
+'
+if ! "$PY" -m plotweaver models import-forge-manifest \
+  "$OUT/checks/forge.json" \
+  --registry "$OUT/checks/models.toml" \
+  --dry-run --json >"$OUT/checks/import-dry.json"; then
+  status=1
+fi
+
+echo "screenshots"
+if ! save_shots; then
+  status=1
+fi
+
+if [[ "$MOCK" == "1" ]]; then
+  echo "mock 16 GB pass"
+  run_book 16gb || status=1
+  echo "mock 24 GB pass"
+  run_book 24gb || status=1
+  echo "Mars hand-off"
+  if ! PLOTWEAVER_MARS_OUT="$OUT/mars" bash "$ROOT/scripts/e2e_mars.sh" --mock; then
+    status=1
+  fi
+else
+  echo "GPU doctor"
+  if ! "$PY" -m plotweaver doctor >"$OUT/doctor.txt"; then
+    status=1
+  fi
+  if [[ "$status" -eq 0 ]]; then
+    echo "model download"
+    if ! "$PY" -c '
+from plotweaver.hardware import require_supported_gpu
+from plotweaver.install import ensure_default_install, ensure_uncensored_models
+gpu = require_supported_gpu()
+print(f"{gpu.name}: {gpu.free_gb:.1f} of {gpu.total_gb:.1f} GB free")
+print("stock", ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb))
+print("forge", ensure_uncensored_models(total_vram_gb=gpu.total_gb, free_gb=gpu.free_gb))
+' >"$OUT/checks/download.txt"; then
+      status=1
+    fi
+  fi
+  if [[ "$status" -eq 0 ]]; then
+    echo "16 GB pass"
+    run_book 16gb || status=1
+    echo "24 GB pass"
+    run_book 24gb || status=1
+    if [[ -f "$OUT/24gb/project/export/book.vxbook" ]]; then
+      save_shots "$OUT/24gb/project/export" || status=1
+    fi
+    echo "Mars hand-off"
+    if ! PLOTWEAVER_MARS_OUT="$OUT/mars" bash "$ROOT/scripts/e2e_mars.sh"; then
+      status=1
+    fi
+  fi
+fi
+
+if [[ -f "$OUT/mars/book.vxbook" ]]; then
+  "$PY" -m plotweaver vxbook validate "$OUT/mars/book.vxbook" --json \
+    >"$OUT/mars/vxbook-validate.json" || status=1
+fi
+if [[ -f "$OUT/mars/book.sound.vxbook" ]]; then
+  "$PY" -m plotweaver vxbook validate "$OUT/mars/book.sound.vxbook" --json \
+    >"$OUT/mars/sound-validate.json" || status=1
+fi
+
+echo "summary"
+PLOTWEAVER_VM_OUT="$OUT" "$PY" -c '
+import os
+from pathlib import Path
+from plotweaver.vm_report import write_summary
+write_summary(Path(os.environ["PLOTWEAVER_VM_OUT"]))
+'
+tar -C "$OUT" -czf "$OUT/vm-test-results.tar.gz" \
+  summary.md screenshots doctor.txt 16gb 24gb mars checks state mode.txt 2>/dev/null \
+  || tar -C "$OUT" -czf "$OUT/vm-test-results.tar.gz" \
+    summary.md screenshots 16gb 24gb mars checks mode.txt
+
+echo "wrote $OUT/summary.md and $OUT/vm-test-results.tar.gz"
+exit "$status"

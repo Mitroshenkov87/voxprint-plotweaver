@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -59,8 +58,10 @@ def test_registry_lists_confirmed_apache_models() -> None:
         "gemma-4-31b-abliterated-iq4-xs",
         "gemma-4-31b-abliterated-iq3-m",
         "gemma-4-31b-abliterated-q3-k-m",
-        "t-lite-it-2.1-forge-abliterated-q4",
-        "qwen3.6-27b-abliterated-q4",
+        "gemma-4-31b-abliterated-iq3-xxs",
+        "t-lite-it-2.1-abliterated-iq4-xs",
+        "t-lite-it-2.1-abliterated-q5",
+        "qwen3.6-27b-abliterated-q5",
         "gemma-4-31b-abliterated-q4",
     ]
     shared = entries[1]
@@ -82,22 +83,61 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert lite_q5.size == 5_850_952_544
     assert lite_q5.sha256.startswith("5ff7c6c3")
     assert lite_q5.revision == lite.revision
-    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    qwen_q3 = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q3-k-m")
+    assert qwen_q3.role == "least-censored"
+    assert qwen_q3.enabled is True
+    assert qwen_q3.tier == "16gb"
+    assert qwen_q3.repo == "Mitroshenkov87/voxprint-huihui-qwen36-27b"
+    assert qwen_q3.revision == "cc596c1a74791b7fca57d037ef168dd57c76ed34"
+    assert qwen_q3.filename == "Q3_K_M.gguf"
+    assert qwen_q3.sha256 == "a52055204d9bd9208f4312951a2a68b32c4c68d54d6905c5386dbb552df58edf"
+    assert qwen_q3.size == 13_500_736_128
+    assert qwen_q3.min_vram_gb == 13
+    assert qwen_q3.default is False
+    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
     assert qwen.role == "least-censored"
     assert qwen.enabled is True
     assert qwen.tier == "24gb"
-    assert qwen.size == 16_547_399_808
+    assert qwen.repo == qwen_q3.repo
+    assert qwen.revision == qwen_q3.revision
+    assert qwen.filename == "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf"
+    assert qwen.sha256 == "a4fd0da6216fb8b9a74e25a688a118b001888b704e17f5c851c2bd80f4f5e284"
+    assert qwen.size == 19_535_700_288
+    assert qwen.min_vram_gb == 18.5
     gemma_31 = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-q4")
     assert gemma_31.enabled is True
     assert gemma_31.tier == "24gb"
+    assert gemma_31.repo == "Mitroshenkov87/voxprint-gemma4-31b"
+    assert gemma_31.revision == "458a5cea1077218d72daf2e49334abe6eb1da930"
+    assert gemma_31.sha256 == "380f2f50f441225e669ab1541220985387bf3933573cd2f4f7e667f3790e73a3"
     assert gemma_31.size == 18_687_057_536
-    russian = next(entry for entry in entries if entry.id == "t-lite-it-2.1-forge-abliterated-q4")
-    assert russian.enabled is False
-    assert russian.languages == ("ru",)
-    assert russian.tier == "16gb"
+    assert gemma_31.min_vram_gb == 18
+    iq4 = next(entry for entry in entries if entry.id == "t-lite-it-2.1-abliterated-iq4-xs")
+    q5_lite = next(entry for entry in entries if entry.id == "t-lite-it-2.1-abliterated-q5")
+    assert iq4.enabled is True and q5_lite.enabled is True
+    assert iq4.languages == ("ru",) and q5_lite.languages == ("ru",)
+    assert iq4.tier == "16gb" and q5_lite.tier == "16gb"
+    assert iq4.repo == "Mitroshenkov87/voxprint-t-lite-it-2.1"
+    assert iq4.revision == "d06307f15311bc5d385c213ef82f52d6dc20ced3"
+    assert q5_lite.revision == iq4.revision
+    assert iq4.filename == "IQ4_XS.gguf"
+    assert iq4.sha256 == "0f0d10020cd7186c5fa46eed0feb5007f5af7fdef01dcd90883e8fe5ee758df0"
+    assert iq4.size == 4_561_837_632
+    assert iq4.min_vram_gb == 5
+    assert q5_lite.filename == "Q5_K_M.gguf"
+    assert q5_lite.sha256 == "3a418e95f953f8d52c8f4047f8731bde37bc1874013bf22e2ea49216fa586b5d"
+    assert q5_lite.size == 5_850_952_896
+    assert q5_lite.min_vram_gb == 6.5
+    waiting = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-iq3-xxs")
+    assert waiting.enabled is False
+    assert waiting.revision == ""
+    assert waiting.sha256 == ""
+    assert waiting.size == 0
+    assert waiting.filename == "gemma-4-31b-abliterated-IQ3_XXS.gguf"
+    assert "import-forge-manifest" in waiting.notes
     fit = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-iq4-xs")
     assert fit.enabled is False
-    assert fit.default is True
+    assert fit.default is False
     assert fit.tier == "16gb"
     assert is_stock(lite)
     assert not is_stock(qwen)
@@ -206,27 +246,31 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert resolve_tier(24, "16gb") == "16gb"
     assert tier_option_enabled("24gb", total_gb=16, free_gb=14) is False
     assert tier_option_enabled("24gb", total_gb=24, free_gb=20) is True
-    assert uncensored_offer_allowed(16) is False
-    assert uncensored_offer_allowed(20) is False
+    assert uncensored_offer_allowed(16) is True
+    assert uncensored_offer_allowed(20) is True
     assert uncensored_offer_allowed(24) is True
-    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    assert uncensored_offer_allowed(8, 3) is False
+    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
     assert qwen.optional is True and qwen.uncensored is True
     assert qwen.tier == "24gb"
+    assert model_offered(qwen, total_gb=16, free_gb=14) is False
+    assert model_offered(qwen, total_gb=24, free_gb=22) is True
     assert bakeoff_skip_reason(qwen, free_gb=20) is None
+    qwen_q3 = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q3-k-m")
+    assert model_offered(qwen_q3, total_gb=16, free_gb=14) is True
     t_pro = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
     assert is_stock(t_pro)
     assert t_pro.tier == "24gb"
     assert bakeoff_skip_reason(t_pro, free_gb=14)
-    placeholder = next(
-        entry for entry in entries if entry.id == "t-lite-it-2.1-forge-abliterated-q4"
-    )
+    placeholder = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-iq3-xxs")
     assert placeholder.enabled is False
     assert placeholder.tier == "16gb"
 
 
 def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
-    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
+    qwen_q3 = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q3-k-m")
     gemma_31 = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-q4")
     gemma = next(entry for entry in entries if entry.filename == "gemma-4-12b-it-Q4_K_M.gguf")
     t_pro = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
@@ -236,21 +280,6 @@ def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> N
     assign_book_models(request, free_gb=16, total_gb=16, store=tmp_path)
     assert request.main_model_id == "gemma-4-12b-it-q4"
     assert request.least_censored_model_id == "gemma-4-12b-it-q4"
-    (tmp_path / qwen.filename).write_bytes(b"q")
-    (tmp_path / gemma_31.filename).write_bytes(b"G")
-    request = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
-    assign_book_models(request, free_gb=22, total_gb=24, store=tmp_path)
-    assert request.main_model_id == "t-pro-it-2.1-q4"
-    assert request.least_censored_model_id == "gemma-4-31b-abliterated-q4"
-    least = BookRequest(
-        title="T",
-        language=Language.EN,
-        synopsis="s",
-        tier=ModelTier.LEAST_CENSORED,
-    )
-    assign_book_models(least, free_gb=22, total_gb=24, store=tmp_path)
-    assert least.main_model_id == "gemma-4-31b-abliterated-q4"
-    assert least.least_censored_gguf == ""
     small = BookRequest(
         title="T",
         language=Language.RU,
@@ -259,6 +288,34 @@ def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> N
     )
     assign_book_models(small, free_gb=16, total_gb=16, store=tmp_path)
     assert small.main_model_id == "gemma-4-12b-it-q4"
+    (tmp_path / qwen_q3.filename).write_bytes(b"3")
+    fitted = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
+    assign_book_models(fitted, free_gb=14, total_gb=16, store=tmp_path)
+    assert fitted.main_model_id == "gemma-4-12b-it-q4"
+    assert fitted.least_censored_model_id == "qwen3.6-27b-abliterated-q3-k-m"
+    (tmp_path / qwen.filename).write_bytes(b"q")
+    (tmp_path / gemma_31.filename).write_bytes(b"G")
+    request = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
+    assign_book_models(request, free_gb=22, total_gb=24, store=tmp_path)
+    assert request.main_model_id == "t-pro-it-2.1-q4"
+    assert request.least_censored_model_id == "qwen3.6-27b-abliterated-q5"
+    least = BookRequest(
+        title="T",
+        language=Language.EN,
+        synopsis="s",
+        tier=ModelTier.LEAST_CENSORED,
+    )
+    assign_book_models(least, free_gb=22, total_gb=24, store=tmp_path)
+    assert least.main_model_id == "qwen3.6-27b-abliterated-q5"
+    assert least.least_censored_gguf == ""
+    russian_small = BookRequest(
+        title="T",
+        language=Language.RU,
+        synopsis="s",
+        tier=ModelTier.LEAST_CENSORED,
+    )
+    assign_book_models(russian_small, free_gb=16, total_gb=16, store=tmp_path)
+    assert russian_small.main_model_id == "qwen3.6-27b-abliterated-q3-k-m"
 
 
 def test_uncensored_download_is_separate_from_the_default_install(
@@ -278,13 +335,18 @@ def test_uncensored_download_is_separate_from_the_default_install(
     assert "mistral-small-3.2-24b-q4" not in downloaded
     assert "t-pro-it-2.1-q4" not in downloaded
     assert ensure_default_install(free_gb=22, total_gb=24, store=tmp_path) == 1
-    assert "qwen3.6-27b-abliterated-q4" not in downloaded
+    assert "qwen3.6-27b-abliterated-q3-k-m" not in downloaded
     assert "t-pro-it-2.1-q4" in downloaded
     assert "mistral-small-3.2-24b-q4" not in downloaded
     with pytest.raises(PlotweaverError, match="least-censored"):
-        ensure_uncensored_models(total_vram_gb=16, store=tmp_path)
-    ensure_uncensored_models(total_vram_gb=24, store=tmp_path)
-    assert "qwen3.6-27b-abliterated-q4" in downloaded
+        ensure_uncensored_models(total_vram_gb=8, free_gb=3, store=tmp_path)
+    assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 3
+    assert "qwen3.6-27b-abliterated-q5" not in downloaded
+    assert "qwen3.6-27b-abliterated-q3-k-m" in downloaded
+    assert "t-lite-it-2.1-abliterated-iq4-xs" in downloaded
+    assert "t-lite-it-2.1-abliterated-q5" in downloaded
+    assert ensure_uncensored_models(total_vram_gb=24, free_gb=22, store=tmp_path) == 2
+    assert "qwen3.6-27b-abliterated-q5" in downloaded
     assert "gemma-4-31b-abliterated-q4" in downloaded
 
 
@@ -308,24 +370,15 @@ def test_uncensored_models_setting_defaults_off(
     assert model_offered(t_pro, total_gb=24, free_gb=22) is False
 
 
-def test_russian_book_prefers_the_forge_t_lite(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_russian_book_prefers_the_forge_t_lite(tmp_path: Path) -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
-    russian = next(entry for entry in entries if entry.id == "t-lite-it-2.1-forge-abliterated-q4")
-    patched = [
-        replace(entry, enabled=True, revision="rev", sha256="ab" * 32, size=10)
-        if entry.id == russian.id
-        else entry
-        for entry in entries
-    ]
-    monkeypatch.setattr("plotweaver.install.load_registry", lambda _path: patched)
-    for entry in patched:
+    for entry in entries:
         if entry.id in {
             "t-pro-it-2.1-q4",
             "gemma-4-31b-abliterated-q4",
-            "qwen3.6-27b-abliterated-q4",
-            russian.id,
+            "qwen3.6-27b-abliterated-q5",
+            "t-lite-it-2.1-abliterated-iq4-xs",
+            "t-lite-it-2.1-abliterated-q5",
         }:
             (tmp_path / entry.filename).write_bytes(b"x")
     russian_book = BookRequest(
@@ -335,7 +388,7 @@ def test_russian_book_prefers_the_forge_t_lite(
         tier=ModelTier.LEAST_CENSORED,
     )
     assign_book_models(russian_book, free_gb=22, total_gb=24, store=tmp_path)
-    assert russian_book.main_model_id == "t-lite-it-2.1-forge-abliterated-q4"
+    assert russian_book.main_model_id == "t-lite-it-2.1-abliterated-q5"
     english = BookRequest(
         title="T",
         language=Language.EN,
@@ -343,7 +396,7 @@ def test_russian_book_prefers_the_forge_t_lite(
         tier=ModelTier.LEAST_CENSORED,
     )
     assign_book_models(english, free_gb=22, total_gb=24, store=tmp_path)
-    assert english.main_model_id == "gemma-4-31b-abliterated-q4"
+    assert english.main_model_id == "qwen3.6-27b-abliterated-q5"
 
 
 def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
@@ -359,7 +412,7 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
             {
                 "models": [
                     {
-                        "id": "t-lite-it-2.1-forge-abliterated-q4",
+                        "id": "gemma-4-31b-abliterated-iq3-xxs",
                         "revision": "rev-1",
                         "sha256": digest,
                         "size": 120,
@@ -376,9 +429,7 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
         main(["models", "import-forge-manifest", str(manifest), "--registry", str(registry)]) == 0
     )
     filled = next(
-        entry
-        for entry in load_registry(registry)
-        if entry.id == "t-lite-it-2.1-forge-abliterated-q4"
+        entry for entry in load_registry(registry) if entry.id == "gemma-4-31b-abliterated-iq3-xxs"
     )
     assert filled.enabled is True
     assert filled.revision == "rev-1"
@@ -387,7 +438,7 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
     assert filled.repo == "Mitroshenkov87/voxprint-model-forge"
     assert filled.filename == "t-lite-forge.gguf"
     assert filled.min_vram_gb == 6
-    assert filled.languages == ("ru",)
+    assert filled.languages == ()
     with pytest.raises(PlotweaverError, match="stock"):
         import_forge_manifest(
             _manifest(tmp_path, "t-pro-it-2.1-q4"),

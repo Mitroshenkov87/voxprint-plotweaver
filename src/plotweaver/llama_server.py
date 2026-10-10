@@ -7,6 +7,7 @@ and never start this process.
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import socket
@@ -23,6 +24,49 @@ from plotweaver.llm import ChatMessage, Completion, ModelSpec
 from plotweaver.vram_plan import ServerPlan, plan_server
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+
+
+def apply_vram_budget_cap(budget_gb: float) -> float:
+    """Cap the server budget when PLOTWEAVER_VRAM_BUDGET_CAP_GB is set."""
+    raw = os.environ.get("PLOTWEAVER_VRAM_BUDGET_CAP_GB", "").strip()
+    if not raw:
+        return budget_gb
+    try:
+        cap = float(raw)
+    except ValueError:
+        return budget_gb
+    if cap <= 0:
+        return budget_gb
+    return min(budget_gb, cap)
+
+
+def append_completion_metric(
+    *,
+    model_id: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    seconds: float,
+) -> None:
+    """Append one JSON line when PLOTWEAVER_METRICS points at a file."""
+    raw = os.environ.get("PLOTWEAVER_METRICS", "").strip()
+    if not raw:
+        return
+    rate = (completion_tokens / seconds) if seconds > 0 else 0.0
+    line = json.dumps(
+        {
+            "model": model_id,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "seconds": round(seconds, 4),
+            "tokens_per_second": round(rate, 4),
+            "ts": time.time(),
+        }
+    )
+    try:
+        with open(raw, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+    except OSError:
+        return
 
 
 def _free_port() -> int:
@@ -57,7 +101,7 @@ class LlamaServer:
         gpu = query_gpu()
         if gpu is None:
             raise PlotweaverError("llama-server needs a visible NVIDIA GPU.")
-        budget = vram_budget_gb(gpu.free_gb, gpu.total_gb)
+        budget = apply_vram_budget_cap(vram_budget_gb(gpu.free_gb, gpu.total_gb))
         weight_gb = spec.path.stat().st_size / (1024**3)
         blocks, experts = block_and_experts(spec.path)
         if spec.moe and experts <= 0:
@@ -142,12 +186,14 @@ class LlamaServer:
         # Thinking stays off for the process (see _start). Qwen templates also honour this.
         payload["chat_template_kwargs"] = {"enable_thinking": temperature >= 0.7}
         url = f"http://127.0.0.1:{self._port}/v1/chat/completions"
+        started = time.perf_counter()
         try:
             response = httpx.post(url, json=payload, timeout=httpx.Timeout(1200.0, connect=10.0))
             response.raise_for_status()
             body = response.json()
         except httpx.HTTPError as exc:
             raise PlotweaverError(f"llama-server request failed: {exc}") from exc
+        elapsed = time.perf_counter() - started
         choices = body.get("choices") if isinstance(body, dict) else None
         if not isinstance(choices, list) or not choices:
             raise PlotweaverError("llama-server returned no choices")
@@ -159,6 +205,12 @@ class LlamaServer:
         prompt_tokens = int(usage.get("prompt_tokens") or 0) if isinstance(usage, dict) else 0
         completion_tokens = (
             int(usage.get("completion_tokens") or 0) if isinstance(usage, dict) else 0
+        )
+        append_completion_metric(
+            model_id=self.model_id,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            seconds=elapsed,
         )
         return Completion(text, prompt_tokens, completion_tokens, self.model_id)
 

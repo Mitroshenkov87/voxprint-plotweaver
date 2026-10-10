@@ -1,6 +1,6 @@
 # Architecture
 
-Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Machashavah, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called.
+Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Tzaruf, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. `docs/vm-test.md` is the short RTX 4090 check.
 
 ## Pipeline
 
@@ -17,7 +17,7 @@ Without `--yes`, autopilot stops after the bible and after the outline. Copilot 
 
 ## One model in memory
 
-`llama-server` from llama.cpp b11476 (MIT, Vulkan build, not vendored in git) serves an OpenAI-compatible completion on localhost. The full installer ships that runtime under `runtime/llama.cpp-b11476`. A checkout without it downloads the same pin into the shared suite folder `<models>/llm`, and an Audiobook Builder copy already there is reused. GGUF weights live in that shared folder, so a file Audiobook Builder already downloaded (Gemma 4 12B Q4_K_M) is not fetched again. `<models>/.users.json` records `plotweaver` next to the other suite apps. The VRAM budget is free memory minus the larger of 2 GB and 8 percent of the card. If the weights do not fit, layers move to RAM; a mixture-of-experts model uses `--n-cpu-moe` instead. A spill halves context (floor 4096) and the batch. The KV cache is q8_0 only when the leftover after weights is above 3 GB and nothing spilled.
+`llama-server` from llama.cpp b11476 (MIT, Vulkan build, not vendored in git) serves an OpenAI-compatible completion on localhost. The full installer ships that runtime under `runtime/llama.cpp-b11476`. A checkout without it downloads the same pin into the shared suite folder `<models>/llm`, and an Audiobook Builder copy already there is reused. GGUF weights live in that shared folder, so a file Audiobook Builder already downloaded (Gemma 4 12B Q4_K_M) is not fetched again. `<models>/.users.json` records `plotweaver` next to the other suite apps. The VRAM budget is free memory minus the larger of 2 GB and 8 percent of the card. `PLOTWEAVER_VRAM_BUDGET_CAP_GB` lowers that budget further, which is how the VM test emulates a 16 GB card on a 24 GB GPU. `PLOTWEAVER_METRICS`, when set to a file path, appends one JSON line per llama-server completion. If the weights do not fit, layers move to RAM; a mixture-of-experts model uses `--n-cpu-moe` instead. A spill halves context (floor 4096) and the batch. The KV cache is q8_0 only when the leftover after weights is above 3 GB and nothing spilled.
 
 The suite lock `%TEMP%/voxprint-gpu.lock` is JSON `{owner, pid, job, started, eta}` in UTC. Owner is `plotweaver`. The same process may re-enter. The lock is stale when the pid is gone or the eta is more than two hours in the past. It is held for the whole book and released when the run returns, including a run that is waiting at a gate.
 
