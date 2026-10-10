@@ -11,7 +11,7 @@ The project folder holds `project.json`, a SQLite canon, and one checkpoint per 
 3. For each chapter: beats, then scene drafts, then one lightweight check and at most one rewrite, then a canon extraction.
 4. Proofread while the model that should own the voice is loaded.
 5. Optional reference overlap, one rewrite if the lexical check flags the book.
-6. Export `book.vxbook` and EPUB 3, plus FictionBook 2.1, DOCX, Markdown, or legacy speaker marks when asked.
+6. Export `book.vxbook` and EPUB 3, plus FictionBook 2.1, DOCX, Markdown, or legacy speaker marks when asked. Optional sound markup writes a second file, `book.sound.vxbook`.
 
 Without `--yes`, autopilot stops after the bible and after the outline. Copilot also stops after each chapter. Manual also stops after each scene. The window has a checkbox for the bible and outline stop. It does not edit beats.
 

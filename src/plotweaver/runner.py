@@ -38,6 +38,7 @@ from plotweaver.prompts import (
     system_message,
 )
 from plotweaver.references import compare_texts, measure_style, read_reference
+from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.textutil import prepare_prose
 from plotweaver.vxbook import build_character_speakers, even_utc_now, name_key
@@ -457,6 +458,13 @@ class _Engine:
             created=request.created,
             speakers=build_character_speakers(_character_rows(self.project)),
         )
+        if request.sound_markup:
+            self._log("sound markup")
+            add_sound(
+                directory / "book.vxbook",
+                directory / "book.sound.vxbook",
+                self.backend,
+            )
         if self.export_to is not None:
             publish_exports(directory, self.export_to)
             return self.export_to

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Write the short Russian Mars story and book.vxbook for Audiobook Builder.
+# Write the short Russian Mars story, book.vxbook, and book.sound.vxbook.
 # Default output is ./out/mars-e2e/. Override with PLOTWEAVER_MARS_OUT.
 # PLOTWEAVER_MOCK=1 or --mock skips the GPU. A real run needs --main-gguf
 # or PLOTWEAVER_MAIN_GGUF.
@@ -65,4 +65,9 @@ pick_python() {
 }
 
 PY="$(pick_python)"
-exec "$PY" -m plotweaver scenario-mars --yes --export-dir "$OUT" --project "$OUT/project" "${ARGS[@]+"${ARGS[@]}"}"
+"$PY" -m plotweaver scenario-mars --yes --export-dir "$OUT" --project "$OUT/project" "${ARGS[@]+"${ARGS[@]}"}"
+SOUND_ARGS=()
+if [[ "$MOCK" == "1" ]]; then
+  SOUND_ARGS+=(--mock)
+fi
+exec "$PY" -m plotweaver sound add "$OUT/book.vxbook" -o "$OUT/book.sound.vxbook" "${SOUND_ARGS[@]+"${SOUND_ARGS[@]}"}"

@@ -25,6 +25,7 @@ from PIL import Image
 from plotweaver.appinfo import APP_VERSION
 from plotweaver.errors import PlotweaverError, assert_never
 from plotweaver.paths import repo_root
+from plotweaver.sound import check_sound
 from plotweaver.textutil import restore_yo
 
 MIME = b"application/vnd.voxprint.book+zip"
@@ -149,10 +150,27 @@ class VxSpeaker:
     voice_hints: dict[str, str] | None = None
 
 
+@dataclass(frozen=True)
+class VxParagraph:
+    """One counted paragraph, in the order Audiobook Builder already uses."""
+
+    index: int
+    chapter: str
+    raw_line: str
+    plain: str
+    scene_start: bool
+    mirrors: tuple[str, ...] = ()
+
+
 @dataclass
 class _ParsedParagraph:
     speaker_id: str | None
     spans: list[tuple[str, int]]
+    raw_line: str = ""
+    plain: str = ""
+    chapter: str = ""
+    scene_start: bool = False
+    mirrors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -160,6 +178,12 @@ class _ParsedBook:
     paragraphs: list[_ParsedParagraph]
     plain_blocks: list[str]
     chapters: list[tuple[str, str, int]]
+
+
+@dataclass
+class _Cursor:
+    chapter: str = ""
+    scene_pending: bool = True
 
 
 def even_utc_now() -> str:
@@ -487,10 +511,13 @@ def validate_vxbook(path: Path) -> list[VxbookIssue]:
     language = manifest.get("language")
     lang = language if isinstance(language, str) else ""
     issues.extend(_stress_issues(book, lang, "book.md"))
-    parsed = _parse_book(book, issues)
+    stacked = version >= (1, 1)
+    _check_extensions(manifest, stacked, issues)
+    parsed = _parse_book(book, issues, stacked=stacked)
     _check_chapters(manifest, parsed, issues)
     _check_spans_and_ids(parsed, people, issues)
     _check_cover_notes_cast(manifest, members, people, lang, issues)
+    issues.extend(_sound_issues(manifest, members, parsed))
     plain, marks, warnings = _section7(parsed, people)
     for warning in warnings:
         issues.append(_warn(warning))
@@ -519,7 +546,7 @@ def legacy_pair(path: Path) -> tuple[str, str]:
     document = json.loads(raw_speakers.decode("utf-8"))
     rows = document.get("speakers") if isinstance(document, dict) else []
     people = _people(rows if isinstance(rows, list) else [])
-    parsed = _parse_book(text, [])
+    parsed = _parse_book(text, [], stacked=True)
     plain, marks, _warnings = _section7(parsed, people)
     return plain, marks
 
@@ -821,13 +848,17 @@ def _rank(item: tuple[str, bytes]) -> tuple[int, str]:
         return (3, name)
     if name == "cast.json":
         return (4, name)
-    if name in {"cover.avif", "cover.jpg"}:
+    if name == "sound.json":
         return (5, name)
-    if name.startswith("notes/"):
+    if name == "sound-cast.json":
         return (6, name)
-    if name == "narration.json":
+    if name in {"cover.avif", "cover.jpg"}:
+        return (7, name)
+    if name.startswith("notes/"):
         return (8, name)
-    return (7, name)
+    if name == "narration.json":
+        return (10, name)
+    return (9, name)
 
 
 def _zip_stamp(created: str) -> tuple[int, int, int, int, int, int]:
@@ -1196,7 +1227,84 @@ def _stress_issues(text: str, language: str, label: str) -> list[VxbookIssue]:
     return []
 
 
-def _parse_book(text: str, issues: list[VxbookIssue]) -> _ParsedBook:
+def read_archive(path: Path) -> tuple[dict[str, object], dict[str, bytes]]:
+    """Read a .vxbook into memory. Raises when the archive itself is unsafe."""
+    if not path.is_file():
+        raise PlotweaverError(f"not a file: {path}")
+    try:
+        archive = zipfile.ZipFile(path)
+    except zipfile.BadZipFile as exc:
+        raise PlotweaverError(f"ZIP does not open: {exc}") from exc
+    with archive:
+        members, issues, _total = _read_members(archive, archive.infolist())
+    errors = [issue.message for issue in issues if issue.severity == "error"]
+    if errors:
+        raise PlotweaverError(errors[0])
+    raw = members.get("manifest.json")
+    if raw is None:
+        raise PlotweaverError("manifest.json is missing")
+    loaded: list[VxbookIssue] = []
+    manifest = _load_json(raw, "manifest.json", loaded)
+    if not isinstance(manifest, dict):
+        message = loaded[0].message if loaded else "manifest.json is invalid"
+        raise PlotweaverError(message)
+    return manifest, members
+
+
+def paragraph_map(text: str) -> list[VxParagraph]:
+    """Counted paragraphs, including v1.1 stacked directives."""
+    parsed = _parse_book(text, [], stacked=True)
+    return [
+        VxParagraph(
+            index,
+            paragraph.chapter,
+            paragraph.raw_line,
+            paragraph.plain,
+            paragraph.scene_start,
+            tuple(paragraph.mirrors),
+        )
+        for index, paragraph in enumerate(parsed.paragraphs, start=1)
+    ]
+
+
+def _check_extensions(
+    manifest: Mapping[str, object], stacked: bool, issues: list[VxbookIssue]
+) -> None:
+    extensions = manifest.get("extensions")
+    if extensions is None:
+        return
+    if not stacked:
+        issues.append(_err("extensions require format_version 1.1"))
+    if not isinstance(extensions, list) or any(not isinstance(item, str) for item in extensions):
+        issues.append(_err("extensions must be an array of strings"))
+
+
+def _sound_issues(
+    manifest: Mapping[str, object], members: Mapping[str, bytes], parsed: _ParsedBook
+) -> list[VxbookIssue]:
+    rows: list[dict[str, object]] = []
+    for index, paragraph in enumerate(parsed.paragraphs, start=1):
+        rows.append(
+            {
+                "index": index,
+                "chapter": paragraph.chapter,
+                "raw_line": paragraph.raw_line,
+                "plain": paragraph.plain,
+                "scene_start": paragraph.scene_start,
+                "mirrors": list(paragraph.mirrors),
+            }
+        )
+    found = check_sound(manifest, members, rows)
+    issues: list[VxbookIssue] = []
+    for item in found:
+        if item.severity == "error":
+            issues.append(_err(item.message))
+        else:
+            issues.append(_warn(item.message))
+    return issues
+
+
+def _parse_book(text: str, issues: list[VxbookIssue], *, stacked: bool = False) -> _ParsedBook:
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines = lines[:-1]
@@ -1206,6 +1314,7 @@ def _parse_book(text: str, issues: list[VxbookIssue]) -> _ParsedBook:
         offsets.append(cursor)
         cursor += len(line.encode("utf-8")) + 1
     parsed = _ParsedBook([], [], [])
+    place = _Cursor()
     index = 0
     while index < len(lines):
         if lines[index] == "":
@@ -1218,7 +1327,7 @@ def _parse_book(text: str, issues: list[VxbookIssue]) -> _ParsedBook:
                 issues.append(_err("book.md line has trailing spaces"))
             index += 1
         block_offset = offsets[start] if start < len(offsets) else 0
-        _interpret_block(lines[start:index], block_offset, parsed, issues)
+        _interpret_block(lines[start:index], block_offset, parsed, issues, place, stacked=stacked)
         if index < len(lines):
             index += 1
             while index < len(lines) and lines[index] == "":
@@ -1230,45 +1339,99 @@ def _parse_book(text: str, issues: list[VxbookIssue]) -> _ParsedBook:
 
 
 def _interpret_block(
-    lines: list[str], offset: int, parsed: _ParsedBook, issues: list[VxbookIssue]
+    lines: list[str],
+    offset: int,
+    parsed: _ParsedBook,
+    issues: list[VxbookIssue],
+    place: _Cursor,
+    *,
+    stacked: bool,
 ) -> None:
-    directive = _parse_directive(lines[0]) if lines else None
-    if directive is not None:
-        name, attrs = directive
-        heading = len(lines) == 2 and lines[1].startswith("# ") and not lines[1].startswith("##")
-        if name == "chapter" and heading:
-            _add_chapter(attrs, lines[1][2:], offset, parsed, issues)
+    directives: list[tuple[str, dict[str, str]]] = []
+    index = 0
+    while index < len(lines):
+        found = _parse_directive(lines[index])
+        if found is None:
+            break
+        directives.append(found)
+        index += 1
+    body = lines[index:]
+    if not directives:
+        if lines and lines[0].startswith("<!--"):
+            issues.append(_err("malformed directive"))
             return
-        if name == "speaker" and len(lines) == 2:
-            speaker_id = attrs.get("id", "")
-            if not _ID.fullmatch(speaker_id):
-                issues.append(_err("vx:speaker id does not match the grammar"))
-            _add_paragraph(lines[1], speaker_id or None, attrs, parsed, issues)
+        if len(lines) != 1:
+            issues.append(_err("a block must be one line, or a directive plus one line"))
             return
-        if name not in {"chapter", "speaker"}:
-            issues.append(_warn(f"ignored unknown directive vx:{name}"))
-            _interpret_block(lines[1:], offset, parsed, issues)
+        line = lines[0]
+        if line == "* * *":
+            place.scene_pending = True
+            parsed.plain_blocks.append(line)
             return
-        issues.append(_err(f"vx:{name} is not attached to the following block"))
+        if line.startswith("## ") and not line.startswith("###"):
+            parsed.plain_blocks.append(line)
+            return
+        _add_paragraph(line, None, {}, parsed, issues, place, [])
         return
-    if lines and lines[0].startswith("<!--"):
-        issues.append(_err("malformed directive"))
-        return
-    if len(lines) != 1:
+    if not stacked and len(directives) > 1:
+        issues.append(_err("stacked directives require format_version 1.1"))
+    if len(body) != 1:
         issues.append(_err("a block must be one line, or a directive plus one line"))
         return
-    line = lines[0]
-    if line == "* * *":
-        parsed.plain_blocks.append(line)
+    content = body[0]
+    if content.startswith("<!--"):
+        issues.append(_err("malformed directive"))
         return
-    if line.startswith("## ") and not line.startswith("###"):
-        parsed.plain_blocks.append(line)
+    mirrors: list[str] = []
+    for name, attrs in directives[:-1]:
+        _leading_directive(name, attrs, mirrors, issues)
+    last_name, last_attrs = directives[-1]
+    heading = content.startswith("# ") and not content.startswith("##")
+    if last_name == "chapter" and heading:
+        _add_chapter(last_attrs, content[2:], offset, parsed, issues, place)
         return
-    _add_paragraph(line, None, {}, parsed, issues)
+    if last_name == "chapter":
+        issues.append(_err("vx:chapter is not attached to the following block"))
+        return
+    if last_name == "speaker":
+        speaker_id = last_attrs.get("id", "")
+        if not _ID.fullmatch(speaker_id):
+            issues.append(_err("vx:speaker id does not match the grammar"))
+        _add_paragraph(content, speaker_id or None, last_attrs, parsed, issues, place, mirrors)
+        return
+    if last_name == "sound":
+        _leading_directive("sound", last_attrs, mirrors, issues)
+    elif last_name not in {"speaker", "chapter"}:
+        issues.append(_warn(f"ignored unknown directive vx:{last_name}"))
+    _add_paragraph(content, None, {}, parsed, issues, place, mirrors)
+
+
+def _leading_directive(
+    name: str, attrs: dict[str, str], mirrors: list[str], issues: list[VxbookIssue]
+) -> None:
+    if name == "sound":
+        cue = attrs.get("cue", "")
+        if _ID.fullmatch(cue):
+            mirrors.append(cue)
+        else:
+            issues.append(_warn("vx:sound cue does not match the grammar"))
+        return
+    if name == "speaker":
+        issues.append(_err("vx:speaker must be the last directive before a paragraph"))
+        return
+    if name == "chapter":
+        issues.append(_err("vx:chapter must be the last directive before a heading"))
+        return
+    issues.append(_warn(f"ignored unknown directive vx:{name}"))
 
 
 def _add_chapter(
-    attrs: dict[str, str], title: str, offset: int, parsed: _ParsedBook, issues: list[VxbookIssue]
+    attrs: dict[str, str],
+    title: str,
+    offset: int,
+    parsed: _ParsedBook,
+    issues: list[VxbookIssue],
+    place: _Cursor,
 ) -> None:
     chapter_id = attrs.get("id", "")
     if not _ID.fullmatch(chapter_id):
@@ -1279,6 +1442,8 @@ def _add_chapter(
         issues.append(_err("chapter heading is empty"))
     parsed.chapters.append((chapter_id, title, offset))
     parsed.plain_blocks.append(f"# {title}")
+    place.chapter = chapter_id
+    place.scene_pending = True
 
 
 def _add_paragraph(
@@ -1287,6 +1452,8 @@ def _add_paragraph(
     attrs: dict[str, str],
     parsed: _ParsedBook,
     issues: list[VxbookIssue],
+    place: _Cursor,
+    mirrors: list[str],
 ) -> None:
     if not line.strip():
         issues.append(_err("empty paragraph"))
@@ -1304,8 +1471,36 @@ def _add_paragraph(
     if not plain.strip():
         issues.append(_err("empty paragraph"))
         return
-    parsed.paragraphs.append(_ParsedParagraph(speaker_id, spans))
+    parsed.paragraphs.append(
+        _ParsedParagraph(
+            speaker_id,
+            spans,
+            raw_line=line,
+            plain=_at_text_plain(line),
+            chapter=place.chapter,
+            scene_start=place.scene_pending,
+            mirrors=list(mirrors),
+        )
+    )
+    place.scene_pending = False
     parsed.plain_blocks.append(plain)
+
+
+def _at_text_plain(line: str) -> str:
+    """Paragraph text the way an at_text snippet is matched."""
+    text = line[2:] if line.startswith("> ") else line
+    text = _SPAN_STRIP.sub("", text)
+    chars: list[str] = []
+    index = 0
+    while index < len(text):
+        if text[index] == "\\" and index + 1 < len(text):
+            chars.append(text[index + 1])
+            index += 2
+            continue
+        if text[index] != "*":
+            chars.append(text[index])
+        index += 1
+    return "".join(chars).replace("\u0301", "")
 
 
 def _forbidden_line(line: str) -> str | None:

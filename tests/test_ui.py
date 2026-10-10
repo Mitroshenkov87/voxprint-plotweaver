@@ -56,6 +56,7 @@ def test_window_selftest(tmp_path: Path) -> None:
     assert (export / "book.epub").is_file()
     assert (export / "book.fb2").is_file()
     assert (export / "book.vxbook").is_file()
+    assert (export / "book.sound.vxbook").is_file()
     assert not (export / "audiobook" / "speaker-marks.txt").is_file()
     assert not (export / "book.docx").is_file()
     del app

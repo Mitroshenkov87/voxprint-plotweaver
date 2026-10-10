@@ -52,6 +52,7 @@ class Task(StrEnum):
     PROOFREAD = "proofread"
     STYLE = "style"
     JUDGE = "judge"
+    SOUND = "sound"
 
 
 def parse_gender(value: object) -> Gender:
@@ -87,6 +88,7 @@ class BookRequest:
     author: str = ""
     export_formats: list[str] = field(default_factory=lambda: [ExportFormat.EPUB.value])
     created: str = ""
+    sound_markup: bool = False
 
     def shape(self) -> tuple[int, int, int]:
         """Return (chapters, scenes per chapter, words per scene)."""
@@ -125,6 +127,7 @@ def request_to_dict(req: BookRequest) -> dict[str, object]:
         "author": req.author,
         "export_formats": normalize_formats(req.export_formats),
         "created": req.created,
+        "sound_markup": req.sound_markup,
     }
 
 
@@ -176,6 +179,7 @@ def request_from_dict(data: dict[str, object]) -> BookRequest:
         author=str(data.get("author") or ""),
         export_formats=normalize_formats(data.get("export_formats")),
         created=str(data.get("created") or ""),
+        sound_markup=bool(data.get("sound_markup")),
     )
 
 

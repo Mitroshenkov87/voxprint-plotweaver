@@ -58,6 +58,7 @@ bash scripts/e2e_mars.sh
 Default output is `./out/mars-e2e/`. Override with `PLOTWEAVER_MARS_OUT`. The script runs autopilot with `--yes` (no bible gate), six chapters, about 6,000 words as the target. The Audiobook Builder file is:
 
 - `out/mars-e2e/book.vxbook` — Voxprint Book hand-off
+- `out/mars-e2e/book.sound.vxbook` — the same book plus sound extension v1
 
 `--speaker-marks` also writes numbered `audiobook/speaker-marks.txt` lines (`1. NARRATOR`) from that file.
 

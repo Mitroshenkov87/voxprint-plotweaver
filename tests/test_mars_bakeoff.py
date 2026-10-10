@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from plotweaver.paths import repo_root
 from plotweaver.scenarios import MARS_CHAPTERS, MARS_TITLE, mars_request
 from plotweaver.vxbook import legacy_pair, validate_vxbook
@@ -77,6 +79,28 @@ def test_mars_mock_cli_exports_audiobook(tmp_path: Path) -> None:
     for name in _FORBIDDEN:
         assert name not in stored
         assert name not in book
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="scripts/e2e_mars.sh is a bash script")
+def test_mars_script_writes_sound_markup(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["PLOTWEAVER_NO_UPDATE_CHECK"] = "1"
+    env["PLOTWEAVER_MOCK"] = "1"
+    env["PLOTWEAVER_MARS_OUT"] = str(tmp_path / "mars")
+    env["VOXPRINT_GPU_LOCK"] = str(tmp_path / "lock.json")
+    proc = subprocess.run(
+        ["bash", "scripts/e2e_mars.sh", "--mock"],
+        cwd=repo_root(),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    sound = tmp_path / "mars" / "book.sound.vxbook"
+    assert sound.is_file()
+    assert (tmp_path / "mars" / "book.vxbook").is_file()
+    assert not [issue for issue in validate_vxbook(sound) if issue.severity == "error"]
 
 
 def test_bakeoff_mock_limit_one(tmp_path: Path) -> None:
