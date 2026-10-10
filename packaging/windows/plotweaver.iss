@@ -1,9 +1,15 @@
-; Voxprint AI Plotweaver. Small online installer: sources plus a runtime script.
-; Python 3.14 is downloaded on first launch of the script, not bundled.
+; Voxprint AI Plotweaver. Full installer: the app, Python 3.14, dependencies,
+; and the pinned llama.cpp b11476 Vulkan runtime. Models download on first run.
 ; Start menu group is Voxprint. Windows 11 24H2 is the minimum.
 
+#ifndef MyAppVersion
+  #define MyAppVersion "0.2.0rc1"
+#endif
+#ifndef StageDir
+  #define StageDir "..\..\build\stage"
+#endif
+
 #define MyAppName "Voxprint AI Plotweaver"
-#define MyAppVersion "0.1.0"
 #define MyAppPublisher "Aleksandr Mitroshenkov"
 #define MyAppURL "https://github.com/Mitroshenkov87/voxprint-plotweaver"
 
@@ -18,7 +24,7 @@ DefaultDirName={localappdata}\Voxprint\Plotweaver
 DefaultGroupName=Voxprint
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=VoxprintPlotweaver-{#MyAppVersion}-setup
+OutputBaseFilename=VoxprintPlotweaver-{#MyAppVersion}-win64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -30,25 +36,8 @@ UninstallDisplayIcon={app}\branding\plotweaver.ico
 UninstallDisplayName={#MyAppName}
 
 [Files]
-Source: "..\..\src\*"; DestDir: "{app}\src"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\bakeoff\*"; DestDir: "{app}\bakeoff"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\scenarios\*"; DestDir: "{app}\scenarios"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\branding\*"; DestDir: "{app}\branding"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\scripts\*"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\pyproject.toml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\BUILD.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "install-runtime.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\.venv\Scripts\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
-
-[Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\install-runtime.ps1"""; StatusMsg: "Installing Python 3.14 and Plotweaver"; Flags: runhidden waituntilterminated
-
-[UninstallDelete]
-Type: filesandordirs; Name: "{app}\.venv"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"

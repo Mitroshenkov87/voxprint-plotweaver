@@ -7,16 +7,29 @@ import sys
 from pathlib import Path
 
 
+def _marked_root(start: Path) -> Path | None:
+    for candidate in (start, *start.parents):
+        if (candidate / "pyproject.toml").is_file() and (candidate / "bakeoff").is_dir():
+            return candidate
+    return None
+
+
 def repo_root() -> Path:
     """Directory that contains pyproject.toml and the bake-off data.
 
-    Walks up from this file so an editable install and a plain checkout both work.
+    An editable checkout is found by walking up from this file. A full installer
+    is found the same way: its bundled interpreter lives in that directory.
+    ``PLOTWEAVER_ROOT`` overrides both.
     """
-    here = Path(__file__).resolve()
-    for candidate in here.parents:
-        if (candidate / "pyproject.toml").is_file() and (candidate / "bakeoff").is_dir():
-            return candidate
-    raise FileNotFoundError("Plotweaver repo root was not found (pyproject.toml + bakeoff/)")
+    override = os.environ.get("PLOTWEAVER_ROOT")
+    if override:
+        return Path(override)
+    found = _marked_root(Path(__file__).resolve())
+    if found is None:
+        found = _marked_root(Path(sys.executable).resolve())
+    if found is None:
+        raise FileNotFoundError("Plotweaver install root was not found (pyproject.toml + bakeoff/)")
+    return found
 
 
 def models_dir() -> Path:

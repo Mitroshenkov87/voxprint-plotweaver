@@ -1,92 +1,110 @@
 # Voxprint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. Version 0.1.0 (Bereshit) plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. Version 0.2.0rc1 (Bereshit) plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
-The engine is a command-line pipeline with checkpoints. The window is a native PySide6 shell for a new book, progress, and the result. A rented Linux GPU machine can run the model bake-off and the Mars end-to-end story with one command each.
+## System requirements
 
-## Status
+- Windows 11 24H2 or newer, or a Linux distribution from 2025 onward (x86_64).
+- An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
+- A 16 GB card keeps 2 GB free and uses the 16 GB model tier. A 24 GB card keeps 3 GB free and uses the 24 GB tier. Cards between those sizes use the 16 GB tier. Settings can override the choice when the card can run it.
 
-This build runs the pipeline on a deterministic mock model, which is what CI uses, and on `llama-server` from llama.cpp b11476 (the Vulkan build Audiobook Builder pins) when an NVIDIA RTX 40-series GPU (or newer) is present. Python 3.14 is the required interpreter. The libraries this app imports publish 3.14 wheels (PySide6, httpx, python-docx, ebooklib, datasketch, pymorphy3, Pillow), so the line was not lowered.
+The installer includes the app, Python 3.14, the Python dependencies, and the pinned llama.cpp b11476 Vulkan runtime. Model weights download on the first real run.
 
-Not in this build, on purpose:
+## Download and install
 
-- Visual editors for the story bible, the outline, or scene beats. Copilot and manual modes stop at those gates; they do not open an editor.
-- Embedding cosine (bge-m3). The anti-copy check is lexical and writes an overlap report.
-- LoRA training and any cloud model API.
-- The full yo and stress normaliser. Audiobook Builder owns that. Plotweaver applies a short unambiguous yo dictionary and stress marks taken from the story bible, and writes those marks into `.vxbook`.
+Release files are on the [v0.2.0-rc1 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc1). Download `SHA256SUMS` with the installer and check it before you run anything.
 
-## Platforms
+Windows:
 
-Windows 11 24H2 or newer, and Linux distributions from 2025 onward. A real book requires an NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. Older cards, including RTX 30-series, are refused. Tests and CI pass `--mock` or `PLOTWEAVER_MOCK=1` and do not need a GPU.
+1. Download `VoxprintPlotweaver-0.2.0rc1-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc1-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc1-win64-setup.exe` line in `SHA256SUMS`.
+3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver` and adds a Voxprint entry to the Start menu. Administrator rights are not required.
 
-One large model is loaded at a time. The VRAM budget is free memory minus the larger of 2 GB and 8 percent of the card. The suite GPU lock is `%TEMP%/voxprint-gpu.lock`. After 2.5 hours at full speed the job pauses while the 5-minute median temperature stays at or above 83 °C, or while thermal throttling lasts more than 60 seconds, and resumes at or below 75 °C.
+Linux, Debian package:
 
-Telemetry is off. The window may check GitHub releases of `Mitroshenkov87/voxprint-plotweaver` and sends no client id. Set `PLOTWEAVER_NO_UPDATE_CHECK=1` to skip that request.
+```bash
+sha256sum -c SHA256SUMS
+sudo dpkg -i voxprint-plotweaver_0.2.0rc1_amd64.deb
+sudo apt-get install -f
+```
 
-## Quick start
+The menu entry is Voxprint AI Plotweaver. The files live in `/opt/voxprint-plotweaver`.
 
-From this checkout, with Python 3.14:
+Linux, tarball (any distribution with the libraries named in the `.deb` control file):
+
+```bash
+sha256sum -c SHA256SUMS
+tar -xzf voxprint-plotweaver-0.2.0rc1-linux-x86_64.tar.gz
+./voxprint-plotweaver/plotweaver-gui.sh
+```
+
+## First run and model download
+
+Open the app on the NVIDIA machine. The first real book reads the GPU, selects the 16 GB or 24 GB tier, and downloads the stock models that fit into the shared suite folder:
+
+- Windows: `%LOCALAPPDATA%\Voxprint\models\llm`
+- Linux: `~/.local/share/voxprint/models/llm`
+
+A card under 24 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card also installs T-pro-it-2.1. A model file already downloaded by Audiobook Builder is reused. Each file is checked by revision, size, and SHA-256.
+
+Least-censored models are a separate download from Settings, and only when a published file fits the card. On 24 GB those are the pinned abliterated Qwen 27B and Gemma 31B quants. On 16 GB they are the fit quants Model Forge publishes. A Russian book prefers the forge abliterated T-lite when that file is installed. Until a forge manifest fills a placeholder, that row stays disabled. Plotweaver does not abliterate or quantize weights.
+
+Settings also has an advanced VRAM-tier override (Auto, 16 GB, 24 GB). The 24 GB choice stays disabled when the card cannot run a published 24 GB model.
+
+## Writing a book from a synopsis
+
+Choose New book. Set the title, the author, and the language. Paste a synopsis of about five pages. Set a target word count. Leave chapters at 0 to let the outline decide, or type a count.
+
+Leave **Stop for bible and outline approval** unchecked to write the book through. Check it when you want to read `bible.json` and `outline.json` and press Approve and continue. The window does not open an editor for the bible, the outline, or scene beats.
+
+Choose Standard or Least censored. Standard is the stock model for the tier. Least censored uses an installed Model Forge model when one fits, and otherwise the stock drafter.
+
+Press Write the book. Progress stays on the next page. The finished files land in the project folder.
+
+## Dark/mature themes
+
+Check **Dark/mature themes** before you start. With it off, the stock model writes every scene. With it on, the stock model drafts the book, and a least-censored model later fills scenes that were marked dark or that the stock model refused. When no least-censored file is installed, that second pass uses the stock drafter.
+
+## Reference books
+
+Add reference accepts `.txt`, `.md`, `.docx`, and `.epub`. Plotweaver reads them for structure and style, then runs a lexical overlap check against the draft. It does not copy those books into the novel, and it does not use an embedding model.
+
+## Exports
+
+EPUB 3 is always written (`book.epub`), with a navigation document and the suite cover. The project also always writes `book.vxbook`. Optional checkboxes add FictionBook 2.1 (`--fb2` on the command line), DOCX, Markdown, and the legacy numbered speaker-marks file. The author field is stored in the book manifest, the EPUB, and FictionBook title-info.
+
+## Add sound markup
+
+Check **Add sound markup**, or run `plotweaver sound add FILE -o OUT` on an existing book. The app writes a second file, `book.sound.vxbook`, and leaves `book.vxbook` unchanged.
+
+## Hand-off to Audiobook Builder
+
+Import `book.vxbook` into Audiobook Builder. Import `book.sound.vxbook` when you turned sound markup on. Both apps share the model folder, so a GGUF one of them has already stored is not downloaded again.
+
+## Troubleshooting
+
+- The setup refuses Windows older than 11 24H2 (build 26100).
+- A GPU whose name does not contain RTX, or whose compute capability is below 8.9, is refused. Install the current NVIDIA driver. On Linux the package also needs the Vulkan loader (`libvulkan1`), which the `.deb` depends on.
+- The first real run needs a network connection and enough free disk for the GGUF files (several gigabytes for the 16 GB tier, more when T-pro is included). A failed download can be started again from the app. Finished files are checked before use.
+- Settings says no published least-censored model fits this card when every forge row for the tier is still disabled or too large for the free memory.
+- `sha256sum -c SHA256SUMS` must succeed before you install. A mismatch means the download is incomplete or not the file this release published.
+- The **Mock model (no GPU)** checkbox writes a deterministic sample without a GPU. It is for a trial of the window, not for a novel you will keep.
+- Set `PLOTWEAVER_NO_UPDATE_CHECK=1` to skip the GitHub release check. That check sends no client id. Telemetry is off.
+- A long run pauses while the card stays hot and resumes when it cools. The suite GPU lock is `%TEMP%/voxprint-gpu.lock` on Windows.
+
+## From source
+
+Python 3.14 is required. From a checkout:
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -e .
+.venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/plotweaver doctor --mock
 .venv/bin/plotweaver gui --mock --selftest
 ```
 
-Write a one-chapter book without a GPU:
+`docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
 
-```bash
-.venv/bin/plotweaver run --mock --yes --project out/demo --synopsis scenarios/mars-e2e/synopsis.md --chapters 1 --target-words 800
-```
-
-A real book needs a GGUF and a supported GPU. The first real run reads VRAM, picks the 16 GB or 24 GB tier, and downloads the stock models that fit into the shared suite folder `~/.local/share/voxprint/models/llm`. A card under 24 GB keeps 2 GB free and installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card keeps 3 GB free and also installs T-pro. Least-censored models come from Model Forge and are not in that stock set. On 24 GB those are the pinned abliterated Qwen 27B and Gemma 31B quants. On 16 GB they are the fit quants Model Forge publishes, which stay disabled until a manifest fills them. A Russian book prefers the forge abliterated T-lite when that file is installed. Settings offers the download when a published least-censored model fits the card, and an advanced override for the VRAM tier. Pass any other Apache-2.0 or MIT file with `--main-gguf`. Other licences are refused unless you add `--allow-other-license`. An empty licence tag is refused either way. Plotweaver does not abliterate or quantize weights.
-
-```bash
-plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf /path/to/model.gguf
-```
-
-`--yes` skips the bible and outline gates. Omit it, read `bible.json` and `outline.json` in the project folder, then continue with `--approve`.
-
-The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (`book.epub`), with a navigation document and the suite cover. Add `--speaker-marks` for the legacy numbered `audiobook/speaker-marks.txt` pair, `--fb2` for FictionBook 2.1, `--docx` for Word, or `--markdown` for a Markdown file. `--sound`, or Add sound markup in the window, writes a second file `book.sound.vxbook` and leaves `book.vxbook` unchanged. The window has the same checkboxes. `--author` sets the name stored in the book manifest, the EPUB, and FictionBook title-info. `plotweaver vxbook validate FILE` runs the format checklist. `plotweaver sound add FILE -o OUT` adds sound markup to an existing book.
-
-## Bake-off (RTX 4090 Linux VM)
-
-```bash
-bash scripts/bakeoff.sh
-```
-
-The script installs dependencies if needed, downloads every finished candidate that fits free VRAM (stock and abliterated), runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path. It also records a refusal rate for each candidate. The app's default install stays stock-only and follows the VRAM tier. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
-
-CI runs the same harness without a GPU:
-
-```bash
-PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --limit 1
-```
-
-## Mars end-to-end story
-
-`scenarios/mars-e2e/synopsis.md` is a short Russian science-fiction synopsis (about 6,000 words, six chapters) about a SpaceX crewed mission to Mars. The crew and mission control are invented. SpaceX is the company on the hardware and the contract. `outline.md` is a human scene list and is not sent to the model.
-
-On the GPU VM, after the weights are on disk:
-
-```bash
-bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
-```
-
-Output defaults to `./out/mars-e2e/`. The Audiobook Builder import is `book.vxbook`. The same run also writes `book.sound.vxbook` (VXBOOK v1.1 + sound extension v1) beside it. `--speaker-marks` also writes the legacy numbered pair under `audiobook/`. Override the folder with `PLOTWEAVER_MARS_OUT`.
-
-Without a GPU:
-
-```bash
-PLOTWEAVER_MOCK=1 bash scripts/e2e_mars.sh
-```
-
-## Layout
-
-`docs/architecture.md` describes the pipeline, the single resident model, and the dark-theme toggle. `docs/audiobook-export.md` describes the export. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored) and the model-weight licences, which stay with the files.
-
-The Windows installer is a small online Inno Setup package (Start menu folder Voxprint, minimum Windows 11 24H2). The Linux package is a tarball and a `.deb` with the sources, a desktop file, and the icon. CI builds both.
 ## ☕ Support the Project
 
 If you find this project useful and would like to support its development, you can buy me a coffee!

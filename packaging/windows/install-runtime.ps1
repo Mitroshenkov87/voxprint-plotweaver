@@ -1,3 +1,5 @@
+# Source-tree helper. The full installer does not run this script:
+# that setup already contains Python, dependencies, and llama.cpp.
 # Downloads uv, installs CPython 3.14, and installs this checkout into a venv.
 # Shared model files under LOCALAPPDATA\Voxprint\models are not touched.
 $ErrorActionPreference = "Stop"
