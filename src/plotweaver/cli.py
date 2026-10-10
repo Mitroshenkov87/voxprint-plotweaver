@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication
 
 from plotweaver.appinfo import APP_NAME, version_label
 from plotweaver.bakeoff import run_bakeoff
+from plotweaver.brief import BookBrief, BriefError, apply_brief, parse_brief, render_markdown
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import GpuUnsupported, PlotweaverError
 from plotweaver.export import export_output_names
@@ -34,7 +35,7 @@ from plotweaver.registry import (
     tier_headroom_gb,
     usable_vram_gb,
 )
-from plotweaver.runner import export_book, run_book
+from plotweaver.runner import draft_book_brief, export_book, run_book
 from plotweaver.scenarios import mars_request
 from plotweaver.sound import add_sound, resolve_vxbook
 from plotweaver.store import Project
@@ -146,6 +147,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_machine_args(sound_add)
     sound_add.set_defaults(func=_sound_add)
+
+    brief = sub.add_parser("brief", help="Draft a book brief from loose notes.")
+    brief_commands = brief.add_subparsers(dest="brief_command", required=True)
+    draft = brief_commands.add_parser("draft", help="Expand notes into a book brief.")
+    draft.add_argument("--idea", required=True, help="Loose notes to expand.")
+    draft.add_argument("--language", choices=["ru", "en"], default="en")
+    draft.add_argument("--mock", action="store_true")
+    _add_machine_args(draft)
+    draft.set_defaults(func=_brief_draft)
     return parser
 
 
@@ -164,6 +174,12 @@ def main(argv: list[str] | None = None) -> int:
 def _add_book_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--synopsis", type=Path)
+    parser.add_argument(
+        "--brief",
+        type=Path,
+        default=None,
+        help="Book brief in JSON or the Markdown template. Supplies the book fields.",
+    )
     parser.add_argument("--title", default="Untitled")
     parser.add_argument("--language", choices=["ru", "en"], default="ru")
     parser.add_argument("--genre", default="")
@@ -469,13 +485,79 @@ def _run_request(args: argparse.Namespace, synopsis: str) -> BookRequest:
     )
 
 
+def _brief_fail(args: argparse.Namespace, exc: BriefError) -> int:
+    if args.json:
+        _print_json(
+            {
+                "ok": False,
+                "command": str(getattr(args, "command", "brief")),
+                "error": str(exc),
+                "code": 1,
+                "errors": [
+                    {"field": item.field, "code": item.code, "message": item.message()}
+                    for item in exc.errors
+                ],
+            }
+        )
+        return 1
+    print(str(exc), file=sys.stderr)
+    return 1
+
+
+def _read_brief_file(args: argparse.Namespace) -> BookBrief | None:
+    if getattr(args, "brief", None) is None:
+        return None
+    if not args.brief.is_file():
+        raise PlotweaverError(f"brief not found: {args.brief}")
+    return parse_brief(args.brief.read_text(encoding="utf-8"))
+
+
+def _brief_draft(args: argparse.Namespace) -> int:
+    if not str(args.idea).strip():
+        raise PlotweaverError("--idea is empty")
+    if args.dry_run:
+        actions = [
+            "expand the notes into a book brief with the mock backend"
+            if args.mock
+            else "expand the notes into a book brief with the local model",
+        ]
+        payload: dict[str, Any] = {
+            "ok": True,
+            "command": "brief.draft",
+            "dry_run": True,
+            "code": 0,
+            "language": args.language,
+            "mock": bool(args.mock),
+            "actions": actions,
+        }
+        lines = ["dry-run", *[f"action: {item}" for item in actions]]
+        return _emit(args, payload, "\n".join(lines))
+    brief = draft_book_brief(str(args.idea), str(args.language), _backend(bool(args.mock)))
+    payload = {
+        "ok": True,
+        "command": "brief.draft",
+        "dry_run": False,
+        "code": 0,
+        "brief": brief.to_dict(),
+    }
+    return _emit(args, payload, render_markdown(brief))
+
+
 def _run(args: argparse.Namespace) -> int:
     exists = (args.project / "project.json").is_file()
-    if args.synopsis is None and not exists:
-        raise PlotweaverError("--synopsis is required when the project does not exist yet")
+    try:
+        loaded = _read_brief_file(args)
+    except BriefError as exc:
+        return _brief_fail(args, exc)
+    if args.synopsis is None and loaded is None and not exists:
+        raise PlotweaverError(
+            "--synopsis or --brief is required when the project does not exist yet"
+        )
     _check_export_dir(args.export_dir)
     _check_references(list(args.reference or []))
     synopsis = ""
+    if loaded is not None:
+        synopsis = loaded.synopsis
     if args.synopsis is not None:
         if not args.synopsis.is_file():
             raise PlotweaverError(f"synopsis not found: {args.synopsis}")
@@ -510,9 +592,15 @@ def _run(args: argparse.Namespace) -> int:
         lines.extend(f"output: {item}" for item in payload["outputs"])
         return _emit(args, payload, "\n".join(lines))
     request = _run_request(args, synopsis)
+    if loaded is not None:
+        apply_brief(request, loaded)
+        if args.chapters:
+            request.chapter_count = args.chapters
+            loaded.chapter_count = args.chapters
+            request.brief = loaded.to_dict()
     _apply_models(request, args)
     project = Project.open_or_create(args.project, request)
-    if project.request_path.is_file() and args.synopsis is None:
+    if loaded is None and project.request_path.is_file() and args.synopsis is None:
         request = project.request()
         _apply_models(request, args)
     elif args.synopsis is not None:

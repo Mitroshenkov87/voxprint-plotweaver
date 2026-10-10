@@ -51,7 +51,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-plotweaver = ["data/fb2/*", "ui/icons/*.svg"]
+plotweaver = ["data/fb2/*", "ui/icons/*.svg", "data/writing-a-brief.md"]
 
 [tool.ruff]
 target-version = "py314"

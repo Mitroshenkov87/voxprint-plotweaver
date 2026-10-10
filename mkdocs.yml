@@ -38,6 +38,7 @@ hooks:
 
 nav:
   - Home: index.md
+  - Writing a brief: WRITING-A-BRIEF.md
   - Command line: CLI.md
   - Command reference: cli-reference.md
   - Bake-off: bakeoff.md

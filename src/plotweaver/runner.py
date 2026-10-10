@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from plotweaver.atomic import write_json
+from plotweaver.brief import BookBrief, attach_context, brief_from_payload
 from plotweaver.checks import chapter_problems, is_refusal, is_sanitised
 from plotweaver.domain import BookMode, BookRequest, Gender, ModelTier, parse_gender
 from plotweaver.errors import ModelOutputError, PlotweaverError, assert_never
@@ -28,6 +29,7 @@ from plotweaver.llm import ChatMessage, LLMBackend, ModelSpec, complete_json
 from plotweaver.prompts import (
     beats_prompt,
     bible_prompt,
+    brief_draft_prompt,
     draft_prompt,
     extract_prompt,
     fill_prompt,
@@ -57,6 +59,20 @@ class RunResult:
     refusals: int
     placeholders: int
     rewrites: int
+
+
+def draft_book_brief(idea: str, language: str, backend: LLMBackend) -> BookBrief:
+    """Expand loose notes into a full brief. The caller reviews it before writing."""
+    payload = complete_json(
+        backend,
+        [
+            ChatMessage("system", system_message()),
+            ChatMessage("user", brief_draft_prompt(idea, language)),
+        ],
+        temperature=0.3,
+        max_tokens=2048,
+    )
+    return brief_from_payload(payload, idea=idea, language=language)
 
 
 def run_book(
@@ -164,7 +180,7 @@ class _Engine:
         self.rewrites = 0
 
     def run(self) -> RunResult:
-        request = self.project.request()
+        request = attach_context(self.project.request())
         main, low = _specs(request)
         self._use(main)
         self._intake(request)

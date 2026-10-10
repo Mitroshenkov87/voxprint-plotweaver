@@ -13,8 +13,11 @@ from typing import assert_never
 from PySide6.QtCore import QSize, QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QStandardItemModel
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -26,6 +29,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QStackedWidget,
     QVBoxLayout,
@@ -33,6 +37,13 @@ from PySide6.QtWidgets import (
 )
 
 from plotweaver.appinfo import version_label
+from plotweaver.brief import (
+    BookBrief,
+    BriefError,
+    chat_prompt,
+    parse_brief,
+    writing_guide_path,
+)
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
 from plotweaver.hardware import query_gpu, require_supported_gpu
@@ -47,7 +58,7 @@ from plotweaver.registry import (
     tier_option_enabled,
     uncensored_offer_allowed,
 )
-from plotweaver.runner import RunResult, run_book
+from plotweaver.runner import RunResult, draft_book_brief, run_book
 from plotweaver.settings import (
     model_tier_override,
     save_model_tier_override,
@@ -56,6 +67,7 @@ from plotweaver.settings import (
 )
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
+from plotweaver.ui.brief_form import BriefForm
 from plotweaver.ui.i18n import tr
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.theme import TEXT, TEXT_ON_PRIMARY, build_style, enable_acrylic
@@ -147,6 +159,8 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self._progress())
         self.stack.addWidget(self._result())
         self.stack.addWidget(self._settings())
+        help_menu = self.menuBar().addMenu(tr("help"))
+        help_menu.addAction(tr("help_brief")).triggered.connect(self._show_guide)
         self.setStyleSheet(build_style(glass=False))
 
     def showEvent(self, event: object) -> None:
@@ -229,16 +243,14 @@ class MainWindow(QMainWindow):
         self.language.addItem("Russian", Language.RU.value)
         self.language.addItem("English", Language.EN.value)
         self.synopsis = QPlainTextEdit()
-        self.synopsis.setMinimumHeight(160)
+        self.synopsis.setMinimumHeight(100)
+        self.brief_form = BriefForm(page)
         self.tier = QComboBox()
         self.tier.addItem(tr("tier_standard"), ModelTier.STANDARD.value)
         self.tier.addItem(tr("tier_least_censored"), ModelTier.LEAST_CENSORED.value)
         self.mode = QComboBox()
         for mode in (BookMode.AUTOPILOT, BookMode.COPILOT, BookMode.MANUAL):
             self.mode.addItem(mode.value, mode.value)
-        self.words = QSpinBox()
-        self.words.setRange(500, 200_000)
-        self.words.setValue(80_000)
         self.chapters = QSpinBox()
         self.chapters.setRange(0, 40)
         self.chapters.setValue(0)
@@ -271,10 +283,14 @@ class MainWindow(QMainWindow):
         form.addRow(tr("author"), self.author)
         form.addRow(tr("language"), self.language)
         form.addRow(tr("synopsis"), self.synopsis)
+        self.brief_form.populate(form)
+        self.brief_form.bind(self.title, self.language, self.synopsis, self.dark, self.chapters)
+        self.brief_form.help_button.clicked.connect(self._draft_brief)
+        self.brief_form.copy_button.clicked.connect(self._copy_prompt)
+        self.brief_form.paste_button.clicked.connect(self._paste_brief)
+        form.addRow(tr("chapters"), self.chapters)
         form.addRow(tr("tier"), self.tier)
         form.addRow(tr("mode"), self.mode)
-        form.addRow(tr("words"), self.words)
-        form.addRow(tr("chapters"), self.chapters)
         form.addRow(tr("formats"), formats)
         form.addRow("", self.sound_markup)
         form.addRow("", self.dark)
@@ -287,7 +303,11 @@ class MainWindow(QMainWindow):
         start.clicked.connect(lambda: self.start(synchronous=False))
         layout.addWidget(start)
         outer.addWidget(card)
-        return page
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(page)
+        return scroll
 
     def _settings(self) -> QWidget:
         page = QWidget()
@@ -557,8 +577,76 @@ class MainWindow(QMainWindow):
         shutil.copytree(src, target)
         self.result_label.setText(f"{tr('done')}\n{target}")
 
+    def _draft_brief(self) -> None:
+        notes = self.brief_form.notes.toPlainText().strip()
+        if not notes:
+            QMessageBox.warning(self, tr("app"), tr("brief_need_notes"))
+            return
+        language = str(self.language.currentData() or "en")
+        try:
+            brief = draft_book_brief(notes, language, _backend(self.mock.isChecked()))
+        except PlotweaverError as exc:
+            QMessageBox.warning(self, tr("app"), str(exc))
+            return
+        self._apply_loaded_brief(brief)
+
+    def _apply_loaded_brief(self, brief: BookBrief) -> None:
+        self.brief_form._loading = True
+        self.title.setText(brief.title)
+        index = self.language.findData(brief.language)
+        if index >= 0:
+            self.language.setCurrentIndex(index)
+        self.synopsis.setPlainText(brief.synopsis)
+        self.dark.setChecked(brief.dark_themes)
+        self.chapters.setValue(brief.chapter_count or 0)
+        self.brief_form._loading = False
+        self.brief_form.apply(brief)
+
+    def _copy_prompt(self) -> None:
+        language = str(self.language.currentData() or "en")
+        QApplication.clipboard().setText(chat_prompt(language))
+        QMessageBox.information(self, tr("app"), tr("brief_copied"))
+
+    def _paste_brief(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("brief_paste"))
+        dialog.resize(720, 480)
+        layout = QVBoxLayout(dialog)
+        editor = QPlainTextEdit()
+        editor.setPlaceholderText(tr("brief_paste"))
+        layout.addWidget(editor)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            brief = parse_brief(editor.toPlainText())
+        except BriefError as exc:
+            QMessageBox.warning(self, tr("app"), _brief_error_text(exc))
+            return
+        self._apply_loaded_brief(brief)
+
+    def _show_guide(self) -> None:
+        path = writing_guide_path()
+        text = path.read_text(encoding="utf-8") if path.is_file() else tr("help_brief")
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("help_brief"))
+        dialog.resize(720, 560)
+        layout = QVBoxLayout(dialog)
+        view = QPlainTextEdit(text)
+        view.setReadOnly(True)
+        layout.addWidget(view)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.exec()
+
     def request_from_form(self) -> BookRequest:
-        chapters = self.chapters.value()
+        brief = self.brief_form.read_lenient()
         formats = ["epub"]
         if self.export_fb2.isChecked():
             formats.append("fb2")
@@ -569,18 +657,24 @@ class MainWindow(QMainWindow):
         if self.export_marks.isChecked():
             formats.append("speaker-marks")
         return BookRequest(
-            title=self.title.text().strip() or "Untitled",
+            title=brief.title or "Untitled",
             author=self.author.text().strip(),
-            language=Language(str(self.language.currentData())),
-            synopsis=self.synopsis.toPlainText().strip(),
-            target_words=self.words.value(),
-            chapter_count=None if chapters == 0 else chapters,
-            dark_themes=self.dark.isChecked(),
+            language=Language(brief.language),
+            synopsis=brief.synopsis,
+            genre=brief.genre,
+            target_words=brief.target_words,
+            chapter_count=brief.chapter_count,
+            scenes_per_chapter=brief.derived_scenes(),
+            pov=brief.pov,
+            tense=brief.tense,
+            dark_themes=brief.dark_themes,
             tier=ModelTier(str(self.tier.currentData())),
             mode=BookMode(str(self.mode.currentData())),
             reference_paths=list(self._refs),
             export_formats=formats,
             sound_markup=self.sound_markup.isChecked(),
+            brief=brief.to_dict(),
+            prompt_override=self.brief_form.override_text(),
         )
 
     def start(self, *, synchronous: bool, approve: bool = False) -> None:
@@ -674,7 +768,8 @@ class MainWindow(QMainWindow):
         self.synopsis.setPlainText(
             "Короткий синопсис для проверки окна. Ещё одна фраза про корабль и пыль."
         )
-        self.words.setValue(800)
+        self.brief_form.pages.setValue(4)
+        self.brief_form.words_per_page.setValue(200)
         self.chapters.setValue(1)
         self.dark.setChecked(False)
         self.mock.setChecked(True)
@@ -687,3 +782,7 @@ class MainWindow(QMainWindow):
         self.sound_button.click()
         if self._project is None or not (self._project.export_dir / "book.sound.vxbook").is_file():
             raise RuntimeError("self-test did not write book.sound.vxbook")
+
+
+def _brief_error_text(exc: BriefError) -> str:
+    return "\n".join(tr(f"brief_err_{item.code}").format(field=item.field) for item in exc.errors)

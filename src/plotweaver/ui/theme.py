@@ -135,6 +135,31 @@ def build_style(*, glass: bool) -> str:
         text-align: center;
     }}
     QProgressBar::chunk {{ background: {ACCENT_STRONG}; border-radius: 6px; }}
+    QScrollArea {{ background: {root}; border: none; }}
+    QScrollArea > QWidget > QWidget {{ background: {root}; }}
+    QTableWidget {{
+        background: {CONTROL_BG};
+        color: {TEXT};
+        gridline-color: {CONTROL_BORDER};
+        border: 1px solid {CONTROL_BORDER};
+        border-radius: 8px;
+    }}
+    QHeaderView::section {{
+        background: {card};
+        color: {TEXT};
+        border: none;
+        padding: 6px;
+    }}
+    QMenuBar {{ background: {root}; color: {TEXT}; }}
+    QMenuBar::item:selected {{ background: {MENU_SELECTION}; }}
+    QMenu {{ background: {MENU_BG}; color: {TEXT}; }}
+    QMenu::item:selected {{ background: {MENU_SELECTION}; }}
+    QToolButton {{
+        background: transparent;
+        color: {TEXT};
+        border: none;
+        padding: 4px;
+    }}
     """
 
 

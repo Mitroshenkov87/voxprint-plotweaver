@@ -222,12 +222,49 @@ class MockBackend:
                 )
             case Task.SOUND:
                 return json.dumps(mock_sound_document(user), ensure_ascii=False)
+            case Task.BRIEF:
+                return json.dumps(self._brief(user), ensure_ascii=False)
             case Task.PROBE:
                 if self.model_id in {"mock-low"} or "abliterated" in (self.model_id or ""):
                     return "The scene continues. Dust stayed on the hatch and nobody lectured."
                 return "I cannot write this scene."
             case _ as unreachable:
                 assert_never(unreachable)
+
+    def _brief(self, user: str) -> dict[str, object]:
+        idea = ""
+        if "IDEA:" in user:
+            idea = user.split("IDEA:", 1)[1].strip()
+        title = idea.splitlines()[0].strip()[:80] if idea else "Untitled"
+        language = "ru" if "language: ru" in user else "en"
+        return {
+            "version": 1,
+            "title": title or "Untitled",
+            "language": language,
+            "pages": 40,
+            "words_per_page": 250,
+            "genre": "science fiction",
+            "subgenre": "expedition",
+            "tone": "dry",
+            "pov": "third-person limited",
+            "tense": "past",
+            "audience": "adult",
+            "setting": "a research station",
+            "characters": [
+                {
+                    "name": "Ilya",
+                    "role": "commander",
+                    "description": "Short orders.",
+                    "gender": "male",
+                }
+            ],
+            "plot_points": ["The seal fails.", "The crew stays."],
+            "ending_type": "bittersweet",
+            "style_references": ["a field log"],
+            "dark_themes": False,
+            "synopsis": idea or "A crew keeps a station.",
+            "guessed": ["tone", "pov", "tense", "audience", "ending_type", "subgenre"],
+        }
 
     def _bible(self, user: str) -> dict[str, object]:
         if _language_ru(user):
