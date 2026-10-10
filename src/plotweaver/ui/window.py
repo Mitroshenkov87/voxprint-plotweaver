@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         self.synopsis.setMinimumHeight(160)
         self.tier = QComboBox()
         self.tier.addItem(tr("tier_standard"), ModelTier.STANDARD.value)
-        self.tier.addItem(tr("tier_low"), ModelTier.LOW_REFUSAL.value)
+        self.tier.addItem(tr("tier_least_censored"), ModelTier.LEAST_CENSORED.value)
         self.mode = QComboBox()
         for mode in (BookMode.AUTOPILOT, BookMode.COPILOT, BookMode.MANUAL):
             self.mode.addItem(mode.value, mode.value)

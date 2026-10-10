@@ -56,7 +56,7 @@ The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (
 bash scripts/bakeoff.sh
 ```
 
-The script installs dependencies if needed, downloads the candidate GGUFs, runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path (main model, one swap to a low-refusal model, then a proofread). Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
+The script installs dependencies if needed, downloads the candidate GGUFs, runs all ten Russian synopses for three chapters on each solo model, then runs the two-pass dark-theme path (main model, one swap to a least-censored model, then a proofread). Least censored means the most permissive model that fits. On a 16 GB card that default is Mistral Small 3.2. Results land in `out/bakeoff/`, including `bakeoff-results.tar.gz` and a blind reading packet. The rubric is `bakeoff/RUBRIC.md`. Exact paths and the skip-if-completed rule are in `docs/bakeoff.md`.
 
 CI runs the same harness without a GPU:
 

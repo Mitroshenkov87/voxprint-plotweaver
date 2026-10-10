@@ -19,8 +19,13 @@ class BookMode(StrEnum):
 
 
 class ModelTier(StrEnum):
+    """STANDARD is the usual drafter.
+
+    LEAST_CENSORED is the most permissive model that fits, not necessarily an abliterated one.
+    """
+
     STANDARD = "standard"
-    LOW_REFUSAL = "low-refusal"
+    LEAST_CENSORED = "least-censored"
 
 
 class Gender(StrEnum):
@@ -81,9 +86,9 @@ class BookRequest:
     mode: BookMode = BookMode.AUTOPILOT
     reference_paths: list[str] = field(default_factory=list)
     main_model_id: str = ""
-    low_refusal_model_id: str = ""
+    least_censored_model_id: str = ""
     main_gguf: str = ""
-    low_refusal_gguf: str = ""
+    least_censored_gguf: str = ""
     scene_words: int | None = None
     author: str = ""
     export_formats: list[str] = field(default_factory=lambda: [ExportFormat.EPUB.value])
@@ -120,9 +125,9 @@ def request_to_dict(req: BookRequest) -> dict[str, object]:
         "mode": req.mode.value,
         "reference_paths": list(req.reference_paths),
         "main_model_id": req.main_model_id,
-        "low_refusal_model_id": req.low_refusal_model_id,
+        "least_censored_model_id": req.least_censored_model_id,
         "main_gguf": req.main_gguf,
-        "low_refusal_gguf": req.low_refusal_gguf,
+        "least_censored_gguf": req.least_censored_gguf,
         "scene_words": req.scene_words,
         "author": req.author,
         "export_formats": normalize_formats(req.export_formats),
@@ -168,19 +173,30 @@ def request_from_dict(data: dict[str, object]) -> BookRequest:
         pov=str(data.get("pov") or "third-person limited"),
         tense=str(data.get("tense") or "past"),
         dark_themes=bool(data.get("dark_themes")),
-        tier=ModelTier(str(data.get("tier") or ModelTier.STANDARD)),
+        tier=_tier_from_stored(data.get("tier")),
         mode=BookMode(str(data.get("mode") or BookMode.AUTOPILOT)),
         reference_paths=[str(item) for item in refs],
         main_model_id=str(data.get("main_model_id") or ""),
-        low_refusal_model_id=str(data.get("low_refusal_model_id") or ""),
+        least_censored_model_id=str(
+            data.get("least_censored_model_id") or data.get("low_refusal_model_id") or ""
+        ),
         main_gguf=str(data.get("main_gguf") or ""),
-        low_refusal_gguf=str(data.get("low_refusal_gguf") or ""),
+        least_censored_gguf=str(
+            data.get("least_censored_gguf") or data.get("low_refusal_gguf") or ""
+        ),
         scene_words=_optional_int(data.get("scene_words")),
         author=str(data.get("author") or ""),
         export_formats=normalize_formats(data.get("export_formats")),
         created=str(data.get("created") or ""),
         sound_markup=bool(data.get("sound_markup")),
     )
+
+
+def _tier_from_stored(value: object) -> ModelTier:
+    text = str(value or ModelTier.STANDARD)
+    if text == "low-refusal":
+        return ModelTier.LEAST_CENSORED
+    return ModelTier(text)
 
 
 def normalize_formats(value: object) -> list[str]:

@@ -45,8 +45,45 @@ moe = false
 notes = "16 GB standard drafter. Same file Audiobook Builder stores at <models>/llm/gemma-4-12b-it-Q4_K_M.gguf."
 
 [[model]]
+id = "mistral-small-3.2-24b-q4"
+role = "least-censored"
+card = "16gb"
+default = true
+repo = "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF"
+revision = "b750ec2299225e492f1bd27cab88a0a595fa848f"
+filename = "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
+sha256 = "a3cc56310807ed0d145eaf9f018ccda9ae7ad8edb41ec870aa2454b0d4700b3c"
+size = 14333922848
+license = "apache-2.0"
+base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
+base_license = "apache-2.0"
+min_vram_gb = 15
+context = 8192
+moe = false
+notes = "16 GB least-censored default. Newest 24B Mistral Small (3.2, Instruct 2506). Official card and this quant are Apache-2.0. Stock instruct model, not an abliteration."
+
+[[model]]
+id = "mistral-small-3.2-24b-abliterated-q4"
+role = "least-censored"
+card = "16gb"
+repo = "mradermacher/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed-GGUF"
+revision = "4737318711c389a453d274fea0ee9b2bd009b573"
+filename = "Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed.Q4_K_M.gguf"
+sha256 = "73829e3062dda23cfdb12f12013dabb52907cd3e35167af28d2a63d3940f38ad"
+size = 14333923648
+license = "apache-2.0"
+base_repo = "huihui-ai/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated"
+base_revision = "7526a40541895942da4ad7b61611443b94f7c842"
+base_license = "apache-2.0"
+min_vram_gb = 15
+context = 8192
+moe = false
+notes = "Extra 16 GB least-censored candidate. Quant and huihui-ai base cards are both Apache-2.0."
+
+[[model]]
 id = "qwen3.6-27b-abliterated-q4"
-role = "low-refusal"
+role = "least-censored"
 card = "24gb"
 repo = "mradermacher/Huihui-Qwen3.6-27B-abliterated-GGUF"
 revision = "530e4cbae44f7a27396a8705f9fe802764ba6103"
@@ -60,11 +97,11 @@ base_license = "apache-2.0"
 min_vram_gb = 18
 context = 8192
 moe = false
-notes = "24 GB low-refusal pass. Quant and base cards are both Apache-2.0."
+notes = "24 GB least-censored pass. Quant and base cards are both Apache-2.0. Abliterated, so it is one candidate, not the definition of the tier."
 
 [[model]]
 id = "gemma-4-31b-abliterated-q4"
-role = "low-refusal"
+role = "least-censored"
 card = "24gb"
 repo = "paperscarecrow/Gemma-4-31B-it-abliterated"
 revision = "2491ee58472b82a2372d288f982943b9d5e6a82c"
@@ -78,4 +115,4 @@ base_license = "apache-2.0"
 min_vram_gb = 20
 context = 8192
 moe = false
-notes = "24 GB low-refusal pass. Base google/gemma-4-31b-it is Apache-2.0, and this quant's card is Apache-2.0."
+notes = "24 GB least-censored pass. Base google/gemma-4-31b-it is Apache-2.0, and this quant's card is Apache-2.0."

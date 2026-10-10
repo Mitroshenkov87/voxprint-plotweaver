@@ -143,7 +143,7 @@ def _split_roles(
     # Real ids from the registry are attached via spec.id. The download step stored role
     # in a sidecar next to the file name: we re-read the registry.
     entries = [entry for entry in load_registry(registry_path()) if _matches(entry, specs)]
-    low_ids = {entry.id for entry in entries if entry.role == "low-refusal"}
+    low_ids = {entry.id for entry in entries if entry.role == "least-censored"}
     main_ids = [entry.id for entry in entries if entry.role == "main"]
     low_specs = [spec for spec in specs if spec.id in low_ids]
     chosen = next((spec for spec in specs if spec.id == (main_ids[0] if main_ids else "")), None)
@@ -204,12 +204,14 @@ def _one_book(
         chapter_count=chapters,
         scenes_per_chapter=2,
         dark_themes=dark,
-        tier=ModelTier.LOW_REFUSAL if main.id == low.id and dark else ModelTier.STANDARD,
+        tier=ModelTier.LEAST_CENSORED if main.id == low.id and dark else ModelTier.STANDARD,
         mode=BookMode.AUTOPILOT,
         main_model_id=main.id,
-        low_refusal_model_id=low.id,
+        least_censored_model_id=low.id,
         main_gguf=str(main.path) if main.path.suffix == ".gguf" and main.path.is_file() else "",
-        low_refusal_gguf=str(low.path) if low.path.suffix == ".gguf" and low.path.is_file() else "",
+        least_censored_gguf=(
+            str(low.path) if low.path.suffix == ".gguf" and low.path.is_file() else ""
+        ),
     )
     project = Project.open_or_create(project_dir, request)
     started = time.monotonic()
@@ -220,7 +222,7 @@ def _one_book(
         {
             "status": result.status,
             "model_id": main.id,
-            "low_refusal_model_id": low.id,
+            "least_censored_model_id": low.id,
             "synopsis_id": story.id,
             "dark_themes": dark,
             "genre": story.genre,

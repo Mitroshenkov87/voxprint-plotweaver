@@ -13,20 +13,22 @@ bash scripts/bakeoff.sh
 That command:
 
 1. Installs Python dependencies if this checkout is not importable yet.
-2. Downloads the GGUF files in `bakeoff/models.toml` into `~/.local/share/voxprint/models/llm`. T-pro is the 24 GB standard drafter. Gemma 4 12B Q4_K_M is the 16 GB standard drafter and the same file Audiobook Builder uses. The Qwen 27B and Gemma 31B abliterated quants are the low-refusal passes. Each manifest records the quant licence and the confirmed base licence (all Apache-2.0).
+2. Downloads the GGUF files in `bakeoff/models.toml` into `~/.local/share/voxprint/models/llm`. T-pro is the 24 GB standard drafter. Gemma 4 12B Q4_K_M is the 16 GB standard drafter and the same file Audiobook Builder uses. The least-censored passes are the most permissive model that fits: Mistral Small 3.2 Q4_K_M is the 16 GB default, with an Apache-2.0 abliterated Mistral Small beside it, plus the Qwen 27B and Gemma 31B abliterated quants on 24 GB. Each manifest records the quant licence and the confirmed base licence (all Apache-2.0).
 3. Downloads llama.cpp b11476 Vulkan `llama-server` on first real use, into the shared `llm/llama.cpp-b11476` tree. An existing Audiobook Builder copy is reused.
 4. Writes every synopsis in `bakeoff/synopses/` as three chapters with dark themes off, one candidate at a time.
-5. Writes them again with dark themes on: T-pro drafts, then each low-refusal model fills placeholders in one swap and proofreads.
+5. Writes them again with dark themes on: T-pro drafts, then each least-censored model fills placeholders in one swap and proofreads. The judge scores every export, including the Russian prose from those dark-scene passes.
 6. Scores the exports with the main model and builds a blind packet.
 
 | Id | Card | Role | Weights | Base |
 |---|---|---|---|---|
 | t-pro-it-2.1-q4 | 24 GB | standard | Apache-2.0 | t-tech/T-pro-it-2.1, Apache-2.0 |
 | gemma-4-12b-it-q4 | 16 GB | standard | Apache-2.0 | google/gemma-4-12b-it, Apache-2.0 |
-| qwen3.6-27b-abliterated-q4 | 24 GB | low-refusal | Apache-2.0 | huihui-ai/Huihui-Qwen3.6-27B-abliterated, Apache-2.0 |
-| gemma-4-31b-abliterated-q4 | 24 GB | low-refusal | Apache-2.0 | google/gemma-4-31b-it, Apache-2.0 |
+| mistral-small-3.2-24b-q4 | 16 GB | least censored (default) | Apache-2.0 | mistralai/Mistral-Small-3.2-24B-Instruct-2506, Apache-2.0 |
+| mistral-small-3.2-24b-abliterated-q4 | 16 GB | least censored | Apache-2.0 | huihui-ai/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated, Apache-2.0 |
+| qwen3.6-27b-abliterated-q4 | 24 GB | least censored | Apache-2.0 | huihui-ai/Huihui-Qwen3.6-27B-abliterated, Apache-2.0 |
+| gemma-4-31b-abliterated-q4 | 24 GB | least censored | Apache-2.0 | google/gemma-4-31b-it, Apache-2.0 |
 
-The 16 GB card has no separate low-refusal file in this registry: those quants need 18 GB and 20 GB. TheDrummer tunes are omitted because their cards have no licence tag.
+Least censored is the most permissive model that fits, not necessarily an abliterated tune. On a 16 GB card the default is Mistral Small 3.2. TheDrummer tunes are omitted because their cards have no licence tag.
 
 Results:
 

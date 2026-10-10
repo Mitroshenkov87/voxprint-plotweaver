@@ -42,6 +42,7 @@ class RegistryEntry:
     base_revision: str = ""
     base_license: str = ""
     card: str = ""
+    default: bool = False
 
 
 def load_registry(path: Path) -> list[RegistryEntry]:
@@ -70,6 +71,7 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             base_revision=str(row.get("base_revision") or ""),
             base_license=str(row.get("base_license") or ""),
             card=str(row.get("card") or ""),
+            default=bool(row.get("default")),
         )
         if not entry.revision or not entry.base_repo or not entry.base_license:
             raise PlotweaverError(
@@ -188,6 +190,7 @@ def download_model(
         "base_license": canonical_licence(entry.base_license),
         "role": entry.role,
         "card": entry.card,
+        "default": entry.default,
         "notes": entry.notes,
     }
     write_json(folder / f"{entry.id}.manifest.json", manifest)
