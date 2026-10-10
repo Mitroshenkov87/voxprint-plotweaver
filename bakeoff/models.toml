@@ -112,6 +112,27 @@ moe = false
 notes = "Optional abliterated Mistral Small. Quant and huihui-ai base cards are both Apache-2.0. Not part of the default install."
 
 [[model]]
+id = "mistral-small-3.2-24b-plotweaver-abliterated-q4"
+role = "least-censored"
+card = "16gb"
+optional = true
+uncensored = true
+enabled = false
+repo = "local/plotweaver-abliterate"
+revision = ""
+filename = "mistral-small-3.2-24b-plotweaver-abliterated-Q4_K_M.gguf"
+sha256 = ""
+size = 0
+license = "apache-2.0"
+base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
+base_license = "apache-2.0"
+min_vram_gb = 15
+context = 8192
+moe = false
+notes = "Optional derivation produced by scripts/abliterate_mistral.sh. Disabled until that run records sha256 and size. The Q4_K_M target matches the stock quant, which is 14.3 GB and fits a 16 GB card. Not part of the default install."
+
+[[model]]
 id = "qwen3.6-27b-abliterated-q4"
 role = "least-censored"
 card = "24gb"

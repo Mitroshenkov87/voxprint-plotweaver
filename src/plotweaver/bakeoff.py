@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from plotweaver.abliterate import DARK_PROMPTS, probe_prompt, refusal_rate
 from plotweaver.atomic import read_json, write_json
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
@@ -103,6 +104,7 @@ def run_bakeoff(
         specs = _real_specs(allow_other_license)
         backend = LlamaServer(ensure_llama_server())
     solo_specs, low_specs, main_for_pass2 = _split_roles(specs, mock)
+    _refusal_report(results, backend, specs, mock)
     for spec in solo_specs:
         for story in stories:
             _one_book(
@@ -237,6 +239,46 @@ def _one_book(
             "seconds": round(elapsed, 3),
         },
     )
+
+
+def _refusal_report(results: Path, backend: LLMBackend, specs: list[ModelSpec], mock: bool) -> None:
+    """Probe every candidate. Stock and abliterated rows are grouped in the file."""
+    entries = [] if mock else load_registry(registry_path())
+    rows: list[dict[str, object]] = []
+    prompts = [probe_prompt(text) for text in DARK_PROMPTS]
+    for spec in specs:
+        backend.load(spec)
+        texts: list[str] = []
+        for prompt in prompts:
+            completion = backend.complete(
+                [ChatMessage("user", prompt)],
+                temperature=0.0,
+                max_tokens=128,
+                json_mode=False,
+            )
+            texts.append(completion.text)
+        rows.append(
+            {
+                "id": spec.id,
+                "group": _probe_group(spec.id, entries),
+                "refusal_rate": refusal_rate(texts),
+            }
+        )
+    write_json(results / "refusal-rates.json", {"probe_count": len(prompts), "models": rows})
+
+
+def _probe_group(model_id: str, entries: list[RegistryEntry]) -> str:
+    for entry in entries:
+        if entry.id != model_id:
+            continue
+        if entry.uncensored:
+            return "abliterated"
+        if entry.role == "least-censored":
+            return "stock-least-censored"
+        return "stock"
+    if model_id == "mock-low":
+        return "stock-least-censored"
+    return "stock"
 
 
 def _export_prose(export: Path) -> str | None:

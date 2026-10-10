@@ -65,8 +65,25 @@ check_untyped_defs = true
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = ["PySide6.*", "ebooklib.*", "docx.*", "datasketch.*", "pymorphy3.*", "PIL.*"]
+module = [
+  "PySide6.*",
+  "ebooklib.*",
+  "docx.*",
+  "datasketch.*",
+  "pymorphy3.*",
+  "PIL.*",
+  "torch",
+  "torch.*",
+  "transformers",
+  "transformers.*",
+]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["plotweaver.abliterate_hf"]
+disallow_untyped_defs = false
+warn_return_any = false
+check_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

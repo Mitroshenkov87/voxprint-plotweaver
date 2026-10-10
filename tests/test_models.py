@@ -40,6 +40,7 @@ def test_registry_lists_confirmed_apache_models() -> None:
         "t-lite-it-2.1-q4",
         "mistral-small-3.2-24b-q4",
         "mistral-small-3.2-24b-abliterated-q4",
+        "mistral-small-3.2-24b-plotweaver-abliterated-q4",
         "qwen3.6-27b-abliterated-q4",
         "gemma-4-31b-abliterated-q4",
     ]
