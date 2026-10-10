@@ -21,7 +21,7 @@ class BookMode(StrEnum):
 class ModelTier(StrEnum):
     """STANDARD is the usual drafter.
 
-    LEAST_CENSORED is the most permissive model that fits, not necessarily an abliterated one.
+    LEAST_CENSORED is an installed Model Forge model. The stock drafter is the fallback.
     """
 
     STANDARD = "standard"

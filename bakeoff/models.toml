@@ -10,7 +10,9 @@
 # A quant whose repository tag is the Gemma licence, rather than Apache-2.0, is not listed.
 # optional + uncensored rows are finished abliterated files, or disabled placeholders
 # for files Model Forge has not published. Plotweaver does not abliterate or quantize.
-# Settings offers the finished download when the GPU has at least 20 GB.
+# Settings offers an enabled least-censored file when the selected tier can run it.
+# Least-censored rows come from Model Forge. Stock rows stay T-pro, Gemma 4 12B,
+# and T-lite Q4/Q5. Disabled rows stay empty until a forge manifest fills them.
 
 [[model]]
 id = "t-pro-it-2.1-q4"
@@ -97,72 +99,30 @@ uncensored = false
 notes = "16 GB stock Russian candidate. Official T-lite-it-2.1 and this Q5_K_M quant are Apache-2.0. 5.85 GB."
 
 [[model]]
-id = "mistral-small-3.2-24b-q4"
+id = "qwen3.6-27b-abliterated-iq4-xs"
 role = "least-censored"
 card = "16gb"
 tier = "16gb"
 default = true
-repo = "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF"
-revision = "b750ec2299225e492f1bd27cab88a0a595fa848f"
-filename = "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
-sha256 = "a3cc56310807ed0d145eaf9f018ccda9ae7ad8edb41ec870aa2454b0d4700b3c"
-size = 14333922848
-license = "apache-2.0"
-base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
-base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
-base_license = "apache-2.0"
-min_vram_gb = 15
-context = 8192
-moe = false
-optional = false
-uncensored = false
-notes = "Stock least-censored model on the 16 GB tier. The file needs 15 GB, so a 16 GB card that keeps 2 GB free does not install it. A 24 GB card does. Official card and this quant are Apache-2.0. Stock instruct model, not an abliteration."
-
-[[model]]
-id = "mistral-small-3.2-24b-abliterated-q4"
-role = "least-censored"
-card = "16gb"
-tier = "16gb"
-optional = true
-uncensored = true
-repo = "mradermacher/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed-GGUF"
-revision = "4737318711c389a453d274fea0ee9b2bd009b573"
-filename = "Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed.Q4_K_M.gguf"
-sha256 = "73829e3062dda23cfdb12f12013dabb52907cd3e35167af28d2a63d3940f38ad"
-size = 14333923648
-license = "apache-2.0"
-base_repo = "huihui-ai/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated"
-base_revision = "7526a40541895942da4ad7b61611443b94f7c842"
-base_license = "apache-2.0"
-min_vram_gb = 15
-context = 8192
-moe = false
-notes = "Optional abliterated Mistral Small. Quant and huihui-ai base cards are both Apache-2.0. Not part of the default install."
-
-[[model]]
-id = "mistral-small-3.2-24b-plotweaver-abliterated-q4"
-role = "least-censored"
-card = "16gb"
-tier = "16gb"
 optional = true
 uncensored = true
 enabled = false
 repo = "unpublished/model-forge"
 revision = ""
-filename = "mistral-small-3.2-24b-plotweaver-abliterated-Q4_K_M.gguf"
+filename = "Huihui-Qwen3.6-27B-abliterated.IQ4_XS.gguf"
 sha256 = ""
 size = 0
 license = "apache-2.0"
-base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
-base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
+base_repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated"
+base_revision = "27502c8717fd5a2f8c0c77188c10c243fd4f672e"
 base_license = "apache-2.0"
-min_vram_gb = 15
+min_vram_gb = 13
 context = 8192
 moe = false
-notes = "Disabled placeholder. Model Forge will publish this abliterated Mistral Small file. Empty revision and SHA-256 until then. Not part of the default install."
+notes = "Disabled 16 GB fit placeholder for the abliterated Qwen 27B IQ4_XS quant. Model Forge fills revision and SHA-256. Not part of the stock install."
 
 [[model]]
-id = "t-lite-it-2.1-plotweaver-abliterated-q4"
+id = "qwen3.6-27b-abliterated-iq3-m"
 role = "least-censored"
 card = "16gb"
 tier = "16gb"
@@ -171,7 +131,119 @@ uncensored = true
 enabled = false
 repo = "unpublished/model-forge"
 revision = ""
-filename = "t-lite-it-2.1-plotweaver-abliterated-Q4_K_M.gguf"
+filename = "Huihui-Qwen3.6-27B-abliterated.IQ3_M.gguf"
+sha256 = ""
+size = 0
+license = "apache-2.0"
+base_repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated"
+base_revision = "27502c8717fd5a2f8c0c77188c10c243fd4f672e"
+base_license = "apache-2.0"
+min_vram_gb = 11
+context = 8192
+moe = false
+notes = "Disabled 16 GB fit placeholder for the abliterated Qwen 27B IQ3_M quant. Model Forge fills revision and SHA-256. Not part of the stock install."
+
+[[model]]
+id = "qwen3.6-27b-abliterated-q3-k-m"
+role = "least-censored"
+card = "16gb"
+tier = "16gb"
+optional = true
+uncensored = true
+enabled = false
+repo = "unpublished/model-forge"
+revision = ""
+filename = "Huihui-Qwen3.6-27B-abliterated.Q3_K_M.gguf"
+sha256 = ""
+size = 0
+license = "apache-2.0"
+base_repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated"
+base_revision = "27502c8717fd5a2f8c0c77188c10c243fd4f672e"
+base_license = "apache-2.0"
+min_vram_gb = 12
+context = 8192
+moe = false
+notes = "Disabled 16 GB fit placeholder for the abliterated Qwen 27B Q3_K_M quant. Model Forge fills revision and SHA-256. Not part of the stock install."
+
+[[model]]
+id = "gemma-4-31b-abliterated-iq4-xs"
+role = "least-censored"
+card = "16gb"
+tier = "16gb"
+default = true
+optional = true
+uncensored = true
+enabled = false
+repo = "unpublished/model-forge"
+revision = ""
+filename = "gemma-4-31b-abliterated-IQ4_XS.gguf"
+sha256 = ""
+size = 0
+license = "apache-2.0"
+base_repo = "google/gemma-4-31b-it"
+base_revision = "842da3794eaa0b77d5f08bae87a17459d91ff475"
+base_license = "apache-2.0"
+min_vram_gb = 13
+context = 8192
+moe = false
+notes = "Disabled 16 GB fit placeholder for the abliterated Gemma 31B IQ4_XS quant. Model Forge fills revision and SHA-256. Not part of the stock install."
+
+[[model]]
+id = "gemma-4-31b-abliterated-iq3-m"
+role = "least-censored"
+card = "16gb"
+tier = "16gb"
+optional = true
+uncensored = true
+enabled = false
+repo = "unpublished/model-forge"
+revision = ""
+filename = "gemma-4-31b-abliterated-IQ3_M.gguf"
+sha256 = ""
+size = 0
+license = "apache-2.0"
+base_repo = "google/gemma-4-31b-it"
+base_revision = "842da3794eaa0b77d5f08bae87a17459d91ff475"
+base_license = "apache-2.0"
+min_vram_gb = 11
+context = 8192
+moe = false
+notes = "Disabled 16 GB fit placeholder for the abliterated Gemma 31B IQ3_M quant. Model Forge fills revision and SHA-256. Not part of the stock install."
+
+[[model]]
+id = "gemma-4-31b-abliterated-q3-k-m"
+role = "least-censored"
+card = "16gb"
+tier = "16gb"
+optional = true
+uncensored = true
+enabled = false
+repo = "unpublished/model-forge"
+revision = ""
+filename = "gemma-4-31b-abliterated-Q3_K_M.gguf"
+sha256 = ""
+size = 0
+license = "apache-2.0"
+base_repo = "google/gemma-4-31b-it"
+base_revision = "842da3794eaa0b77d5f08bae87a17459d91ff475"
+base_license = "apache-2.0"
+min_vram_gb = 12
+context = 8192
+moe = false
+notes = "Disabled 16 GB fit placeholder for the abliterated Gemma 31B Q3_K_M quant. Model Forge fills revision and SHA-256. Not part of the stock install."
+
+[[model]]
+id = "t-lite-it-2.1-forge-abliterated-q4"
+role = "least-censored"
+card = "16gb"
+tier = "16gb"
+languages = ["ru"]
+optional = true
+uncensored = true
+enabled = false
+repo = "unpublished/model-forge"
+revision = ""
+filename = "t-lite-it-2.1-forge-abliterated-Q4_K_M.gguf"
 sha256 = ""
 size = 0
 license = "apache-2.0"
@@ -181,29 +253,7 @@ base_license = "apache-2.0"
 min_vram_gb = 6
 context = 8192
 moe = false
-notes = "Disabled placeholder. Model Forge will publish this abliterated T-lite-it-2.1 file. Apache-2.0. Empty revision and SHA-256 until then. Not part of the default install."
-
-[[model]]
-id = "t-pro-it-2.1-plotweaver-abliterated-q4"
-role = "least-censored"
-card = "24gb"
-tier = "24gb"
-optional = true
-uncensored = true
-enabled = false
-repo = "unpublished/model-forge"
-revision = ""
-filename = "t-pro-it-2.1-plotweaver-abliterated-Q4_K_M.gguf"
-sha256 = ""
-size = 0
-license = "apache-2.0"
-base_repo = "t-tech/T-pro-it-2.1"
-base_revision = "a677a7c27bb8820c816fbcf578d912acedcf4439"
-base_license = "apache-2.0"
-min_vram_gb = 20
-context = 8192
-moe = false
-notes = "Disabled placeholder. Model Forge will publish this abliterated T-pro-it-2.1 file. Apache-2.0. Empty revision and SHA-256 until then. Not part of the default install."
+notes = "Disabled placeholder for the Russian least-censored model. Model Forge publishes the abliterated T-lite-it-2.1 file. Empty revision and SHA-256 until then."
 
 [[model]]
 id = "qwen3.6-27b-abliterated-q4"
@@ -224,7 +274,7 @@ base_license = "apache-2.0"
 min_vram_gb = 18
 context = 8192
 moe = false
-notes = "Optional abliterated Qwen. Quant and base cards are both Apache-2.0. Not part of the default install."
+notes = "24 GB least-censored model. Pinned Apache-2.0 quant of the abliterated Qwen 27B. Not part of the stock install."
 
 [[model]]
 id = "gemma-4-31b-abliterated-q4"
@@ -245,4 +295,4 @@ base_license = "apache-2.0"
 min_vram_gb = 20
 context = 8192
 moe = false
-notes = "Optional abliterated Gemma 31B. Base and this quant are Apache-2.0. Not part of the default install."
+notes = "24 GB least-censored model. Pinned Apache-2.0 quant of the abliterated Gemma 31B. Not part of the stock install."

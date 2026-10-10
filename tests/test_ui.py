@@ -55,7 +55,7 @@ def test_settings_hides_abliterated_downloads_below_20gb(tmp_path: Path, monkeyp
     window._open_settings()
     assert window.stack.currentIndex() == 4
     assert window.uncensored_models.isEnabled() is False
-    assert "20" in window.settings_note.text()
+    assert "published" in window.settings_note.text()
     window.uncensored_models.setChecked(True)
     window._save_settings()
     assert uncensored_models_preference() is False

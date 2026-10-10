@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
 
     def _open_settings(self) -> None:
         self._refresh_vram_tier()
-        allowed = uncensored_offer_allowed(self._gpu_total())
+        allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
         self.uncensored_models.setEnabled(allowed)
         self.uncensored_models.setChecked(uncensored_models_preference() if allowed else False)
         self.download_uncensored.setEnabled(allowed and self.uncensored_models.isChecked())
@@ -396,7 +396,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(SETTINGS)
 
     def _uncensored_toggled(self, checked: bool) -> None:
-        allowed = uncensored_offer_allowed(self._gpu_total())
+        allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
         self.download_uncensored.setEnabled(allowed and checked)
 
     def _save_settings(self) -> None:
@@ -405,7 +405,7 @@ class MainWindow(QMainWindow):
             choice = "auto"
         save_model_tier_override(choice)
         self._refresh_vram_tier()
-        allowed = uncensored_offer_allowed(self._gpu_total())
+        allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
         enabled = bool(self.uncensored_models.isChecked()) and allowed
         save_uncensored_models(enabled)
         if not allowed:
@@ -416,7 +416,7 @@ class MainWindow(QMainWindow):
 
     def _download_uncensored(self) -> None:
         total = self._gpu_total()
-        if not uncensored_offer_allowed(total):
+        if not uncensored_offer_allowed(total, self._gpu_free()):
             self.settings_status.setText(tr("settings_uncensored_blocked"))
             return
         save_uncensored_models(True)
@@ -435,7 +435,9 @@ class MainWindow(QMainWindow):
 
     def _download_failed(self, message: str) -> None:
         self.settings_status.setText(message)
-        self.download_uncensored.setEnabled(uncensored_offer_allowed(self._gpu_total()))
+        self.download_uncensored.setEnabled(
+            uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
+        )
 
     def _add_ref(self) -> None:
         path, _selected = QFileDialog.getOpenFileName(

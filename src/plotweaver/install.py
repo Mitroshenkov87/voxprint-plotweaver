@@ -1,11 +1,10 @@
-"""Default stock downloads, and the separate abliterated download from Settings.
+"""Default stock downloads, and the separate least-censored download from Settings.
 
 The first real run detects VRAM, picks the 16 GB or 24 GB tier, and downloads
-stock models that tier can run with 2 GB or 3 GB of headroom. Abliterated
-models stay out of that set. Settings can download them when the GPU has at
-least 20 GB and the same tier rule allows the file. A dark-theme book uses an
-installed abliterated file when one fits, and otherwise the stock
-least-censored model, or the stock drafter when that file does not fit.
+stock models that tier can run with 2 GB or 3 GB of headroom. Least-censored
+models come from Model Forge and stay out of that set. A Russian book prefers
+the forge T-lite file when it is installed. Otherwise the largest installed
+forge model for the tier is used, and the stock drafter is the fallback.
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import assert_never
 
-from plotweaver.domain import BookRequest, ModelTier
+from plotweaver.domain import BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
 from plotweaver.hardware import require_supported_gpu
 from plotweaver.paths import gguf_dir
@@ -49,10 +48,10 @@ def ensure_default_install(
 def ensure_uncensored_models(
     *, total_vram_gb: float, free_gb: float | None = None, store: Path | None = None
 ) -> int:
-    """Download abliterated models that this tier can run. Refused below 20 GB."""
-    if not uncensored_offer_allowed(total_vram_gb):
-        raise PlotweaverError("Abliterated models need a GPU with at least 20 GB of VRAM.")
+    """Download published least-censored models that this tier can run."""
     free = total_vram_gb if free_gb is None else free_gb
+    if not uncensored_offer_allowed(total_vram_gb, free):
+        raise PlotweaverError("No published least-censored model fits this card.")
     folder = store or gguf_dir()
     count = 0
     for entry in load_registry(registry_path()):
@@ -80,7 +79,7 @@ def assign_book_models(
     if not request.main_gguf:
         match request.tier:
             case ModelTier.LEAST_CENSORED:
-                chosen = _stock_least_censored(entries, total, free_gb)
+                chosen = _least_censored(entries, total, free_gb, store, request.language)
             case ModelTier.STANDARD:
                 chosen = _stock_main(entries, total, free_gb)
             case _ as unreachable:
@@ -91,7 +90,11 @@ def assign_book_models(
         and request.tier is ModelTier.STANDARD
         and not request.least_censored_gguf
     ):
-        _bind_least(request, _dark_pass(entries, store, total, free_gb), store)
+        _bind_least(
+            request,
+            _least_censored(entries, total, free_gb, store, request.language),
+            store,
+        )
 
 
 def prepare_real_models(
@@ -119,36 +122,36 @@ def _stock_main(entries: list[RegistryEntry], total_gb: float, free_gb: float) -
     raise PlotweaverError("No stock model fits this VRAM tier.")
 
 
-def _stock_least_censored(
-    entries: list[RegistryEntry], total_gb: float, free_gb: float
+def _least_censored(
+    entries: list[RegistryEntry],
+    total_gb: float,
+    free_gb: float,
+    store: Path,
+    language: Language,
 ) -> RegistryEntry:
-    stock = [
-        entry
-        for entry in entries
-        if entry.role == "least-censored" and is_stock(entry) and _offered(entry, total_gb, free_gb)
-    ]
-    for entry in stock:
-        if entry.default:
-            return entry
-    if stock:
-        return stock[0]
-    return _stock_main(entries, total_gb, free_gb)
-
-
-def _dark_pass(
-    entries: list[RegistryEntry], store: Path, total_gb: float, free_gb: float
-) -> RegistryEntry:
+    """Installed Model Forge model for this language and tier, else the stock drafter."""
     installed = [
         entry
         for entry in entries
         if entry.enabled
         and entry.uncensored
+        and entry.role == "least-censored"
         and _offered(entry, total_gb, free_gb)
         and (store / entry.filename).is_file()
     ]
-    if installed:
-        return max(installed, key=lambda entry: entry.min_vram_gb)
-    return _stock_least_censored(entries, total_gb, free_gb)
+    specific = [entry for entry in installed if language.value in entry.languages]
+    if specific:
+        return _preferred(specific)
+    general = [entry for entry in installed if not entry.languages]
+    if general:
+        return _preferred(general)
+    return _stock_main(entries, total_gb, free_gb)
+
+
+def _preferred(entries: list[RegistryEntry]) -> RegistryEntry:
+    marked = [entry for entry in entries if entry.default]
+    pool = marked or entries
+    return max(pool, key=lambda entry: entry.min_vram_gb)
 
 
 def _installed(entry: RegistryEntry, store: Path) -> Path:
