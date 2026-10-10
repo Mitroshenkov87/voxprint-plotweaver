@@ -123,6 +123,8 @@ def _backend(mock: bool) -> LLMBackend:
 
 
 class MainWindow(QMainWindow):
+    """The desktop window: new book, progress, and result."""
+
     def __init__(self, mock: bool = False) -> None:
         super().__init__()
         self.mock_default = mock

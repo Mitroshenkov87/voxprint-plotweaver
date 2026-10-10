@@ -105,6 +105,10 @@ python -m venv .venv
 
 `docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
 
+## Documentation
+
+The guides, the command reference, and the API notes are at <https://mitroshenkov87.github.io/voxprint-plotweaver/>.
+
 ## Roadmap
 
 What comes next is in [ROADMAP.md](ROADMAP.md).

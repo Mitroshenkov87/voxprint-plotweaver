@@ -36,6 +36,7 @@ jobs:
           ruff format --check src tests
           mypy src
           bandit -c pyproject.toml -r src -ll
+          interrogate src/plotweaver
       - name: EPUBCheck
         if: runner.os == 'Linux'
         run: |

@@ -10,6 +10,7 @@ _THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 
 def parse_json_object(text: str) -> dict[str, Any] | None:
+    """Return the JSON object in a model reply, or None when it is not there."""
     cleaned = _THINK.sub("", text).strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)

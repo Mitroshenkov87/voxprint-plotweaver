@@ -43,7 +43,8 @@ from plotweaver.ui.window import MainWindow
 from plotweaver.vxbook import validate_vxbook
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Build the plotweaver command parser, including every subcommand."""
     parser = argparse.ArgumentParser(prog="plotweaver", description=APP_NAME)
     parser.add_argument("--version", action="version", version=version_label())
     sub = parser.add_subparsers(dest="command", required=True)
@@ -145,7 +146,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     _add_machine_args(sound_add)
     sound_add.set_defaults(func=_sound_add)
+    return parser
 
+
+def main(argv: list[str] | None = None) -> int:
+    """Run one plotweaver command and return its exit code."""
+    parser = build_parser()
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))

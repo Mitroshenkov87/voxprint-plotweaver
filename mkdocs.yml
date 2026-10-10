@@ -1,0 +1,46 @@
+site_name: Voxprint AI Plotweaver
+site_description: Guides, the command reference, and the API notes for Voxprint AI Plotweaver.
+site_url: https://mitroshenkov87.github.io/voxprint-plotweaver/
+repo_url: https://github.com/Mitroshenkov87/voxprint-plotweaver
+repo_name: Mitroshenkov87/voxprint-plotweaver
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  font: false
+  palette:
+    - scheme: default
+      primary: blue grey
+      accent: indigo
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_if_no_docstring: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            filters: ["!^_"]
+            merge_init_into_class: true
+            heading_level: 2
+            show_bases: false
+            inherited_members: false
+
+hooks:
+  - docs/hooks.py
+
+nav:
+  - Home: index.md
+  - Command line: CLI.md
+  - Command reference: cli-reference.md
+  - Bake-off: bakeoff.md
+  - Architecture: architecture.md
+  - Audiobook export: audiobook-export.md
+  - API: api.md

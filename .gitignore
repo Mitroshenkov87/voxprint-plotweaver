@@ -23,6 +23,8 @@ models/
 audit-report.txt
 .coverage
 htmlcov/
+site/
+docs/cli-reference.md
 *.AppImage
 packaging/windows/Output/
 packaging/linux/pkg/

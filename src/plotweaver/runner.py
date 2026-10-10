@@ -48,6 +48,8 @@ Progress = Any
 
 @dataclass
 class RunResult:
+    """What a book run finished with: status, gate, and the export counts."""
+
     status: str
     gate: str | None
     export_dir: Path | None

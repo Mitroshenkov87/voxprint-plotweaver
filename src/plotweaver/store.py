@@ -33,11 +33,14 @@ class Checkpoint:
 
 
 class Project:
+    """The folder for one book: request, artefacts, checkpoint, and canon."""
+
     def __init__(self, root: Path) -> None:
         self.root = root
 
     @classmethod
     def open_or_create(cls, root: Path, request: BookRequest) -> Project:
+        """Create the project folder and project.json when they are missing."""
         root.mkdir(parents=True, exist_ok=True)
         project = cls(root)
         if not project.request_path.is_file():
@@ -58,12 +61,14 @@ class Project:
         return self.root / "export"
 
     def request(self) -> BookRequest:
+        """Read the stored book request."""
         payload = read_json(self.request_path)
         if not isinstance(payload, dict):
             raise TypeError("project.json is not an object")
         return request_from_dict(payload)
 
     def save_request(self, request: BookRequest) -> None:
+        """Write the book request back to project.json."""
         write_json(self.request_path, request_to_dict(request))
 
     def checkpoint(self) -> Checkpoint:

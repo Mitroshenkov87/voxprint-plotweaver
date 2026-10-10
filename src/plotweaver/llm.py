@@ -15,12 +15,16 @@ from plotweaver.sound import mock_sound_document
 
 @dataclass
 class ChatMessage:
+    """One message in a model chat."""
+
     role: str
     content: str
 
 
 @dataclass
 class Completion:
+    """Text and token counts from one model reply."""
+
     text: str
     prompt_tokens: int
     completion_tokens: int
@@ -39,6 +43,8 @@ class ModelSpec:
 
 
 class LLMBackend(Protocol):
+    """The model caller the pipeline uses."""
+
     model_id: str
 
     def load(self, spec: ModelSpec) -> None:
@@ -62,6 +68,7 @@ class LLMBackend(Protocol):
 
 
 def task_of(messages: list[ChatMessage]) -> Task:
+    """Read the TASK line from the latest user message."""
     for message in reversed(messages):
         if message.role != "user":
             continue
