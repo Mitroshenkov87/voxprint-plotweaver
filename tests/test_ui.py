@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtGui import QStandardItemModel
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QComboBox
 
 from plotweaver.appinfo import version_label
 from plotweaver.settings import model_tier_override, uncensored_models_preference
@@ -121,6 +121,37 @@ def test_window_selftest(tmp_path: Path) -> None:
     del app
 
 
+def test_brief_form_marks_guesses_and_shows_pov(tmp_path: Path) -> None:
+    os.environ["PLOTWEAVER_UI_PROJECT"] = str(tmp_path / "ui")
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    window.stack.setCurrentIndex(1)
+    window.mock.setChecked(True)
+    window.brief_form.notes.setPlainText("The seal fails.\nThe crew stays.")
+    window._draft_brief()
+    assert window.title.text()
+    assert window.synopsis.toPlainText()
+    pov = window.findChild(QComboBox, "pov")
+    tense = window.findChild(QComboBox, "tense")
+    assert pov is not None and pov.isVisible()
+    assert tense is not None and tense.isVisible()
+    assert window.brief_form._marks["pov"].isVisible()
+    assert window.brief_form._marks["tense"].isVisible()
+    pov.setCurrentIndex(1)
+    assert window.brief_form._marks["pov"].isVisible() is False
+    window.brief_form.preview_toggle.setChecked(True)
+    assert "BOOK BRIEF" in window.brief_form.preview.toPlainText()
+    window.brief_form.preview.setPlainText("Use the edited preview.")
+    request = window.request_from_form()
+    assert request.prompt_override == "Use the edited preview."
+    assert request.brief is not None
+    menu = window.menuBar().actions()[0].menu()
+    assert menu is not None
+    assert menu.actions()[0].text() == "How to write a brief"
+    del app
+
+
 def test_suite_icons_and_splash() -> None:
     app = QApplication.instance() or QApplication([])
     folder = Path(__file__).parents[1] / "src" / "plotweaver" / "ui" / "icons"
@@ -134,7 +165,7 @@ def test_suite_icons_and_splash() -> None:
     assert splash.version_text == version_label()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Rikmah"'
+    assert window.about_text() == '0.2.0 RC · build dev "Machashavah"'
     save = next(
         button
         for button in window.findChildren(type(window.download_uncensored))

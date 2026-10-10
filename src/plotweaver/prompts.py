@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 
+from plotweaver.brief import attach_context
 from plotweaver.domain import BookRequest, Task
 
 SYSTEM = (
@@ -22,6 +23,7 @@ SYSTEM = (
 
 
 def _header(task: Task, req: BookRequest, extra: list[str]) -> str:
+    attach_context(req)
     chapters, scenes, per_scene = req.shape()
     lines = [
         f"TASK: {task.value}",
@@ -37,6 +39,8 @@ def _header(task: Task, req: BookRequest, extra: list[str]) -> str:
         f"target_words: {req.target_words}",
         *extra,
     ]
+    if req.generation_context.strip():
+        lines.extend(["", req.generation_context.strip()])
     return "\n".join(lines)
 
 
@@ -48,8 +52,15 @@ def system_message() -> str:
 def bible_prompt(req: BookRequest) -> str:
     """Ask for the story bible as one JSON object."""
     body = _header(Task.BIBLE, req, [])
+    binding = ""
+    if req.generation_context.strip():
+        binding = (
+            "The BOOK BRIEF block is binding for genre, tone, point of view, tense, "
+            "audience, setting, ending, and characters. "
+        )
     return (
         f"{body}\n\n"
+        f"{binding}"
         "Read the synopsis and return one JSON object with keys logline, theme, "
         "genre_contract, tone, ending_intent, and characters. characters is a list of "
         "objects with name, gender (male or female), role, goals, secrets, voice, arc, "
@@ -64,8 +75,12 @@ def bible_prompt(req: BookRequest) -> str:
 def outline_prompt(req: BookRequest, bible: dict[str, object]) -> str:
     """Ask for the chapter outline as JSON."""
     body = _header(Task.OUTLINE, req, [])
+    binding = ""
+    if req.generation_context.strip():
+        binding = "Follow the BOOK BRIEF plot points and ending. "
     return (
         f"{body}\n\n"
+        f"{binding}"
         'Return JSON {"chapters": [{"id", "title", "purpose", "pov", '
         '"word_budget", "dark_hint"}]}. Use the chapter_count above. '
         "dark_hint is true only when the chapter needs violence, crime, or adult "
@@ -195,6 +210,23 @@ def style_prompt(req: BookRequest, measured: str, excerpt: str) -> str:
         'Write a neutral style card in JSON {"style_card": "..."}. Describe sentence '
         "length, dialogue, and tone. Do not quote the excerpt and do not name its plot.\n\n"
         f"MEASURED:\n{measured}\n\nEXCERPT (style only, do not copy):\n{excerpt[:1200]}\n"
+    )
+
+
+def brief_draft_prompt(idea: str, language: str) -> str:
+    """Ask the local model to expand notes into a version-1 book brief."""
+    return (
+        f"TASK: {Task.BRIEF.value}\n"
+        f"language: {language}\n"
+        "Return one JSON object with keys version, title, language, pages, "
+        "words_per_page, genre, subgenre, tone, pov, tense, audience, setting, "
+        "characters, plot_points, ending_type, style_references, dark_themes, "
+        "synopsis, and guessed. characters is a list of objects with name, role, "
+        "description, and gender (male, female, or unspecified). guessed is the list "
+        "of keys you had to choose because the notes did not say them. Fill every key. "
+        "Write prose values in the requested language. version is 1. "
+        "Do not invent a target_words value.\n\n"
+        f"IDEA:\n{idea.strip()}\n"
     )
 
 

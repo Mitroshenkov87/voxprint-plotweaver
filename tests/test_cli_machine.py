@@ -22,7 +22,7 @@ def test_version_flag_is_the_display_label(capsys: pytest.CaptureFixture[str]) -
     assert caught.value.code == 0
     assert capsys.readouterr().out.strip() == version_label()
     assert main(["version"]) == 0
-    assert capsys.readouterr().out.strip() == '0.2.0 RC · build dev "Rikmah"'
+    assert capsys.readouterr().out.strip() == '0.2.0 RC · build dev "Machashavah"'
 
 
 def test_stamp_replaces_the_dev_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -31,12 +31,12 @@ def test_stamp_replaces_the_dev_marker(tmp_path: Path, monkeypatch: pytest.Monke
     stamped.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     assert stamp_build(stamped, 52) == 52
     monkeypatch.setenv("PLOTWEAVER_BUILD_JSON", str(stamped))
-    assert version_label() == '0.2.0 RC · build 52 "Rikmah"'
+    assert version_label() == '0.2.0 RC · build 52 "Machashavah"'
     final = json.loads(stamped.read_text(encoding="utf-8"))
     final["prerelease"] = None
     final["build"] = 9
     stamped.write_text(json.dumps(final), encoding="utf-8")
-    assert version_label() == '0.2.0 · build 9 "Rikmah"'
+    assert version_label() == '0.2.0 · build 9 "Machashavah"'
 
 
 def test_run_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

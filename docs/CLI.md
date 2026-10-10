@@ -3,7 +3,7 @@
 `plotweaver --version` and `plotweaver version` print the display label and nothing else:
 
 ```text
-0.2.0 RC · build dev "Rikmah"
+0.2.0 RC · build dev "Machashavah"
 ```
 
 `BUILD.json` at the repository root is the source for the version, the prerelease, the codename, and the build offset. A packaged CI build replaces `dev` with `GITHUB_RUN_NUMBER + offset`. A final release (`prerelease` null or empty) drops ` RC`.
@@ -77,6 +77,8 @@ After a real `run`:
 
 `status` is `completed` or `waiting`. `gate` is a string while the book is waiting for approval, otherwise null. `scenario-mars` omits `gate`, `refusals`, `placeholders`, and `rewrites`. Its `code` is 3 and `ok` is false when `status` is not `completed`.
 
+`--brief PATH` reads a version-1 JSON brief or the Markdown template in [Writing a brief](WRITING-A-BRIEF.md). It supplies the title, language, length, genre, point of view, tense, characters, and synopsis. `--synopsis` still wins when both are set. A new project needs one of the two. An invalid brief exits 1. With `--json` the object adds `errors`, a list of `{field, code, message}`.
+
 Output names, relative to the export directory:
 
 | File | When |
@@ -89,6 +91,14 @@ Output names, relative to the export directory:
 | `book.md` | `--markdown` |
 | `audiobook/book.md` and `audiobook/speaker-marks.txt` | `--speaker-marks` |
 | `book.sound.vxbook` | `--sound` |
+
+### `brief draft`
+
+```text
+plotweaver brief draft --idea "..." [--language ru|en] [--mock] [--json] [--dry-run]
+```
+
+Expands loose notes into a full brief with the local model, or the mock backend when `--mock` is set. The text form is the Markdown template. `--json` returns `brief`, the version-1 object, including `guessed`. A dry-run does not call a model. Its `command` is `brief.draft`.
 
 ### `export`
 

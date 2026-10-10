@@ -18,7 +18,9 @@ def test_cli_reference_lists_the_live_commands() -> None:
         "## plotweaver models list",
         "## plotweaver models import-forge-manifest",
         "## plotweaver sound add",
+        "## plotweaver brief draft",
     ):
         assert heading in text
     assert "--json" in text
     assert "--dry-run" in text
+    assert "--brief" in text

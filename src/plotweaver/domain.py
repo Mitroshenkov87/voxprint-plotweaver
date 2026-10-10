@@ -65,6 +65,7 @@ class Task(StrEnum):
     JUDGE = "judge"
     SOUND = "sound"
     PROBE = "probe"
+    BRIEF = "brief"
 
 
 def parse_gender(value: object) -> Gender:
@@ -102,6 +103,9 @@ class BookRequest:
     export_formats: list[str] = field(default_factory=lambda: [ExportFormat.EPUB.value])
     created: str = ""
     sound_markup: bool = False
+    brief: dict[str, object] | None = None
+    prompt_override: str = ""
+    generation_context: str = ""
 
     def shape(self) -> tuple[int, int, int]:
         """Return (chapters, scenes per chapter, words per scene)."""
@@ -142,6 +146,8 @@ def request_to_dict(req: BookRequest) -> dict[str, object]:
         "export_formats": normalize_formats(req.export_formats),
         "created": req.created,
         "sound_markup": req.sound_markup,
+        "brief": req.brief,
+        "prompt_override": req.prompt_override,
     }
 
 
@@ -199,7 +205,15 @@ def request_from_dict(data: dict[str, object]) -> BookRequest:
         export_formats=normalize_formats(data.get("export_formats")),
         created=str(data.get("created") or ""),
         sound_markup=bool(data.get("sound_markup")),
+        brief=_brief_dict(data.get("brief")),
+        prompt_override=str(data.get("prompt_override") or ""),
     )
+
+
+def _brief_dict(value: object) -> dict[str, object] | None:
+    if isinstance(value, dict):
+        return value
+    return None
 
 
 def _tier_from_stored(value: object) -> ModelTier:

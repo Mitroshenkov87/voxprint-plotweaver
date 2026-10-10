@@ -1,6 +1,6 @@
 # Voxprint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Rikmah. `plotweaver --version` prints `0.2.0 RC · build N "Rikmah"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Machashavah. `plotweaver --version` prints `0.2.0 RC · build N "Machashavah"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -12,19 +12,19 @@ The installer includes the app, Python 3.14, the Python dependencies, and the pi
 
 ## Download and install
 
-Release files are on the [v0.2.0-rc2 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc2). Download `SHA256SUMS` with the installer and check it before you run anything.
+Release files are on the [v0.2.0-rc3 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc3). Download `SHA256SUMS` with the installer and check it before you run anything.
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc2-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc2-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc2-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc3-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc3-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc3-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver` and adds a Voxprint entry to the Start menu. Administrator rights are not required.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc2_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc3_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -34,7 +34,7 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf voxprint-plotweaver-0.2.0rc2-linux-x86_64.tar.gz
+tar -xzf voxprint-plotweaver-0.2.0rc3-linux-x86_64.tar.gz
 ./voxprint-plotweaver/plotweaver-gui.sh
 ```
 
@@ -53,7 +53,7 @@ Settings also has an advanced VRAM-tier override (Auto, 16 GB, 24 GB). The 24 GB
 
 ## Writing a book from a synopsis
 
-Choose New book. Set the title, the author, and the language. Paste a synopsis of about five pages. Set a target word count. Leave chapters at 0 to let the outline decide, or type a count.
+Choose New book. Set the title, the author, and the language. Paste a synopsis, or write loose notes and press **Help me write the brief**. Pages and words per page set the length. Leave chapters at 0 to let the outline decide, or type a count. Point of view and tense stay on the form. The prompt preview is editable.
 
 Leave **Stop for bible and outline approval** unchecked to write the book through. Check it when you want to read `bible.json` and `outline.json` and press Approve and continue. The window does not open an editor for the bible, the outline, or scene beats.
 
@@ -107,7 +107,7 @@ python -m venv .venv
 
 ## Documentation
 
-The guides, the command reference, and the API notes are at <https://mitroshenkov87.github.io/voxprint-plotweaver/>.
+The guides, the command reference, and the API notes are at <https://mitroshenkov87.github.io/voxprint-plotweaver/>. [How to write a brief](docs/WRITING-A-BRIEF.md) is also on that site and in the Help menu.
 
 ## Roadmap
 
