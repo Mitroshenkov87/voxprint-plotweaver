@@ -1,0 +1,73 @@
+[project]
+name = "voxprint-plotweaver"
+version = "0.1.0"
+description = "Voxprint AI Plotweaver writes a whole novel from a synopsis with local LLMs."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+authors = [{ name = "Aleksandr Mitroshenkov" }]
+dependencies = [
+  "PySide6-Essentials>=6.10",
+  "httpx>=0.28",
+  "python-docx>=1.2",
+  "ebooklib>=0.18",
+  "datasketch>=1.6",
+  "pymorphy3>=2.0.3",
+  "pymorphy3-dicts-ru",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.12",
+  "mypy>=1.17",
+  "bandit>=1.8",
+  "pip-audit>=2.9",
+]
+
+[project.scripts]
+plotweaver = "plotweaver.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
+Repository = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.14"
+mypy_path = "src"
+packages = ["plotweaver"]
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["PySide6.*", "ebooklib.*", "docx.*", "datasketch.*", "pymorphy3.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]

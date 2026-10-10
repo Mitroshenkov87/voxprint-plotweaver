@@ -1,0 +1,24 @@
+Voxprint AI Plotweaver
+Copyright 2026 Aleksandr Mitroshenkov
+
+The source code of this program is licensed under the Apache License, Version 2.0
+(see LICENSE).
+
+Not covered by that licence (each has its own terms):
+  * Model weights downloaded at runtime. The default registry lists Apache-2.0
+    weights only. Each file keeps the licence recorded in its manifest.
+  * llama.cpp (MIT), used as an external llama-server binary. Plotweaver does not
+    vendor its source. https://github.com/ggml-org/llama.cpp
+  * Third-party Python packages (PySide6/Qt, python-docx, ebooklib, datasketch,
+    pymorphy3, httpx, and their dependencies) keep their own licences.
+
+The icon and the master mark branding/plotweaver-1024.png are original artwork
+by Aleksandr Mitroshenkov, licensed with this project under Apache-2.0.
+
+Ideas, not code, were taken from public research and from MIT/Apache projects
+named in docs/architecture.md (Dramatron, Re3, DOC, novel-studio, show-me-the-story).
+GPL, AGPL, and unlicensed novel generators were not used as source.
+
+Voxprint AI Plotweaver is an independent project and is not affiliated with
+SpaceX, Hugging Face, or the model authors. SpaceX appears only as a fictional
+setting in the Mars sample scenario.
