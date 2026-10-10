@@ -1,0 +1,43 @@
+# Apache-2.0 GGUF candidates for the RTX 4090 bake-off.
+# Sizes and SHA-256 were checked against Hugging Face on 2026-10-10.
+# One large model is resident at a time. The Gemma quant from amarck is not listed:
+# that repository's licence tag is gemma, not Apache-2.0 or MIT.
+
+[[model]]
+id = "t-pro-it-2.1-q4"
+role = "main"
+repo = "t-tech/T-pro-it-2.1-GGUF"
+filename = "T-pro-it-2.1-Q4_K_M.gguf"
+sha256 = "b19e88cc1154b4b0c99f09bc7b57b8e5f3a6af4135581a3bfd31a2518ed58714"
+size = 19761766048
+license = "apache-2.0"
+min_vram_gb = 20
+context = 8192
+moe = false
+notes = "Main Russian-prose candidate. About 19.8 GB. Tight on a 24 GB card: context stays 8192 and the KV cache is q4_0."
+
+[[model]]
+id = "qwen3.6-27b-abliterated-q4"
+role = "low-refusal"
+repo = "mradermacher/Huihui-Qwen3.6-27B-abliterated-GGUF"
+filename = "Huihui-Qwen3.6-27B-abliterated.Q4_K_M.gguf"
+sha256 = "e893b14906e582ff14ccf13cd9e4b2d50bf7848413cd695a313d03f905118461"
+size = 16547399808
+license = "apache-2.0"
+min_vram_gb = 18
+context = 8192
+moe = false
+notes = "Low-refusal pass-2 candidate. The model card mentions research use; the licence field is Apache-2.0, inherited from Qwen."
+
+[[model]]
+id = "gemma-4-31b-abliterated-q4"
+role = "low-refusal"
+repo = "paperscarecrow/Gemma-4-31B-it-abliterated"
+filename = "gemma-4-31b-abliterated-Q4_K_M.gguf"
+sha256 = "380f2f50f441225e669ab1541220985387bf3933573cd2f4f7e667f3790e73a3"
+size = 18687057536
+license = "apache-2.0"
+min_vram_gb = 20
+context = 8192
+moe = false
+notes = "Second low-refusal candidate. Apache-2.0 quant. Do not substitute a Gemma-licence quant."
