@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PIL import features
 
+from plotweaver.appinfo import APP_VERSION
 from plotweaver.cli import main
 from plotweaver.vxbook import (
     BlockKind,
@@ -129,7 +130,7 @@ def test_writer_is_reproducible_and_marks_inferred_speech(tmp_path: Path) -> Non
         manifest = json.loads(archive.read("manifest.json"))
         book = archive.read("book.md").decode("utf-8")
         names = archive.namelist()
-    assert manifest["generator"] == {"app": "plotweaver", "version": "0.1.0"}
+    assert manifest["generator"] == {"app": "plotweaver", "version": APP_VERSION}
     assert manifest["created_by"]["app"] == "plotweaver"
     assert manifest["source"] == {"format": "plotweaver"}
     assert manifest["created"] == created

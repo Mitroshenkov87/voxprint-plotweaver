@@ -7,6 +7,7 @@ import json
 import zipfile
 from pathlib import Path
 
+from plotweaver.appinfo import APP_VERSION
 from plotweaver.cli import main
 from plotweaver.domain import BookMode, BookRequest, Language
 from plotweaver.llm import MockBackend
@@ -105,7 +106,7 @@ def test_mock_sound_add_is_reproducible(tmp_path: Path) -> None:
         sound = json.loads(archive.read("sound.json"))
     assert manifest["format_version"] == "1.1"
     assert manifest["extensions"] == ["sound/1"]
-    assert manifest["generator"] == {"app": "plotweaver", "version": "0.1.0"}
+    assert manifest["generator"] == {"app": "plotweaver", "version": APP_VERSION}
     assert manifest["source"]["format"] == "vxbook"
     assert manifest["source"]["filename"] == "book.vxbook"
     assert manifest["source"]["sha256"] == hashlib.sha256(original).hexdigest()

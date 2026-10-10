@@ -61,27 +61,67 @@ jobs:
 
   windows-installer:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
       - name: Inno Setup
-        run: choco install innosetup -y
-      - name: Compile installer
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\plotweaver.iss
+        run: choco install innosetup --no-progress -y
+      - name: Build the full setup
+        shell: pwsh
+        run: ./packaging/windows/build-installer.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-setup
-          path: packaging/windows/Output/*.exe
+          name: VoxprintPlotweaver-windows
+          path: packaging/windows/Output/*
+          retention-days: 14
 
   linux-package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: Package
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Qt and Vulkan libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libglib2.0-0t64 libdbus-1-3 libxkbcommon0 libfontconfig1 libx11-6 libxcb1 libvulkan1
+      - name: Build the full package
         run: bash packaging/linux/build-package.sh
+      - name: The staged app imports Qt
+        run: |
+          QT_QPA_PLATFORM=offscreen build/stage/.venv/bin/python -c "import PySide6.QtWidgets, plotweaver; from plotweaver.llama_release import find_server; from pathlib import Path; binary = find_server(Path('build/stage/runtime/llama.cpp-b11476')); assert binary and binary.is_file(); print(plotweaver.__version__, binary)"
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-packages
-          path: |
-            dist/*.tar.gz
-            dist/*.deb
+          name: VoxprintPlotweaver-linux
+          path: dist/*
+          retention-days: 14
+
+  release:
+    needs: [windows-installer, linux-package]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: VoxprintPlotweaver-*
+          path: release-parts
+      - name: SHA256SUMS and pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          find release-parts -type f ! -name 'SHA256SUMS' -exec cp -t assets {} +
+          cd assets
+          sha256sum -- * | LC_ALL=C sort -k2 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          tag="${GITHUB_REF_NAME}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease --title "$tag" --notes "Release candidate. The Windows setup and the Linux package include the app, Python 3.14, dependencies, and llama.cpp b11476. Model weights download on first run."
+          gh release upload "$tag" --clobber ./*

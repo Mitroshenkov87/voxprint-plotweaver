@@ -1,8 +1,9 @@
 """Pinned llama.cpp b11476 Vulkan build, shared with Audiobook Builder.
 
-The binary is not vendored. `scripts/bakeoff.sh` downloads the same archives
-Audiobook Builder pins (URL, size, SHA-256) into `<models>/llm/llama.cpp-b11476`.
-Tests cover the pin only and never start the process.
+The binary is not vendored in git. The full installer unpacks the same archive
+Audiobook Builder pins (URL, size, SHA-256) under ``runtime/llama.cpp-b11476``.
+A checkout without that tree downloads it into ``<models>/llm/llama.cpp-b11476``.
+Tests cover the pin and the bundled-tree lookup. They never start the process.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from pathlib import Path
 import httpx
 
 from plotweaver.errors import PlotweaverError
-from plotweaver.paths import llama_runtime_dir
+from plotweaver.paths import llama_runtime_dir, repo_root
 from plotweaver.registry import verify_file
 
 LLAMA_BUILD = "b11476"
@@ -92,12 +93,20 @@ def find_server(dest: Path) -> Path | None:
     return None
 
 
-def ensure_llama_server(dest: Path | None = None) -> Path:
-    """Return the shared b11476 `llama-server`, downloading it when the tree is absent."""
-    override = os_environ_server()
-    if override is not None:
-        return override
-    folder = dest or llama_runtime_dir()
+def bundled_runtime_dir(root: Path) -> Path:
+    """llama.cpp tree shipped beside the app, ``<root>/runtime/llama.cpp-b11476``."""
+    return root / "runtime" / f"llama.cpp-{LLAMA_BUILD}"
+
+
+def _bundled_dir() -> Path | None:
+    try:
+        root = repo_root()
+    except FileNotFoundError:
+        return None
+    return bundled_runtime_dir(root)
+
+
+def _ensure_in(folder: Path) -> Path:
     ready = _ready_server(folder)
     if ready is not None:
         return ready
@@ -123,6 +132,29 @@ def ensure_llama_server(dest: Path | None = None) -> Path:
         raise PlotweaverError("llama.cpp archive did not contain llama-server")
     binary.chmod(binary.stat().st_mode | 0o755)
     return binary
+
+
+def ensure_llama_server(dest: Path | None = None) -> Path:
+    """Return b11476 ``llama-server``.
+
+    ``PLOTWEAVER_LLAMA_SERVER`` wins. An explicit ``dest`` is filled in place.
+    Otherwise an already unpacked shared copy is used, then the copy shipped
+    next to the app, and only then a download into the shared models folder.
+    """
+    override = os_environ_server()
+    if override is not None:
+        return override
+    if dest is not None:
+        return _ensure_in(dest)
+    ready = _ready_server(llama_runtime_dir())
+    if ready is not None:
+        return ready
+    bundled = _bundled_dir()
+    if bundled is not None:
+        found = _ready_server(bundled)
+        if found is not None:
+            return found
+    return _ensure_in(llama_runtime_dir())
 
 
 def os_environ_server() -> Path | None:
