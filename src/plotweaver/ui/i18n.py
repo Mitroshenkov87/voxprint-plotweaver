@@ -53,9 +53,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_uncensored_note": (
             "The default install is stock models only. Abliterated models are a separate download."
         ),
-        "settings_uncensored_blocked": (
-            "Abliterated models need a GPU with at least 20 GB of VRAM."
-        ),
+        "settings_uncensored_blocked": ("No published least-censored model fits this card."),
         "settings_download": "Download",
         "settings_downloading": "Downloading…",
         "settings_save": "Save",
@@ -110,7 +108,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "По умолчанию только обычные модели. Аблитерированные скачиваются отдельно."
         ),
         "settings_uncensored_blocked": (
-            "Аблитерированные модели доступны на GPU от 20 ГБ видеопамяти."
+            "Для этой карты нет опубликованной наименее цензурированной модели."
         ),
         "settings_download": "Скачать",
         "settings_downloading": "Скачивание…",
@@ -166,7 +164,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "Standard sind nur die Originalmodelle. Abliterierte Modelle sind ein eigener Download."
         ),
         "settings_uncensored_blocked": (
-            "Abliterierte Modelle brauchen eine GPU mit mindestens 20 GB Videospeicher."
+            "Für diese Karte passt kein veröffentlichtes am wenigsten zensiertes Modell."
         ),
         "settings_download": "Herunterladen",
         "settings_downloading": "Wird geladen…",

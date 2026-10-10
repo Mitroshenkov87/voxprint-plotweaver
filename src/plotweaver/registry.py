@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,8 +25,7 @@ from plotweaver.paths import gguf_dir, repo_root
 from plotweaver.settings import model_tier_override
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
-# Abliterated models are offered in Settings only on a GPU at least this large.
-UNCENSORED_MIN_VRAM_GB = 20.0
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 TIER_16: Literal["16gb"] = "16gb"
 TIER_24: Literal["24gb"] = "24gb"
 TierName = Literal["16gb", "24gb"]
@@ -55,6 +55,7 @@ class RegistryEntry:
     enabled: bool = True
     optional: bool = False
     uncensored: bool = False
+    languages: tuple[str, ...] = ()
 
 
 def load_registry(path: Path) -> list[RegistryEntry]:
@@ -88,6 +89,7 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             enabled=bool(row.get("enabled", True)),
             optional=bool(row.get("optional")),
             uncensored=bool(row.get("uncensored")),
+            languages=_languages(row),
         )
         if entry.enabled and (
             not entry.revision
@@ -104,6 +106,20 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             raise PlotweaverError(f"{entry.id} needs tier {TIER_16} or {TIER_24}")
         entries.append(entry)
     return entries
+
+
+def _languages(row: dict[str, object]) -> tuple[str, ...]:
+    raw = row.get("languages") or []
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        raise PlotweaverError("languages must be a list of language codes")
+    found: list[str] = []
+    for item in raw:
+        text = str(item).strip().lower()
+        if text:
+            found.append(text)
+    return tuple(found)
 
 
 def licence_allowed(entry: RegistryEntry, *, allow_other: bool = False) -> bool:
@@ -289,9 +305,17 @@ def tier_option_enabled(tier: str, *, total_gb: float, free_gb: float) -> bool:
             assert_never(unreachable)
 
 
-def uncensored_offer_allowed(total_vram_gb: float | None) -> bool:
-    """Settings offers abliterated models only on a 20 GB GPU or larger."""
-    return total_vram_gb is not None and total_vram_gb >= UNCENSORED_MIN_VRAM_GB
+def uncensored_offer_allowed(total_vram_gb: float | None, free_gb: float | None = None) -> bool:
+    """True when this card can run a published least-censored model."""
+    if total_vram_gb is None:
+        return False
+    free = total_vram_gb if free_gb is None else free_gb
+    return any(
+        entry.enabled
+        and entry.uncensored
+        and model_offered(entry, total_gb=total_vram_gb, free_gb=free)
+        for entry in load_registry(registry_path())
+    )
 
 
 def bakeoff_skip_reason(entry: RegistryEntry, *, free_gb: float) -> str | None:
@@ -360,3 +384,123 @@ def download_model(
     }
     write_json(folder / f"{entry.id}.manifest.json", manifest)
     return target
+
+
+def import_forge_manifest(manifest: Path, registry: Path | None = None) -> list[str]:
+    """Fill disabled least-censored rows from a Model Forge JSON manifest.
+
+    Each object needs ``id``, ``revision``, ``sha256``, and ``size``. Optional
+    ``repo``, ``filename``, and ``min_vram_gb`` replace those fields. The row
+    is enabled. Stock rows are refused.
+    """
+    path = registry or registry_path()
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise PlotweaverError("forge manifest must be a JSON object")
+    rows = payload.get("models")
+    if not isinstance(rows, list) or not rows:
+        raise PlotweaverError("forge manifest needs a non-empty models list")
+    known = {entry.id: entry for entry in load_registry(path)}
+    text = path.read_text(encoding="utf-8")
+    enabled: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise PlotweaverError("each forge manifest model must be an object")
+        model_id = str(row.get("id") or "")
+        entry = known.get(model_id)
+        if entry is None:
+            raise PlotweaverError(f"{model_id} is not in the registry")
+        if is_stock(entry):
+            raise PlotweaverError(f"{model_id} is a stock model. Model Forge cannot replace it.")
+        text = _fill_registry_block(text, model_id, _forge_updates(row))
+        enabled.append(model_id)
+    _write_registry(path, text)
+    loaded = {entry.id: entry for entry in load_registry(path)}
+    for model_id in enabled:
+        filled = loaded[model_id]
+        if not filled.enabled or not filled.revision or not filled.sha256 or filled.size <= 0:
+            raise PlotweaverError(f"{model_id} was not enabled")
+    return enabled
+
+
+def _forge_updates(row: dict[str, object]) -> dict[str, str]:
+    revision = _forge_text(row, "revision")
+    digest = _forge_text(row, "sha256").lower()
+    if _SHA256.fullmatch(digest) is None:
+        raise PlotweaverError("forge manifest sha256 must be 64 hex characters")
+    size = row.get("size")
+    if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
+        raise PlotweaverError("forge manifest size must be a positive integer")
+    updates = {
+        "revision": _toml_string(revision),
+        "sha256": _toml_string(digest),
+        "size": str(size),
+        "enabled": "true",
+    }
+    if "repo" in row:
+        updates["repo"] = _toml_string(_forge_text(row, "repo"))
+    if "filename" in row:
+        updates["filename"] = _toml_string(_forge_text(row, "filename"))
+    if "min_vram_gb" in row:
+        raw = row["min_vram_gb"]
+        if isinstance(raw, bool) or not isinstance(raw, int | float) or float(raw) <= 0:
+            raise PlotweaverError("forge manifest min_vram_gb must be a positive number")
+        updates["min_vram_gb"] = _toml_number(float(raw))
+    return updates
+
+
+def _forge_text(row: dict[str, object], key: str) -> str:
+    value = row.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise PlotweaverError(f"forge manifest {key} must be a non-empty string")
+    return value.strip()
+
+
+def _toml_string(value: str) -> str:
+    if any(character in value for character in ('"', "\\", "\n", "\r")):
+        raise PlotweaverError("forge manifest strings cannot contain quotes or line breaks")
+    return f'"{value}"'
+
+
+def _toml_number(value: float) -> str:
+    if value == int(value):
+        return str(int(value))
+    return str(value)
+
+
+def _fill_registry_block(text: str, model_id: str, updates: dict[str, str]) -> str:
+    marker = f'id = "{model_id}"'
+    start = text.find(marker)
+    if start < 0:
+        raise PlotweaverError(f"{model_id} is not in the registry file")
+    block_start = text.rfind("[[model]]", 0, start)
+    if block_start < 0:
+        raise PlotweaverError(f"{model_id} is not inside a model block")
+    next_at = text.find("\n[[model]]", start)
+    if next_at < 0:
+        block = text[block_start:]
+        rest = ""
+    else:
+        block = text[block_start:next_at]
+        rest = text[next_at:]
+    for key, rendered in updates.items():
+        block = _set_toml_field(block, key, rendered)
+    if rest and not block.endswith("\n"):
+        block += "\n"
+    return text[:block_start] + block + rest
+
+
+def _set_toml_field(block: str, key: str, rendered: str) -> str:
+    pattern = re.compile(rf"^{re.escape(key)} = .*$", re.MULTILINE)
+    line = f"{key} = {rendered}"
+    if pattern.search(block):
+        return pattern.sub(line, block, count=1)
+    if not block.endswith("\n"):
+        block += "\n"
+    return block + line + "\n"
+
+
+def _write_registry(path: Path, text: str) -> None:
+    temporary = path.with_name(f".{path.name}.{os.urandom(4).hex()}.tmp")
+    temporary.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(temporary, path)

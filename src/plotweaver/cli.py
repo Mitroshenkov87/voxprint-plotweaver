@@ -19,7 +19,13 @@ from plotweaver.install import prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend, MockBackend
-from plotweaver.registry import detected_tier, resolve_tier, tier_headroom_gb, usable_vram_gb
+from plotweaver.registry import (
+    detected_tier,
+    import_forge_manifest,
+    resolve_tier,
+    tier_headroom_gb,
+    usable_vram_gb,
+)
 from plotweaver.runner import run_book
 from plotweaver.scenarios import mars_request
 from plotweaver.sound import add_sound
@@ -80,6 +86,21 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("file", type=Path)
     validate.set_defaults(func=_vxbook_validate)
 
+    models = sub.add_parser("models", help="Registry tools for Model Forge publications.")
+    model_commands = models.add_subparsers(dest="models_command", required=True)
+    forge = model_commands.add_parser(
+        "import-forge-manifest",
+        help="Enable placeholder rows from a Model Forge JSON manifest.",
+    )
+    forge.add_argument("file", type=Path)
+    forge.add_argument(
+        "--registry",
+        type=Path,
+        default=None,
+        help="Registry file to update. Defaults to bakeoff/models.toml.",
+    )
+    forge.set_defaults(func=_import_forge_manifest)
+
     sound = sub.add_parser("sound", help="Add VXBOOK v1.1 + sound extension v1 markup.")
     sound_commands = sound.add_subparsers(dest="sound_command", required=True)
     sound_add = sound_commands.add_parser("add", help="Write a new .vxbook with sound markup.")
@@ -118,7 +139,7 @@ def _add_book_args(parser: argparse.ArgumentParser) -> None:
         "--tier",
         choices=[ModelTier.STANDARD.value, ModelTier.LEAST_CENSORED.value],
         default=ModelTier.STANDARD.value,
-        help="standard, or least-censored (the most permissive model that fits).",
+        help="standard, or least-censored (an installed Model Forge model).",
     )
     parser.add_argument("--mode", choices=["autopilot", "copilot", "manual"], default="autopilot")
     parser.add_argument("--reference", action="append", default=[])
@@ -183,6 +204,12 @@ def _sound_add(args: argparse.Namespace) -> int:
     for message in warnings:
         print(f"warning: {message}")
     print(args.output)
+    return 0
+
+
+def _import_forge_manifest(args: argparse.Namespace) -> int:
+    for model_id in import_forge_manifest(args.file, args.registry):
+        print(model_id)
     return 0
 
 

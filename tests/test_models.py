@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from plotweaver.cli import main
 from plotweaver.domain import BookRequest, Language, ModelTier, request_from_dict, request_to_dict
 from plotweaver.errors import PlotweaverError
 from plotweaver.install import assign_book_models, ensure_default_install, ensure_uncensored_models
@@ -16,6 +18,7 @@ from plotweaver.registry import (
     bakeoff_skip_reason,
     claim_user,
     detected_tier,
+    import_forge_manifest,
     is_stock,
     load_registry,
     model_offered,
@@ -50,11 +53,13 @@ def test_registry_lists_confirmed_apache_models() -> None:
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
         "t-lite-it-2.1-q5",
-        "mistral-small-3.2-24b-q4",
-        "mistral-small-3.2-24b-abliterated-q4",
-        "mistral-small-3.2-24b-plotweaver-abliterated-q4",
-        "t-lite-it-2.1-plotweaver-abliterated-q4",
-        "t-pro-it-2.1-plotweaver-abliterated-q4",
+        "qwen3.6-27b-abliterated-iq4-xs",
+        "qwen3.6-27b-abliterated-iq3-m",
+        "qwen3.6-27b-abliterated-q3-k-m",
+        "gemma-4-31b-abliterated-iq4-xs",
+        "gemma-4-31b-abliterated-iq3-m",
+        "gemma-4-31b-abliterated-q3-k-m",
+        "t-lite-it-2.1-forge-abliterated-q4",
         "qwen3.6-27b-abliterated-q4",
         "gemma-4-31b-abliterated-q4",
     ]
@@ -77,19 +82,25 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert lite_q5.size == 5_850_952_544
     assert lite_q5.sha256.startswith("5ff7c6c3")
     assert lite_q5.revision == lite.revision
-    mistral = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-q4")
-    assert mistral.role == "least-censored"
-    assert mistral.default is True
-    assert mistral.card == "16gb"
-    assert mistral.filename == "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
-    assert mistral.size == 14_333_922_848
-    ablated = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-abliterated-q4")
-    assert ablated.enabled is True
-    assert ablated.optional is True
-    assert ablated.uncensored is True
-    assert ablated.size == 14_333_923_648
-    assert not is_stock(ablated)
-    assert is_stock(mistral)
+    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    assert qwen.role == "least-censored"
+    assert qwen.enabled is True
+    assert qwen.tier == "24gb"
+    assert qwen.size == 16_547_399_808
+    gemma_31 = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-q4")
+    assert gemma_31.enabled is True
+    assert gemma_31.tier == "24gb"
+    assert gemma_31.size == 18_687_057_536
+    russian = next(entry for entry in entries if entry.id == "t-lite-it-2.1-forge-abliterated-q4")
+    assert russian.enabled is False
+    assert russian.languages == ("ru",)
+    assert russian.tier == "16gb"
+    fit = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-iq4-xs")
+    assert fit.enabled is False
+    assert fit.default is True
+    assert fit.tier == "16gb"
+    assert is_stock(lite)
+    assert not is_stock(qwen)
     for entry in entries:
         if entry.enabled:
             assert entry.license == "apache-2.0"
@@ -104,6 +115,7 @@ def test_registry_lists_confirmed_apache_models() -> None:
         ).lower()
         for banned in _EXCLUDED:
             assert banned not in blob
+        assert "mistral" not in blob
 
 
 def test_registry_rejects_a_row_without_a_base_licence(tmp_path: Path) -> None:
@@ -184,7 +196,6 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
         "t-lite-it-2.1-q5",
-        "mistral-small-3.2-24b-q4",
     ]
     assert tier_headroom_gb(16) == 2
     assert tier_headroom_gb(24) == 3
@@ -196,7 +207,8 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert tier_option_enabled("24gb", total_gb=16, free_gb=14) is False
     assert tier_option_enabled("24gb", total_gb=24, free_gb=20) is True
     assert uncensored_offer_allowed(16) is False
-    assert uncensored_offer_allowed(20) is True
+    assert uncensored_offer_allowed(20) is False
+    assert uncensored_offer_allowed(24) is True
     qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
     assert qwen.optional is True and qwen.uncensored is True
     assert qwen.tier == "24gb"
@@ -206,39 +218,38 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert t_pro.tier == "24gb"
     assert bakeoff_skip_reason(t_pro, free_gb=14)
     placeholder = next(
-        entry for entry in entries if entry.id == "t-lite-it-2.1-plotweaver-abliterated-q4"
+        entry for entry in entries if entry.id == "t-lite-it-2.1-forge-abliterated-q4"
     )
     assert placeholder.enabled is False
     assert placeholder.tier == "16gb"
 
 
-def test_dark_pass_uses_an_installed_abliterated_model_else_stock(tmp_path: Path) -> None:
+def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
-    mistral = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-q4")
     qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    gemma_31 = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-q4")
     gemma = next(entry for entry in entries if entry.filename == "gemma-4-12b-it-Q4_K_M.gguf")
     t_pro = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
     (tmp_path / gemma.filename).write_bytes(b"g")
-    (tmp_path / mistral.filename).write_bytes(b"m")
     (tmp_path / t_pro.filename).write_bytes(b"p")
     request = BookRequest(title="T", language=Language.RU, synopsis="s", dark_themes=True)
     assign_book_models(request, free_gb=16, total_gb=16, store=tmp_path)
     assert request.main_model_id == "gemma-4-12b-it-q4"
     assert request.least_censored_model_id == "gemma-4-12b-it-q4"
     (tmp_path / qwen.filename).write_bytes(b"q")
-    request = BookRequest(title="T", language=Language.RU, synopsis="s", dark_themes=True)
-    assign_book_models(request, free_gb=20, total_gb=24, store=tmp_path)
+    (tmp_path / gemma_31.filename).write_bytes(b"G")
+    request = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
+    assign_book_models(request, free_gb=22, total_gb=24, store=tmp_path)
     assert request.main_model_id == "t-pro-it-2.1-q4"
-    assert request.least_censored_model_id == "qwen3.6-27b-abliterated-q4"
+    assert request.least_censored_model_id == "gemma-4-31b-abliterated-q4"
     least = BookRequest(
         title="T",
-        language=Language.RU,
+        language=Language.EN,
         synopsis="s",
         tier=ModelTier.LEAST_CENSORED,
-        dark_themes=True,
     )
-    assign_book_models(least, free_gb=20, total_gb=24, store=tmp_path)
-    assert least.main_model_id == "mistral-small-3.2-24b-q4"
+    assign_book_models(least, free_gb=22, total_gb=24, store=tmp_path)
+    assert least.main_model_id == "gemma-4-31b-abliterated-q4"
     assert least.least_censored_gguf == ""
     small = BookRequest(
         title="T",
@@ -266,14 +277,14 @@ def test_uncensored_download_is_separate_from_the_default_install(
     assert ensure_default_install(free_gb=16, total_gb=16, store=tmp_path) == 3
     assert "mistral-small-3.2-24b-q4" not in downloaded
     assert "t-pro-it-2.1-q4" not in downloaded
-    assert ensure_default_install(free_gb=22, total_gb=24, store=tmp_path) == 2
+    assert ensure_default_install(free_gb=22, total_gb=24, store=tmp_path) == 1
     assert "qwen3.6-27b-abliterated-q4" not in downloaded
     assert "t-pro-it-2.1-q4" in downloaded
-    assert "mistral-small-3.2-24b-q4" in downloaded
-    with pytest.raises(PlotweaverError, match="20 GB"):
+    assert "mistral-small-3.2-24b-q4" not in downloaded
+    with pytest.raises(PlotweaverError, match="least-censored"):
         ensure_uncensored_models(total_vram_gb=16, store=tmp_path)
     ensure_uncensored_models(total_vram_gb=24, store=tmp_path)
-    assert "mistral-small-3.2-24b-abliterated-q4" in downloaded
+    assert "qwen3.6-27b-abliterated-q4" in downloaded
     assert "gemma-4-31b-abliterated-q4" in downloaded
 
 
@@ -295,3 +306,112 @@ def test_uncensored_models_setting_defaults_off(
         if entry.id == "t-pro-it-2.1-q4"
     )
     assert model_offered(t_pro, total_gb=24, free_gb=22) is False
+
+
+def test_russian_book_prefers_the_forge_t_lite(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    entries = load_registry(repo_root() / "bakeoff" / "models.toml")
+    russian = next(entry for entry in entries if entry.id == "t-lite-it-2.1-forge-abliterated-q4")
+    patched = [
+        replace(entry, enabled=True, revision="rev", sha256="ab" * 32, size=10)
+        if entry.id == russian.id
+        else entry
+        for entry in entries
+    ]
+    monkeypatch.setattr("plotweaver.install.load_registry", lambda _path: patched)
+    for entry in patched:
+        if entry.id in {
+            "t-pro-it-2.1-q4",
+            "gemma-4-31b-abliterated-q4",
+            "qwen3.6-27b-abliterated-q4",
+            russian.id,
+        }:
+            (tmp_path / entry.filename).write_bytes(b"x")
+    russian_book = BookRequest(
+        title="T",
+        language=Language.RU,
+        synopsis="s",
+        tier=ModelTier.LEAST_CENSORED,
+    )
+    assign_book_models(russian_book, free_gb=22, total_gb=24, store=tmp_path)
+    assert russian_book.main_model_id == "t-lite-it-2.1-forge-abliterated-q4"
+    english = BookRequest(
+        title="T",
+        language=Language.EN,
+        synopsis="s",
+        tier=ModelTier.LEAST_CENSORED,
+    )
+    assign_book_models(english, free_gb=22, total_gb=24, store=tmp_path)
+    assert english.main_model_id == "gemma-4-31b-abliterated-q4"
+
+
+def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
+    registry = tmp_path / "models.toml"
+    registry.write_text(
+        (repo_root() / "bakeoff" / "models.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "forge.json"
+    digest = "ab" * 32
+    manifest.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "id": "t-lite-it-2.1-forge-abliterated-q4",
+                        "revision": "rev-1",
+                        "sha256": digest,
+                        "size": 120,
+                        "repo": "Mitroshenkov87/voxprint-model-forge",
+                        "filename": "t-lite-forge.gguf",
+                        "min_vram_gb": 6,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(["models", "import-forge-manifest", str(manifest), "--registry", str(registry)]) == 0
+    )
+    filled = next(
+        entry
+        for entry in load_registry(registry)
+        if entry.id == "t-lite-it-2.1-forge-abliterated-q4"
+    )
+    assert filled.enabled is True
+    assert filled.revision == "rev-1"
+    assert filled.sha256 == digest
+    assert filled.size == 120
+    assert filled.repo == "Mitroshenkov87/voxprint-model-forge"
+    assert filled.filename == "t-lite-forge.gguf"
+    assert filled.min_vram_gb == 6
+    assert filled.languages == ("ru",)
+    with pytest.raises(PlotweaverError, match="stock"):
+        import_forge_manifest(
+            _manifest(tmp_path, "t-pro-it-2.1-q4"),
+            registry,
+        )
+    with pytest.raises(PlotweaverError, match="not in the registry"):
+        import_forge_manifest(_manifest(tmp_path, "missing-model"), registry)
+
+
+def _manifest(folder: Path, model_id: str) -> Path:
+    path = folder / f"{model_id}.json"
+    path.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "id": model_id,
+                        "revision": "rev",
+                        "sha256": "cd" * 32,
+                        "size": 4,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
