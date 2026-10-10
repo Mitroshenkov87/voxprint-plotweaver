@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
-from plotweaver.settings import optional_models_preference
+from plotweaver.settings import uncensored_models_preference
 from plotweaver.ui.i18n import STRINGS
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
@@ -45,17 +45,35 @@ def test_catalogues_share_keys() -> None:
     assert set(STRINGS["de"]) == english
 
 
-def test_settings_page_saves_optional_models(tmp_path: Path, monkeypatch) -> None:
+def test_settings_hides_abliterated_downloads_below_20gb(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
+    monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4060 Ti,8.9,16384,14000")
     app = QApplication.instance() or QApplication([])
     window = MainWindow(mock=True)
     window.show()
     window._open_settings()
     assert window.stack.currentIndex() == 4
-    window.optional_models.setChecked(True)
+    assert window.uncensored_models.isEnabled() is False
+    assert "20" in window.settings_note.text()
+    window.uncensored_models.setChecked(True)
     window._save_settings()
-    assert optional_models_preference() is True
-    assert window.settings_status.text()
+    assert uncensored_models_preference() is False
+    del app
+
+
+def test_settings_offers_abliterated_downloads_at_20gb(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
+    monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4090,8.9,24576,20000")
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    window._open_settings()
+    assert window.uncensored_models.isEnabled() is True
+    assert window.download_uncensored.isEnabled() is False
+    window.uncensored_models.setChecked(True)
+    assert window.download_uncensored.isEnabled() is True
+    window._save_settings()
+    assert uncensored_models_preference() is True
     del app
 
 

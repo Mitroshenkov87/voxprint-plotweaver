@@ -19,10 +19,11 @@ import httpx
 
 from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
-from plotweaver.paths import gguf_dir
+from plotweaver.paths import gguf_dir, repo_root
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
-OPTIONAL_VRAM_GB = 20.0
+# Abliterated models are offered in Settings only on a GPU at least this large.
+UNCENSORED_MIN_VRAM_GB = 20.0
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,8 @@ class RegistryEntry:
     card: str = ""
     default: bool = False
     enabled: bool = True
+    optional: bool = False
+    uncensored: bool = False
 
 
 def load_registry(path: Path) -> list[RegistryEntry]:
@@ -75,6 +78,8 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             card=str(row.get("card") or ""),
             default=bool(row.get("default")),
             enabled=bool(row.get("enabled", True)),
+            optional=bool(row.get("optional")),
+            uncensored=bool(row.get("uncensored")),
         )
         if entry.enabled and (
             not entry.revision
@@ -153,33 +158,29 @@ def claim_user(store: Path, user: str = "plotweaver") -> None:
     os.replace(tmp, path)
 
 
-def is_optional_download(entry: RegistryEntry) -> bool:
-    """Models that need 20 GB of VRAM are optional downloads."""
-    return entry.min_vram_gb >= OPTIONAL_VRAM_GB
+def registry_path() -> Path:
+    return repo_root() / "bakeoff" / "models.toml"
 
 
-def allows_optional_download(*, total_vram_gb: float | None, preference: bool | None) -> bool:
-    """A saved Settings choice wins. Otherwise a 20 GB GPU opts in."""
-    if preference is not None:
-        return preference
-    return total_vram_gb is not None and total_vram_gb >= OPTIONAL_VRAM_GB
+def is_stock(entry: RegistryEntry) -> bool:
+    """Stock models are the default install. Abliterated rows are optional."""
+    return entry.enabled and not entry.optional and not entry.uncensored
 
 
-def download_decision(
-    entry: RegistryEntry,
-    *,
-    free_gb: float,
-    total_vram_gb: float | None,
-    optional_preference: bool | None,
-) -> str | None:
-    """Return a skip reason, or None when the file should be downloaded."""
+def fits_vram(entry: RegistryEntry, free_gb: float) -> bool:
+    return entry.min_vram_gb <= free_gb + 0.5
+
+
+def uncensored_offer_allowed(total_vram_gb: float | None) -> bool:
+    """Settings offers abliterated models only on a 20 GB GPU or larger."""
+    return total_vram_gb is not None and total_vram_gb >= UNCENSORED_MIN_VRAM_GB
+
+
+def bakeoff_skip_reason(entry: RegistryEntry, *, free_gb: float) -> str | None:
+    """The bake-off downloads every enabled candidate that fits, stock or abliterated."""
     if not entry.enabled:
         return "disabled until the file is published with a revision and SHA-256"
-    if is_optional_download(entry) and not allows_optional_download(
-        total_vram_gb=total_vram_gb, preference=optional_preference
-    ):
-        return f"optional (needs {OPTIONAL_VRAM_GB:.0f} GB of VRAM)"
-    if entry.min_vram_gb > free_gb + 0.5:
+    if not fits_vram(entry, free_gb):
         return f"needs {entry.min_vram_gb} GB, {free_gb:.1f} GB free"
     return None
 

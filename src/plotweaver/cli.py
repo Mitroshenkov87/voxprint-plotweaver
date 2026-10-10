@@ -15,6 +15,7 @@ from plotweaver.bakeoff import run_bakeoff
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import GpuUnsupported, PlotweaverError
 from plotweaver.hardware import require_supported_gpu, vram_budget_gb, vram_headroom_gb
+from plotweaver.install import prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend, MockBackend
@@ -224,11 +225,6 @@ def _apply_models(request: BookRequest, args: argparse.Namespace) -> None:
         )
     elif args.least_censored_model_id:
         request.least_censored_model_id = args.least_censored_model_id
-    if not args.mock and not request.main_gguf:
-        raise PlotweaverError(
-            "A real run needs --main-gguf PATH. "
-            "scripts/bakeoff.sh downloads the registry GGUFs into the shared models/llm folder."
-        )
 
 
 def _run(args: argparse.Namespace) -> int:
@@ -255,7 +251,10 @@ def _run(args: argparse.Namespace) -> int:
     )
     _apply_models(request, args)
     project = Project.open_or_create(args.project, request)
-    if args.synopsis is not None:
+    if project.request_path.is_file() and args.synopsis is None:
+        request = project.request()
+        _apply_models(request, args)
+    elif args.synopsis is not None:
         stored = project.request()
         request.synopsis = synopsis
         # Keep model paths already stored when the caller only resumes.
@@ -265,7 +264,9 @@ def _run(args: argparse.Namespace) -> int:
         if not request.least_censored_gguf:
             request.least_censored_gguf = stored.least_censored_gguf
             request.least_censored_model_id = stored.least_censored_model_id
-        project.save_request(request)
+    if not args.mock:
+        prepare_real_models(request, on_progress=print)
+    project.save_request(request)
     result = run_book(
         project,
         _backend(args.mock),

@@ -7,17 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from plotweaver.domain import ModelTier, request_from_dict, request_to_dict
+from plotweaver.domain import BookRequest, Language, ModelTier, request_from_dict, request_to_dict
 from plotweaver.errors import PlotweaverError
+from plotweaver.install import assign_book_models, ensure_default_install, ensure_uncensored_models
 from plotweaver.llama_release import LLAMA_BUILD
 from plotweaver.paths import gguf_dir, llama_runtime_dir, models_dir, repo_root
 from plotweaver.registry import (
+    bakeoff_skip_reason,
     claim_user,
-    download_decision,
-    download_model,
+    is_stock,
     load_registry,
+    uncensored_offer_allowed,
 )
-from plotweaver.settings import optional_models_preference, save_optional_models
+from plotweaver.settings import save_uncensored_models, uncensored_models_preference
 
 _EXCLUDED = ("thedrummer", "heretic", "yandex")
 
@@ -58,9 +60,13 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert mistral.card == "16gb"
     assert mistral.filename == "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
     assert mistral.size == 14_333_922_848
-    placeholder = entries[4]
-    assert placeholder.enabled is False
-    assert placeholder.sha256 == ""
+    ablated = entries[4]
+    assert ablated.enabled is True
+    assert ablated.optional is True
+    assert ablated.uncensored is True
+    assert ablated.size == 14_333_923_648
+    assert not is_stock(ablated)
+    assert is_stock(mistral)
     for entry in entries:
         if entry.enabled:
             assert entry.license == "apache-2.0"
@@ -130,33 +136,80 @@ def test_users_file_keeps_other_suite_apps(tmp_path: Path) -> None:
     assert (tmp_path / ".users.json").read_text(encoding="utf-8") == again
 
 
-def test_optional_download_follows_vram_unless_settings_say_otherwise() -> None:
+def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
-    large = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
-    small = next(entry for entry in entries if entry.id == "t-lite-it-2.1-q4")
-    held = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-abliterated-q4")
-    assert download_decision(large, free_gb=22, total_vram_gb=16, optional_preference=None)
-    assert download_decision(large, free_gb=22, total_vram_gb=24, optional_preference=None) is None
-    assert download_decision(large, free_gb=22, total_vram_gb=24, optional_preference=False)
-    assert download_decision(large, free_gb=22, total_vram_gb=16, optional_preference=True) is None
-    assert download_decision(small, free_gb=14, total_vram_gb=16, optional_preference=None) is None
-    assert download_decision(held, free_gb=24, total_vram_gb=24, optional_preference=True)
+    stock_16 = [entry.id for entry in entries if is_stock(entry) and entry.min_vram_gb <= 16]
+    assert stock_16 == [
+        "gemma-4-12b-it-q4",
+        "t-lite-it-2.1-q4",
+        "mistral-small-3.2-24b-q4",
+    ]
+    assert uncensored_offer_allowed(16) is False
+    assert uncensored_offer_allowed(20) is True
+    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    assert qwen.optional is True and qwen.uncensored is True
+    assert bakeoff_skip_reason(qwen, free_gb=20) is None
+    t_pro = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
+    assert is_stock(t_pro)
+    assert bakeoff_skip_reason(t_pro, free_gb=14)
 
 
-def test_disabled_placeholder_is_not_downloaded(tmp_path: Path) -> None:
-    held = next(
-        entry
-        for entry in load_registry(repo_root() / "bakeoff" / "models.toml")
-        if entry.id == "mistral-small-3.2-24b-abliterated-q4"
+def test_dark_pass_uses_an_installed_abliterated_model_else_stock_mistral(tmp_path: Path) -> None:
+    entries = load_registry(repo_root() / "bakeoff" / "models.toml")
+    mistral = next(entry for entry in entries if entry.id == "mistral-small-3.2-24b-q4")
+    qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q4")
+    gemma = next(entry for entry in entries if entry.filename == "gemma-4-12b-it-Q4_K_M.gguf")
+    (tmp_path / gemma.filename).write_bytes(b"g")
+    (tmp_path / mistral.filename).write_bytes(b"m")
+    request = BookRequest(title="T", language=Language.RU, synopsis="s", dark_themes=True)
+    assign_book_models(request, free_gb=16, store=tmp_path)
+    assert request.main_model_id == "gemma-4-12b-it-q4"
+    assert request.least_censored_model_id == "mistral-small-3.2-24b-q4"
+    (tmp_path / qwen.filename).write_bytes(b"q")
+    request = BookRequest(title="T", language=Language.RU, synopsis="s", dark_themes=True)
+    assign_book_models(request, free_gb=19, store=tmp_path)
+    assert request.least_censored_model_id == "qwen3.6-27b-abliterated-q4"
+    least = BookRequest(
+        title="T",
+        language=Language.RU,
+        synopsis="s",
+        tier=ModelTier.LEAST_CENSORED,
+        dark_themes=True,
     )
-    with pytest.raises(PlotweaverError, match="disabled"):
-        download_model(held, tmp_path)
+    assign_book_models(least, free_gb=16, store=tmp_path)
+    assert least.main_model_id == "mistral-small-3.2-24b-q4"
+    assert least.least_censored_gguf == ""
 
 
-def test_optional_models_setting_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_uncensored_download_is_separate_from_the_default_install(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    downloaded: list[str] = []
+
+    def fake_download(entry, store, *, allow_other: bool = False):  # noqa: ANN001
+        del allow_other
+        downloaded.append(entry.id)
+        target = store / entry.filename
+        target.write_bytes(b"x")
+        return target
+
+    monkeypatch.setattr("plotweaver.install.download_model", fake_download)
+    assert ensure_default_install(free_gb=22, store=tmp_path) == 4
+    assert "qwen3.6-27b-abliterated-q4" not in downloaded
+    assert "t-pro-it-2.1-q4" in downloaded
+    with pytest.raises(PlotweaverError, match="20 GB"):
+        ensure_uncensored_models(total_vram_gb=16, store=tmp_path)
+    ensure_uncensored_models(total_vram_gb=24, store=tmp_path)
+    assert "mistral-small-3.2-24b-abliterated-q4" in downloaded
+    assert "gemma-4-31b-abliterated-q4" in downloaded
+
+
+def test_uncensored_models_setting_defaults_off(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
-    assert optional_models_preference() is None
-    save_optional_models(True)
-    assert optional_models_preference() is True
-    save_optional_models(False)
-    assert optional_models_preference() is False
+    assert uncensored_models_preference() is False
+    save_uncensored_models(True)
+    assert uncensored_models_preference() is True
+    save_uncensored_models(False)
+    assert uncensored_models_preference() is False

@@ -22,9 +22,14 @@ from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import ChatMessage, LLMBackend, MockBackend, ModelSpec
 from plotweaver.paths import repo_root
 from plotweaver.prompts import judge_prompt, system_message
-from plotweaver.registry import RegistryEntry, download_decision, download_model, load_registry
+from plotweaver.registry import (
+    RegistryEntry,
+    bakeoff_skip_reason,
+    download_model,
+    load_registry,
+    registry_path,
+)
 from plotweaver.runner import run_book
-from plotweaver.settings import optional_models_preference
 from plotweaver.store import Project
 from plotweaver.vxbook import legacy_pair
 
@@ -40,10 +45,6 @@ class Synopsis:
 
 def synopses_dir() -> Path:
     return repo_root() / "bakeoff" / "synopses"
-
-
-def registry_path() -> Path:
-    return repo_root() / "bakeoff" / "models.toml"
 
 
 def load_synopses() -> list[Synopsis]:
@@ -158,16 +159,9 @@ def _matches(entry: RegistryEntry, specs: list[ModelSpec]) -> bool:
 def _real_specs(allow_other: bool) -> list[ModelSpec]:
     gpu = query_gpu()
     free = gpu.free_gb if gpu else 0.0
-    total = gpu.total_gb if gpu else None
-    preference = optional_models_preference()
     specs: list[ModelSpec] = []
     for entry in load_registry(registry_path()):
-        reason = download_decision(
-            entry,
-            free_gb=free,
-            total_vram_gb=total,
-            optional_preference=preference,
-        )
+        reason = bakeoff_skip_reason(entry, free_gb=free)
         if reason is not None:
             print(f"skip {entry.id}: {reason}")
             continue

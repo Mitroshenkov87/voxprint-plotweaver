@@ -40,10 +40,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "egg": "The loom is awake.",
         "gpu_note": "A real run needs an NVIDIA RTX 40-series GPU or newer.",
         "settings": "Settings",
-        "settings_optional": "Download models that need 20 GB of VRAM",
-        "settings_optional_note": (
-            "With no saved choice, models that need 20 GB of VRAM download only on a 20 GB GPU."
+        "settings_uncensored": "Download abliterated models",
+        "settings_uncensored_note": (
+            "The default install is stock models only. Abliterated models are a separate download."
         ),
+        "settings_uncensored_blocked": (
+            "Abliterated models need a GPU with at least 20 GB of VRAM."
+        ),
+        "settings_download": "Download",
+        "settings_downloading": "Downloading…",
         "settings_save": "Save",
         "settings_saved": "Saved.",
     },
@@ -82,10 +87,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "egg": "Станок проснулся.",
         "gpu_note": "Настоящий запуск требует NVIDIA RTX 40-й серии или новее.",
         "settings": "Настройки",
-        "settings_optional": "Скачивать модели, которым нужно 20 ГБ видеопамяти",
-        "settings_optional_note": (
-            "Без сохранённого выбора такие модели скачиваются только на GPU от 20 ГБ."
+        "settings_uncensored": "Скачать аблитерированные модели",
+        "settings_uncensored_note": (
+            "По умолчанию только обычные модели. Аблитерированные скачиваются отдельно."
         ),
+        "settings_uncensored_blocked": (
+            "Аблитерированные модели доступны на GPU от 20 ГБ видеопамяти."
+        ),
+        "settings_download": "Скачать",
+        "settings_downloading": "Скачивание…",
         "settings_save": "Сохранить",
         "settings_saved": "Сохранено.",
     },
@@ -124,10 +134,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "egg": "Der Webstuhl ist wach.",
         "gpu_note": "Ein echter Lauf braucht eine NVIDIA RTX 40 oder neuer.",
         "settings": "Einstellungen",
-        "settings_optional": "Modelle laden, die 20 GB Videospeicher brauchen",
-        "settings_optional_note": (
-            "Ohne gespeicherte Wahl laden diese Modelle nur auf einer GPU ab 20 GB."
+        "settings_uncensored": "Abliterierte Modelle herunterladen",
+        "settings_uncensored_note": (
+            "Standard sind nur die Originalmodelle. Abliterierte Modelle sind ein eigener Download."
         ),
+        "settings_uncensored_blocked": (
+            "Abliterierte Modelle brauchen eine GPU mit mindestens 20 GB Videospeicher."
+        ),
+        "settings_download": "Herunterladen",
+        "settings_downloading": "Wird geladen…",
         "settings_save": "Speichern",
         "settings_saved": "Gespeichert.",
     },

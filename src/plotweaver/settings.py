@@ -8,7 +8,7 @@ from pathlib import Path
 from plotweaver.atomic import read_json, write_json
 from plotweaver.paths import suite_state_dir
 
-_KEY = "optional_models"
+_KEY = "uncensored_models"
 
 
 def _path() -> Path:
@@ -28,15 +28,12 @@ def _load() -> dict[str, object]:
     return {}
 
 
-def optional_models_preference() -> bool | None:
-    """None means the user has not saved a choice yet."""
-    data = _load()
-    if _KEY not in data:
-        return None
-    return bool(data[_KEY])
+def uncensored_models_preference() -> bool:
+    """Abliterated downloads stay off until Settings saves an explicit yes."""
+    return bool(_load().get(_KEY))
 
 
-def save_optional_models(enabled: bool) -> None:
+def save_uncensored_models(enabled: bool) -> None:
     data = _load()
     data[_KEY] = enabled
     write_json(_path(), data)
