@@ -18,7 +18,7 @@ def repo_root() -> Path:
     """Directory that contains pyproject.toml and the bake-off data.
 
     An editable checkout is found by walking up from this file. A full installer
-    is found the same way: its virtual environment lives in that directory.
+    is found the same way: its bundled interpreter lives in that directory.
     ``PLOTWEAVER_ROOT`` overrides both.
     """
     override = os.environ.get("PLOTWEAVER_ROOT")

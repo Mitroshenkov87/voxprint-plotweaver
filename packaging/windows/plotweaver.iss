@@ -39,5 +39,5 @@ UninstallDisplayName={#MyAppName}
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\.venv\Scripts\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\.venv\Scripts\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"

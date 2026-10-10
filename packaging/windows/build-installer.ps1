@@ -10,7 +10,7 @@ python -m pip install -q "uv==0.13.0"
 $Stage = Join-Path $Root "build\stage"
 if (Test-Path $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
 python packaging\assemble.py --dest $Stage
-$py = Join-Path $Stage ".venv\Scripts\python.exe"
+$py = Join-Path $Stage "python\python.exe"
 Push-Location $Stage
 & $py -c "import PySide6.QtWidgets, plotweaver; from plotweaver.llama_release import find_server; from pathlib import Path; binary = find_server(Path('runtime') / 'llama.cpp-b11476'); assert binary is not None; print(plotweaver.__version__, binary)"
 if ($LASTEXITCODE -ne 0) { throw "staged interpreter failed" }

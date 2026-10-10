@@ -94,7 +94,7 @@ jobs:
         run: bash packaging/linux/build-package.sh
       - name: The staged app imports Qt
         run: |
-          QT_QPA_PLATFORM=offscreen build/stage/.venv/bin/python -c "import PySide6.QtWidgets, plotweaver; from plotweaver.llama_release import find_server; from pathlib import Path; binary = find_server(Path('build/stage/runtime/llama.cpp-b11476')); assert binary and binary.is_file(); print(plotweaver.__version__, binary)"
+          QT_QPA_PLATFORM=offscreen build/stage/python/bin/python3 -c "import PySide6.QtWidgets, plotweaver; from plotweaver.llama_release import find_server; from pathlib import Path; binary = find_server(Path('build/stage/runtime/llama.cpp-b11476')); assert binary and binary.is_file(); print(plotweaver.__version__, binary)"
       - uses: actions/upload-artifact@v4
         with:
           name: VoxprintPlotweaver-linux

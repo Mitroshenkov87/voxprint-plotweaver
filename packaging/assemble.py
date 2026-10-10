@@ -39,10 +39,10 @@ print(binary)
 """
 _GUI_SH = """#!/bin/sh
 ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-exec "$ROOT/.venv/bin/python" -m plotweaver gui "$@"
+exec "$ROOT/python/bin/python3" -m plotweaver gui "$@"
 """
 _GUI_CMD = """@echo off\r
-"%~dp0.venv\\Scripts\\pythonw.exe" -m plotweaver gui %*\r
+"%~dp0python\\pythonw.exe" -m plotweaver gui %*\r
 """
 
 
@@ -57,12 +57,10 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
     prefix = _install_python(dest / "python")
-    venv = dest / ".venv"
-    base = _base_python(prefix)
-    _uv("venv", "--relocatable", "--python", str(base), str(venv))
-    py = _venv_python(venv)
+    py = _base_python(prefix)
+    for marker in prefix.rglob("EXTERNALLY-MANAGED"):
+        marker.unlink()
     _uv("pip", "install", "--python", str(py), "--link-mode", "copy", str(_ROOT))
-    _relativize_venv(venv, dest)
     _copy_payload(dest)
     runtime = dest / "runtime" / "llama.cpp-b11476"
     runtime.parent.mkdir(parents=True, exist_ok=True)
@@ -121,12 +119,6 @@ def _base_python(prefix: Path) -> Path:
     raise SystemExit(f"no Python executable in {prefix}")
 
 
-def _venv_python(venv: Path) -> Path:
-    if os.name == "nt":
-        return venv / "Scripts" / "python.exe"
-    return venv / "bin" / "python"
-
-
 def _uv(*args: str) -> None:
     probe = subprocess.run(
         [sys.executable, "-m", "uv", "--version"],
@@ -140,42 +132,6 @@ def _uv(*args: str) -> None:
         subprocess.run(["uv", *args], check=True)
         return
     raise SystemExit("uv is not installed")
-
-
-def _relativize_venv(venv: Path, root: Path) -> None:
-    """Point the venv at the bundled interpreter with paths that survive a move."""
-    cfg_path = venv / "pyvenv.cfg"
-    if cfg_path.is_file():
-        lines: list[str] = []
-        for line in cfg_path.read_text(encoding="utf-8").splitlines():
-            key, separator, value = line.partition("=")
-            raw = value.strip()
-            path = Path(raw)
-            if separator and path.is_absolute() and _is_inside(path, root):
-                relative = Path(os.path.relpath(path, venv))
-                line = f"{key}{separator} {relative.as_posix()}"
-            lines.append(line)
-        cfg_path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-    if os.name == "nt":
-        return
-    bindir = venv / "bin"
-    for item in bindir.iterdir():
-        if not item.is_symlink():
-            continue
-        target = Path(os.readlink(item))
-        if not target.is_absolute() or not _is_inside(target, root):
-            continue
-        relative = os.path.relpath(target, item.parent)
-        item.unlink()
-        item.symlink_to(relative)
-
-
-def _is_inside(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root)
-    except ValueError:
-        return False
-    return True
 
 
 def _copy_payload(dest: Path) -> None:
