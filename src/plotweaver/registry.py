@@ -22,6 +22,7 @@ from plotweaver.errors import PlotweaverError
 from plotweaver.paths import gguf_dir
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
+OPTIONAL_VRAM_GB = 20.0
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class RegistryEntry:
     base_license: str = ""
     card: str = ""
     default: bool = False
+    enabled: bool = True
 
 
 def load_registry(path: Path) -> list[RegistryEntry]:
@@ -72,10 +74,17 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             base_license=str(row.get("base_license") or ""),
             card=str(row.get("card") or ""),
             default=bool(row.get("default")),
+            enabled=bool(row.get("enabled", True)),
         )
-        if not entry.revision or not entry.base_repo or not entry.base_license:
+        if entry.enabled and (
+            not entry.revision
+            or not entry.sha256
+            or entry.size <= 0
+            or not entry.base_repo
+            or not entry.base_license
+        ):
             raise PlotweaverError(
-                f"{entry.id} needs revision, base_repo, and base_license. "
+                f"{entry.id} needs revision, sha256, size, base_repo, and base_license. "
                 "Untagged tunes are not downloaded."
             )
         entries.append(entry)
@@ -144,9 +153,45 @@ def claim_user(store: Path, user: str = "plotweaver") -> None:
     os.replace(tmp, path)
 
 
+def is_optional_download(entry: RegistryEntry) -> bool:
+    """Models that need 20 GB of VRAM are optional downloads."""
+    return entry.min_vram_gb >= OPTIONAL_VRAM_GB
+
+
+def allows_optional_download(*, total_vram_gb: float | None, preference: bool | None) -> bool:
+    """A saved Settings choice wins. Otherwise a 20 GB GPU opts in."""
+    if preference is not None:
+        return preference
+    return total_vram_gb is not None and total_vram_gb >= OPTIONAL_VRAM_GB
+
+
+def download_decision(
+    entry: RegistryEntry,
+    *,
+    free_gb: float,
+    total_vram_gb: float | None,
+    optional_preference: bool | None,
+) -> str | None:
+    """Return a skip reason, or None when the file should be downloaded."""
+    if not entry.enabled:
+        return "disabled until the file is published with a revision and SHA-256"
+    if is_optional_download(entry) and not allows_optional_download(
+        total_vram_gb=total_vram_gb, preference=optional_preference
+    ):
+        return f"optional (needs {OPTIONAL_VRAM_GB:.0f} GB of VRAM)"
+    if entry.min_vram_gb > free_gb + 0.5:
+        return f"needs {entry.min_vram_gb} GB, {free_gb:.1f} GB free"
+    return None
+
+
 def download_model(
     entry: RegistryEntry, store: Path | None = None, *, allow_other: bool = False
 ) -> Path:
+    if not entry.enabled:
+        raise PlotweaverError(
+            f"{entry.id} is disabled until Voxprint Model Forge publishes it "
+            "with a revision and SHA-256. Plotweaver does not abliterate or quantize."
+        )
     if not licence_allowed(entry, allow_other=allow_other):
         raise PlotweaverError(
             f"{entry.id} is licensed {entry.license!r} "

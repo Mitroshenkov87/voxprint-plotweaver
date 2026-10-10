@@ -45,6 +45,24 @@ moe = false
 notes = "16 GB standard drafter. Same file Audiobook Builder stores at <models>/llm/gemma-4-12b-it-Q4_K_M.gguf."
 
 [[model]]
+id = "t-lite-it-2.1-q4"
+role = "main"
+card = "16gb"
+repo = "t-tech/T-lite-it-2.1-GGUF"
+revision = "fc10186e59064c2e74f59c3d5dbce233931b3b81"
+filename = "T-lite-it-2.1-Q4_K_M.gguf"
+sha256 = "68c75f5940c36baca18113058ad3d55f6d1d3e1123a8053bb4bba8481805c960"
+size = 5027750240
+license = "apache-2.0"
+base_repo = "t-tech/T-lite-it-2.1"
+base_revision = "d125c970c553de58fcee3c937d5e4867d4a448d8"
+base_license = "apache-2.0"
+min_vram_gb = 6
+context = 8192
+moe = false
+notes = "16 GB stock Russian candidate. Official T-lite-it-2.1 and this Q4_K_M quant are Apache-2.0."
+
+[[model]]
 id = "mistral-small-3.2-24b-q4"
 role = "least-censored"
 card = "16gb"
@@ -67,19 +85,20 @@ notes = "16 GB least-censored default. Newest 24B Mistral Small (3.2, Instruct 2
 id = "mistral-small-3.2-24b-abliterated-q4"
 role = "least-censored"
 card = "16gb"
-repo = "mradermacher/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed-GGUF"
-revision = "4737318711c389a453d274fea0ee9b2bd009b573"
-filename = "Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated-llamacppfixed.Q4_K_M.gguf"
-sha256 = "73829e3062dda23cfdb12f12013dabb52907cd3e35167af28d2a63d3940f38ad"
-size = 14333923648
-license = "apache-2.0"
-base_repo = "huihui-ai/Huihui-Mistral-Small-3.2-24B-Instruct-2506-abliterated"
-base_revision = "7526a40541895942da4ad7b61611443b94f7c842"
+enabled = false
+repo = "Mitroshenkov87/voxprint-model-forge"
+revision = ""
+filename = "mistral-small-3.2-24b-abliterated-Q4_K_M.gguf"
+sha256 = ""
+size = 0
+license = ""
+base_repo = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+base_revision = "95a6d26c4bfb886c58daf9d3f7332c857cb27b43"
 base_license = "apache-2.0"
 min_vram_gb = 15
 context = 8192
 moe = false
-notes = "Extra 16 GB least-censored candidate. Quant and huihui-ai base cards are both Apache-2.0."
+notes = "Disabled placeholder. Voxprint Model Forge has not published this file. Plotweaver does not abliterate or quantize."
 
 [[model]]
 id = "qwen3.6-27b-abliterated-q4"
