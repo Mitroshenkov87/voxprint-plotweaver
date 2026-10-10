@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -9,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from plotweaver.bakeoff import run_bakeoff
 from plotweaver.paths import repo_root
 from plotweaver.scenarios import MARS_CHAPTERS, MARS_TITLE, mars_request
 from plotweaver.vxbook import legacy_pair, validate_vxbook
@@ -135,3 +137,13 @@ def test_bakeoff_mock_limit_one(tmp_path: Path) -> None:
     assert len(solos) == 2
     two_pass = list((results / "two-pass").glob("*/*/metrics.json"))
     assert len(two_pass) == 1
+
+
+def test_bakeoff_records_refusal_rates(tmp_path: Path) -> None:
+    run_bakeoff(tmp_path, mock=True, limit=1)
+    payload = json.loads((tmp_path / "refusal-rates.json").read_text(encoding="utf-8"))
+    by_id = {row["id"]: row for row in payload["models"]}
+    assert by_id["mock-main"]["group"] == "stock"
+    assert by_id["mock-low"]["group"] == "stock-least-censored"
+    assert by_id["mock-low"]["refusal_rate"] < by_id["mock-main"]["refusal_rate"]
+    assert payload["probe_count"] == 8

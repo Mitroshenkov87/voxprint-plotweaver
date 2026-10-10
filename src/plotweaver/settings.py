@@ -6,9 +6,12 @@ import json
 from pathlib import Path
 
 from plotweaver.atomic import read_json, write_json
+from plotweaver.errors import PlotweaverError
 from plotweaver.paths import suite_state_dir
 
 _KEY = "uncensored_models"
+_TIER_KEY = "model_tier_override"
+_TIER_VALUES = {"auto", "16gb", "24gb"}
 
 
 def _path() -> Path:
@@ -36,4 +39,20 @@ def uncensored_models_preference() -> bool:
 def save_uncensored_models(enabled: bool) -> None:
     data = _load()
     data[_KEY] = enabled
+    write_json(_path(), data)
+
+
+def model_tier_override() -> str:
+    """Advanced Settings choice: auto, 16gb, or 24gb. Missing values mean auto."""
+    value = _load().get(_TIER_KEY)
+    if isinstance(value, str) and value in _TIER_VALUES:
+        return value
+    return "auto"
+
+
+def save_model_tier_override(value: str) -> None:
+    if value not in _TIER_VALUES:
+        raise PlotweaverError(f"VRAM tier override must be one of {sorted(_TIER_VALUES)}")
+    data = _load()
+    data[_TIER_KEY] = value
     write_json(_path(), data)
