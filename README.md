@@ -1,6 +1,6 @@
 # Voxprint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Sefer. `plotweaver --version` prints `0.2.0 RC · build N "Sefer"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Rikmah. `plotweaver --version` prints `0.2.0 RC · build N "Rikmah"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -12,19 +12,19 @@ The installer includes the app, Python 3.14, the Python dependencies, and the pi
 
 ## Download and install
 
-Release files are on the [v0.2.0-rc1 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc1). Download `SHA256SUMS` with the installer and check it before you run anything.
+Release files are on the [v0.2.0-rc2 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc2). Download `SHA256SUMS` with the installer and check it before you run anything.
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc1-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc1-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc1-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc2-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc2-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc2-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver` and adds a Voxprint entry to the Start menu. Administrator rights are not required.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc1_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc2_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -34,7 +34,7 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf voxprint-plotweaver-0.2.0rc1-linux-x86_64.tar.gz
+tar -xzf voxprint-plotweaver-0.2.0rc2-linux-x86_64.tar.gz
 ./voxprint-plotweaver/plotweaver-gui.sh
 ```
 
@@ -104,6 +104,10 @@ python -m venv .venv
 ```
 
 `docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
+
+## Roadmap
+
+What comes next is in [ROADMAP.md](ROADMAP.md).
 
 ## ☕ Support the Project
 
