@@ -25,6 +25,7 @@ from plotweaver.prompts import judge_prompt, system_message
 from plotweaver.registry import RegistryEntry, download_model, load_registry
 from plotweaver.runner import run_book
 from plotweaver.store import Project
+from plotweaver.vxbook import legacy_pair
 
 
 @dataclass
@@ -233,6 +234,18 @@ def _one_book(
     )
 
 
+def _export_prose(export: Path) -> str | None:
+    """Plain chapter text for the judge and the blind packet."""
+    vxbook = export / "book.vxbook"
+    if vxbook.is_file():
+        plain, _marks = legacy_pair(vxbook)
+        return plain
+    for candidate in (export / "book.md", export / "audiobook" / "book.md"):
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8")
+    return None
+
+
 def _judge(results: Path, backend: LLMBackend) -> None:
     scores_dir = results / "judge"
     scores_dir.mkdir(parents=True, exist_ok=True)
@@ -240,12 +253,10 @@ def _judge(results: Path, backend: LLMBackend) -> None:
     for metrics_path in sorted(results.glob("*/*/*/metrics.json")) + sorted(
         results.glob("*/*/metrics.json")
     ):
-        book = metrics_path.parent / "export" / "book.md"
-        if not book.is_file():
-            book = metrics_path.parent / "export" / "audiobook" / "book.md"
-        if not book.is_file():
+        packet = _export_prose(metrics_path.parent / "export")
+        if packet is None:
             continue
-        packet = book.read_text(encoding="utf-8")[:6000]
+        packet = packet[:6000]
         completion = backend.complete(
             [ChatMessage("system", system_message()), ChatMessage("user", judge_prompt(packet))],
             temperature=0.2,
@@ -253,7 +264,7 @@ def _judge(results: Path, backend: LLMBackend) -> None:
             json_mode=True,
         )
         parsed = parse_json_object(completion.text) or {}
-        parsed["book"] = str(book)
+        parsed["book"] = str(metrics_path.parent / "export" / "book.vxbook")
         scores.append(parsed)
     write_json(scores_dir / "scores.json", {"scores": scores})
 
@@ -275,13 +286,11 @@ def _blind(results: Path) -> None:
         else:
             code = next(name for name, value in key.items() if value == model_id)
         story_id = metrics_path.parent.name
-        source = metrics_path.parent / "export" / "book.md"
-        if not source.is_file():
-            source = metrics_path.parent / "export" / "audiobook" / "book.md"
-        if source.is_file():
+        prose = _export_prose(metrics_path.parent / "export")
+        if prose is not None:
             target = reader / code
             target.mkdir(exist_ok=True)
-            shutil.copy2(source, target / f"{story_id}.md")
+            (target / f"{story_id}.md").write_text(prose, encoding="utf-8")
     instructions = (
         "# Blind reading\n\n"
         "Read the folders in any order. Do not open assignment-key.json until you have "

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.llm import MockBackend, Task
 from plotweaver.runner import run_book
 from plotweaver.store import Project
+from plotweaver.vxbook import legacy_pair, validate_vxbook
 
 
 def _request(tmp: Path, *, dark: bool, chapters: int = 2) -> BookRequest:
@@ -32,22 +34,26 @@ def test_mock_export_aligns_marks_and_keeps_yo(tmp_path: Path) -> None:
     assert result.status == "completed"
     assert result.swaps == 0
     assert result.export_dir is not None
-    audio = result.export_dir / "audiobook"
-    book = (audio / "book.md").read_text(encoding="utf-8")
-    marks = (audio / "speaker-marks.txt").read_text(encoding="utf-8").splitlines()
+    vxbook = result.export_dir / "book.vxbook"
+    assert not [issue for issue in validate_vxbook(vxbook) if issue.severity == "error"]
+    book, marks_text = legacy_pair(vxbook)
+    marks = marks_text.splitlines()
     paragraphs = [
         block for block in book.split("\n\n") if block.strip() and not block.startswith("# ")
     ]
     assert len(marks) == len(paragraphs)
-    assert any(line == "NARRATOR" for line in marks)
-    assert any(line.startswith("MALE:") for line in marks)
-    assert any(line.startswith("FEMALE:") for line in marks)
+    assert any(line.endswith("NARRATOR") for line in marks)
+    assert any("MALE:" in line for line in marks)
+    assert any("FEMALE:" in line for line in marks)
     assert "ё" in book or "Ё" in book
     assert "\u0301" in book
+    with zipfile.ZipFile(vxbook) as archive:
+        assert 'src="auto"' in archive.read("book.md").decode("utf-8")
     assert (result.export_dir / "book.epub").is_file()
     assert not (result.export_dir / "book.docx").is_file()
     assert not (result.export_dir / "book.fb2").is_file()
     assert not (result.export_dir / "book.md").is_file()
+    assert not (result.export_dir / "audiobook" / "speaker-marks.txt").is_file()
 
 
 def test_dark_toggle_swaps_once_and_fills(tmp_path: Path) -> None:
@@ -83,7 +89,7 @@ def test_refusal_becomes_a_placeholder_only_when_dark_is_on(tmp_path: Path) -> N
     book = kept.export_dir or Path()
     text = ""
     if kept.export_dir is not None:
-        text = (kept.export_dir / "audiobook" / "book.md").read_text(encoding="utf-8")
+        text, _marks = legacy_pair(kept.export_dir / "book.vxbook")
     assert "cannot write" in text.lower() or "I cannot" in text
     del book
 

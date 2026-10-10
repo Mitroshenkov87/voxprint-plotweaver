@@ -1,0 +1,43 @@
+{
+  "format_version": "1.0",
+  "speakers": [
+    {
+      "id": "narrator",
+      "role": "narrator",
+      "name": "Narrator",
+      "gender": "unspecified",
+      "age_group": "unspecified",
+      "voice_hints": {
+        "pace": "normal",
+        "notes": "calm, warm"
+      }
+    },
+    {
+      "id": "anna",
+      "role": "character",
+      "name": "Анна",
+      "gender": "female",
+      "age_group": "young_adult",
+      "voice_hints": {
+        "pitch": "medium",
+        "pace": "fast",
+        "notes": "nervous at first"
+      }
+    },
+    {
+      "id": "pyotr",
+      "role": "character",
+      "name": "Пётр",
+      "aliases": [
+        "Петя"
+      ],
+      "gender": "male",
+      "age_group": "elderly",
+      "voice_hints": {
+        "pitch": "low",
+        "pace": "slow",
+        "timbre": "hoarse"
+      }
+    }
+  ]
+}

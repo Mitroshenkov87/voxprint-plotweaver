@@ -30,12 +30,13 @@ class Gender(StrEnum):
 
 
 class ExportFormat(StrEnum):
-    """User-facing book files. EPUB is always written; the others are optional."""
+    """User-facing book files. EPUB and .vxbook are always written."""
 
     EPUB = "epub"
     FB2 = "fb2"
     DOCX = "docx"
     MARKDOWN = "markdown"
+    SPEAKER_MARKS = "speaker-marks"
 
 
 class Task(StrEnum):
@@ -85,6 +86,7 @@ class BookRequest:
     scene_words: int | None = None
     author: str = ""
     export_formats: list[str] = field(default_factory=lambda: [ExportFormat.EPUB.value])
+    created: str = ""
 
     def shape(self) -> tuple[int, int, int]:
         """Return (chapters, scenes per chapter, words per scene)."""
@@ -122,6 +124,7 @@ def request_to_dict(req: BookRequest) -> dict[str, object]:
         "scene_words": req.scene_words,
         "author": req.author,
         "export_formats": normalize_formats(req.export_formats),
+        "created": req.created,
     }
 
 
@@ -172,6 +175,7 @@ def request_from_dict(data: dict[str, object]) -> BookRequest:
         scene_words=_optional_int(data.get("scene_words")),
         author=str(data.get("author") or ""),
         export_formats=normalize_formats(data.get("export_formats")),
+        created=str(data.get("created") or ""),
     )
 
 

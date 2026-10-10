@@ -1,4 +1,4 @@
-"""EPUB 3 by default, optional FictionBook 2.1, DOCX, and Markdown, plus Audiobook Builder."""
+"""EPUB 3, Voxprint Book, and optional FictionBook, DOCX, Markdown, and speaker marks."""
 
 from __future__ import annotations
 
@@ -23,6 +23,20 @@ from plotweaver.appinfo import APP_NAME, APP_VERSION
 from plotweaver.domain import ExportFormat, Gender
 from plotweaver.errors import assert_never
 from plotweaver.paths import repo_root
+from plotweaver.vxbook import (
+    BlockKind,
+    VxBlock,
+    VxChapter,
+    VxPart,
+    VxSpeaker,
+    even_utc_now,
+    legacy_pair,
+    make_character,
+    name_key,
+    narrator_speaker,
+    with_given_aliases,
+    write_vxbook,
+)
 
 _FB2_NS = "http://www.gribuser.ru/xml/fictionbook/2.0"
 _XLINK_NS = "http://www.w3.org/1999/xlink"
@@ -69,12 +83,14 @@ class RenderedParagraph:
     text: str
     speaker: str
     gender: Gender
+    parts: tuple[tuple[str | None, str], ...] = ()
 
 
 @dataclass
 class RenderedChapter:
     title: str
     paragraphs: list[RenderedParagraph]
+    id: str = ""
 
 
 def speaker_mark(speaker: str, gender: Gender) -> str:
@@ -320,15 +336,26 @@ def write_bundle(
     genre: str = "",
     synopsis: str = "",
     formats: Collection[str] | None = None,
+    created: str = "",
+    speakers: list[VxSpeaker] | None = None,
 ) -> tuple[str, str]:
-    """Write the Audiobook Builder bundle, EPUB 3, and any extra formats the user asked for."""
+    """Write book.vxbook and EPUB 3, plus any extra formats the user asked for."""
     directory.mkdir(parents=True, exist_ok=True)
-    markdown, marks = render_markdown(chapters)
-    audio = directory / "audiobook"
-    audio.mkdir(exist_ok=True)
-    (audio / "book.md").write_text(markdown, encoding="utf-8", newline="\n")
-    (audio / "speaker-marks.txt").write_text(marks, encoding="utf-8", newline="\n")
+    stamp = created or even_utc_now()
+    vx_chapters, vx_speakers = bind_rendered(chapters, speakers or [])
+    write_vxbook(
+        directory / "book.vxbook",
+        title=title,
+        author=author,
+        language=language,
+        chapters=vx_chapters,
+        speakers=vx_speakers,
+        created=stamp,
+        synopsis=synopsis,
+    )
+    markdown, _plain_marks = render_markdown(chapters)
     selected = _selected_formats(formats)
+    marks = ""
     for kind in selected:
         match kind:
             case ExportFormat.EPUB:
@@ -347,6 +374,12 @@ def write_bundle(
                 write_docx(directory / "book.docx", chapters)
             case ExportFormat.MARKDOWN:
                 (directory / "book.md").write_text(markdown, encoding="utf-8", newline="\n")
+            case ExportFormat.SPEAKER_MARKS:
+                plain, marks = legacy_pair(directory / "book.vxbook")
+                audio = directory / "audiobook"
+                audio.mkdir(exist_ok=True)
+                (audio / "book.md").write_text(plain, encoding="utf-8", newline="\n")
+                (audio / "speaker-marks.txt").write_text(marks, encoding="utf-8", newline="\n")
             case _ as unreachable:
                 assert_never(unreachable)
     payload = json.dumps(overlap, ensure_ascii=False, indent=2) + "\n"
@@ -359,7 +392,8 @@ def publish_exports(source: Path, dest: Path) -> None:
     if source.resolve() == dest.resolve():
         return
     dest.mkdir(parents=True, exist_ok=True)
-    for name in ("book.md", "book.docx", "book.epub", "book.fb2", "overlap-report.json"):
+    names = ("book.md", "book.docx", "book.epub", "book.fb2", "book.vxbook", "overlap-report.json")
+    for name in names:
         item = source / name
         if item.is_file():
             shutil.copy2(item, dest / name)
@@ -370,6 +404,60 @@ def publish_exports(source: Path, dest: Path) -> None:
         for item in audio.iterdir():
             if item.is_file():
                 shutil.copy2(item, target / item.name)
+
+
+def bind_rendered(
+    chapters: list[RenderedChapter], cards: list[VxSpeaker]
+) -> tuple[list[VxChapter], list[VxSpeaker]]:
+    """Map canon speaker names onto vxbook ids. Inferred speech is src=auto."""
+    people = [narrator_speaker(), *cards]
+    by_key: dict[str, VxSpeaker] = {}
+    for speaker in people:
+        if speaker.name:
+            by_key.setdefault(name_key(speaker.name), speaker)
+        for alias in speaker.aliases:
+            by_key.setdefault(name_key(alias), speaker)
+    used = {speaker.id for speaker in people}
+    extras: list[VxSpeaker] = []
+
+    def resolve(name: str, gender: Gender) -> str | None:
+        key = name_key(name)
+        if not key or key == "narrator" or name.strip().upper() == "NARRATOR":
+            return None
+        found = by_key.get(key)
+        if found is not None:
+            return found.id
+        created = make_character(name, gender.value, used)
+        extras.append(created)
+        by_key[name_key(created.name)] = created
+        return created.id
+
+    vx_chapters: list[VxChapter] = []
+    for index, chapter in enumerate(chapters, start=1):
+        blocks: list[VxBlock] = []
+        for paragraph in chapter.paragraphs:
+            parts = tuple(
+                VxPart(
+                    text,
+                    resolve(speaker, Gender.UNSPECIFIED) if speaker else None,
+                    "auto" if speaker else None,
+                )
+                for speaker, text in paragraph.parts
+            )
+            if not paragraph.text.strip() and not parts:
+                continue
+            speaker_id = resolve(paragraph.speaker, paragraph.gender)
+            blocks.append(
+                VxBlock(
+                    BlockKind.PARAGRAPH,
+                    text=paragraph.text,
+                    speaker_id=speaker_id,
+                    src="auto" if speaker_id else None,
+                    parts=parts,
+                )
+            )
+        vx_chapters.append(VxChapter(chapter.id or f"ch{index:02d}", chapter.title, blocks))
+    return vx_chapters, with_given_aliases([*people, *extras])
 
 
 def _selected_formats(formats: Collection[str] | None) -> list[ExportFormat]:

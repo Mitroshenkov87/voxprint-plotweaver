@@ -51,7 +51,9 @@ def bible_prompt(req: BookRequest) -> str:
         "Read the synopsis and return one JSON object with keys logline, theme, "
         "genre_contract, tone, ending_intent, and characters. characters is a list of "
         "objects with name, gender (male or female), role, goals, secrets, voice, arc, "
-        "pronunciation. pronunciation is the name with U+0301 after the stressed vowel. "
+        "pronunciation, age_group (child, teen, young_adult, adult, elderly, or "
+        "unspecified), and voice_hints (optional object with pitch, pace, timbre, notes). "
+        "pronunciation is the name with U+0301 after the stressed vowel. "
         "Invent only fictional people. Write prose values in the book language.\n\n"
         f"SYNOPSIS:\n{req.synopsis.strip()}\n"
     )

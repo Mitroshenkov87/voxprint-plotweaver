@@ -149,8 +149,8 @@ def package_text(path: Path) -> str:
 def test_bundle_writes_epub_and_optional_formats(tmp_path: Path) -> None:
     write_bundle(tmp_path, "Title", "en", _chapters(), {}, author="Ada Lovelace")
     assert (tmp_path / "book.epub").is_file()
-    assert (tmp_path / "audiobook" / "book.md").is_file()
-    assert (tmp_path / "audiobook" / "speaker-marks.txt").is_file()
+    assert (tmp_path / "book.vxbook").is_file()
+    assert not (tmp_path / "audiobook" / "speaker-marks.txt").is_file()
     assert not (tmp_path / "book.fb2").is_file()
     assert not (tmp_path / "book.docx").is_file()
     assert not (tmp_path / "book.md").is_file()
@@ -161,13 +161,16 @@ def test_bundle_writes_epub_and_optional_formats(tmp_path: Path) -> None:
         "en",
         _chapters(),
         {"hits": []},
-        formats=["fb2", "docx", "markdown"],
+        formats=["fb2", "docx", "markdown", "speaker-marks"],
         synopsis="A blurb.",
     )
     assert (extra / "book.fb2").is_file()
     assert (extra / "book.docx").is_file()
     assert (extra / "book.md").is_file()
     assert (extra / "book.epub").is_file()
+    assert (extra / "book.vxbook").is_file()
+    marks = (extra / "audiobook" / "speaker-marks.txt").read_text(encoding="utf-8")
+    assert marks.startswith("1. ")
 
 
 def test_cli_optional_formats(tmp_path: Path) -> None:
@@ -196,6 +199,7 @@ def test_cli_optional_formats(tmp_path: Path) -> None:
             "--fb2",
             "--docx",
             "--markdown",
+            "--speaker-marks",
             "--export-dir",
             str(export),
         ]

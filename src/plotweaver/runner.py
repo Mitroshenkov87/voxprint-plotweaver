@@ -40,6 +40,7 @@ from plotweaver.prompts import (
 from plotweaver.references import compare_texts, measure_style, read_reference
 from plotweaver.store import Project
 from plotweaver.textutil import prepare_prose
+from plotweaver.vxbook import build_character_speakers, even_utc_now, name_key
 
 Progress = Any
 
@@ -438,6 +439,9 @@ class _Engine:
         chapters: list[dict[str, Any]],
         overlap: dict[str, object],
     ) -> Path:
+        if not request.created:
+            request.created = even_utc_now()
+            self.project.save_request(request)
         rendered = _render(self.project, request, chapters)
         directory = self.project.export_dir
         write_bundle(
@@ -450,6 +454,8 @@ class _Engine:
             genre=request.genre,
             synopsis=request.synopsis,
             formats=request.export_formats,
+            created=request.created,
+            speakers=build_character_speakers(_character_rows(self.project)),
         )
         if self.export_to is not None:
             publish_exports(directory, self.export_to)
@@ -706,5 +712,41 @@ def _render(
                 if gender is Gender.UNSPECIFIED and speaker.upper() != "NARRATOR":
                     gender = Gender.UNSPECIFIED
                 paragraphs.append(RenderedParagraph(text, speaker, gender))
-        rendered.append(RenderedChapter(str(chapter.get("title") or chapter.get("id")), paragraphs))
+        rendered.append(
+            RenderedChapter(
+                str(chapter.get("title") or chapter.get("id")),
+                paragraphs,
+                id=str(chapter.get("id") or ""),
+            )
+        )
     return rendered
+
+
+def _character_rows(project: Project) -> list[dict[str, object]]:
+    extras: dict[str, dict[str, object]] = {}
+    if (project.artefacts / "bible.json").is_file():
+        bible = _obj(project.read_artefact("bible.json"))
+        for item in _list(bible.get("characters")):
+            if isinstance(item, dict):
+                key = name_key(str(item.get("name") or ""))
+                if key:
+                    extras[key] = item
+    with project.canon() as canon:
+        stored = canon.characters()
+    if not stored:
+        return list(extras.values())
+    rows: list[dict[str, object]] = []
+    for row in stored:
+        extra = extras.get(name_key(row["name"]), {})
+        rows.append(
+            {
+                "name": row["name"],
+                "gender": row["gender"],
+                "voice": row["voice"],
+                "age_group": extra.get("age_group", ""),
+                "age": extra.get("age"),
+                "voice_hints": extra.get("voice_hints"),
+                "aliases": extra.get("aliases"),
+            }
+        )
+    return rows

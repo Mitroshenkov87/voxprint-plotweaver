@@ -6,15 +6,14 @@ The engine is a command-line pipeline with checkpoints. The window is a native P
 
 ## Status
 
-This build runs the pipeline on a deterministic mock model, which is what CI uses, and on `llama-server` from llama.cpp when an NVIDIA RTX 40-series GPU (or newer) is present. Python 3.14 is the required interpreter. The libraries this app imports publish 3.14 wheels (PySide6, httpx, python-docx, ebooklib, datasketch, pymorphy3), so the line was not lowered.
+This build runs the pipeline on a deterministic mock model, which is what CI uses, and on `llama-server` from llama.cpp when an NVIDIA RTX 40-series GPU (or newer) is present. Python 3.14 is the required interpreter. The libraries this app imports publish 3.14 wheels (PySide6, httpx, python-docx, ebooklib, datasketch, pymorphy3, Pillow), so the line was not lowered.
 
 Not in this build, on purpose:
 
 - Visual editors for the story bible, the outline, or scene beats. Copilot and manual modes stop at those gates; they do not open an editor.
 - Embedding cosine (bge-m3). The anti-copy check is lexical and writes an overlap report.
 - LoRA training and any cloud model API.
-- The full yo and stress normaliser. Audiobook Builder owns that. Plotweaver applies a short unambiguous yo dictionary and stress marks taken from the story bible.
-- A suite-native `.vxbook` package. EPUB 3 is the default book file.
+- The full yo and stress normaliser. Audiobook Builder owns that. Plotweaver applies a short unambiguous yo dictionary and stress marks taken from the story bible, and writes those marks into `.vxbook`.
 
 ## Platforms
 
@@ -49,7 +48,7 @@ plotweaver run --yes --project out/my-book --synopsis my-synopsis.md --main-gguf
 
 `--yes` skips the bible and outline gates. Omit it, read `bible.json` and `outline.json` in the project folder, then continue with `--approve`.
 
-The finished book is EPUB 3 (`book.epub`), with a navigation document and the suite cover. Add `--fb2` for FictionBook 2.1, `--docx` for Word, or `--markdown` for a Markdown file. The window has the same checkboxes. The Audiobook Builder folder is always written. `--author` sets the name stored in the EPUB and in FictionBook title-info.
+The finished book is `book.vxbook` (the Audiobook Builder hand-off) and EPUB 3 (`book.epub`), with a navigation document and the suite cover. Add `--speaker-marks` for the legacy numbered `audiobook/speaker-marks.txt` pair, `--fb2` for FictionBook 2.1, `--docx` for Word, or `--markdown` for a Markdown file. The window has the same checkboxes. `--author` sets the name stored in the book manifest, the EPUB, and FictionBook title-info. `plotweaver vxbook validate FILE` runs the format checklist.
 
 ## Bake-off (RTX 4090 Linux VM)
 
@@ -75,7 +74,7 @@ On the GPU VM, after the weights are on disk:
 bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/T-pro-it-2.1-Q4_K_M.gguf"
 ```
 
-Output defaults to `./out/mars-e2e/`. The Audiobook Builder import is `audiobook/book.md` plus `audiobook/speaker-marks.txt`. Override the folder with `PLOTWEAVER_MARS_OUT`.
+Output defaults to `./out/mars-e2e/`. The Audiobook Builder import is `book.vxbook`. `--speaker-marks` also writes the legacy numbered pair under `audiobook/`. Override the folder with `PLOTWEAVER_MARS_OUT`.
 
 Without a GPU:
 

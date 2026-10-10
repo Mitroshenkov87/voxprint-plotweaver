@@ -55,10 +55,11 @@ export PLOTWEAVER_MAIN_GGUF="$HOME/.local/share/voxprint/models/T-pro-it-2.1-Q4_
 bash scripts/e2e_mars.sh
 ```
 
-Default output is `./out/mars-e2e/`. Override with `PLOTWEAVER_MARS_OUT`. The script runs autopilot with `--yes` (no bible gate), six chapters, about 6,000 words as the target. The Audiobook Builder files are:
+Default output is `./out/mars-e2e/`. Override with `PLOTWEAVER_MARS_OUT`. The script runs autopilot with `--yes` (no bible gate), six chapters, about 6,000 words as the target. The Audiobook Builder file is:
 
-- `out/mars-e2e/audiobook/book.md` — `#` chapter headings, paragraphs separated by a blank line
-- `out/mars-e2e/audiobook/speaker-marks.txt` — one line per paragraph, `NARRATOR`, `MALE: Name`, or `FEMALE: Name`
+- `out/mars-e2e/book.vxbook` — Voxprint Book hand-off
+
+`--speaker-marks` also writes numbered `audiobook/speaker-marks.txt` lines (`1. NARRATOR`) from that file.
 
 Mock path, no GPU:
 
