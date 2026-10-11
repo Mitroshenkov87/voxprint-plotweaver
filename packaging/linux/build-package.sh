@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full Linux package: relocatable CPython, dependencies, and llama.cpp b11476.
-# Model weights are not included.
+# Shared files are installed by plotweaver provision, not while this package is built.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -43,8 +43,32 @@ Maintainer: Aleksandr Mitroshenkov <https://github.com/Mitroshenkov87/voxprint-p
 Depends: libglib2.0-0t64 | libglib2.0-0, libegl1, libgl1, libxkbcommon0, libfontconfig1, libdbus-1-3, libx11-6, libxcb1, libvulkan1
 Description: Voxprint AI Plotweaver
  Local synopsis-to-novel app. Python, dependencies, and llama.cpp b11476
- are included. Model weights download on first run.
+ are included. The package installer runs plotweaver provision, which fills
+ ~/.local/share/voxprint/shared when something is missing.
 EOF
+
+cat > "$PKG/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -eu
+APP=/opt/voxprint-plotweaver
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+  su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver provision"
+else
+  echo "Run $APP/plotweaver-provision.sh as your user to install shared files."
+fi
+EOF
+
+cat > "$PKG/DEBIAN/prerm" << 'EOF'
+#!/bin/sh
+set -eu
+APP=/opt/voxprint-plotweaver
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+  if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+    su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver release-shared" || true
+  fi
+fi
+EOF
+chmod 755 "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/prerm"
 
 TAR="voxprint-plotweaver-${VERSION}-linux-x86_64.tar.gz"
 DEB="voxprint-plotweaver_${VERSION}_amd64.deb"

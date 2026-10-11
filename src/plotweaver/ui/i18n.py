@@ -56,6 +56,25 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_uncensored_blocked": ("No published least-censored model fits this card."),
         "settings_download": "Download",
         "settings_downloading": "Downloading…",
+        "repair_title": "Checking shared files",
+        "repair_checking": "Checking shared files.",
+        "repair_reusing": "Reusing {name} already installed by another Voxprint app.",
+        "repair_installing": "Installing {name} ({size}).",
+        "repair_broken": "Repairing {name}.",
+        "driver_missing": "No NVIDIA driver was found. Install a current driver from {url}.",
+        "driver_old": (
+            "The NVIDIA driver is {version}. The CUDA runtime needs {minimum} or newer. "
+            "Install a current driver from {url}. "
+            "Plotweaver will use the Vulkan runtime until then."
+        ),
+        "driver_ok": "NVIDIA driver {version}.",
+        "optional_notice": "{name} is {size}. Estimated time about {minutes} min.",
+        "optional_eta": "Downloading {name} ({size}). About {eta} left.",
+        "eta_min": "{count} min",
+        "eta_sec": "{count} sec",
+        "models_skipped": (
+            "No supported NVIDIA GPU was found, so the stock models were not downloaded."
+        ),
         "settings_save": "Save",
         "settings_saved": "Saved.",
         "about": "About",
@@ -167,6 +186,22 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "settings_download": "Скачать",
         "settings_downloading": "Скачивание…",
+        "repair_title": "Проверка общих файлов",
+        "repair_checking": "Проверяю общие файлы.",
+        "repair_reusing": "Беру {name}: его уже поставило другое приложение Voxprint.",
+        "repair_installing": "Устанавливаю {name} ({size}).",
+        "repair_broken": "Восстанавливаю {name}.",
+        "driver_missing": "Драйвер NVIDIA не найден. Установите свежий драйвер: {url}.",
+        "driver_old": (
+            "Драйвер NVIDIA — {version}. Для CUDA нужен {minimum} или новее. "
+            "Установите свежий драйвер: {url}. Пока Plotweaver будет использовать Vulkan."
+        ),
+        "driver_ok": "Драйвер NVIDIA {version}.",
+        "optional_notice": "{name}: {size}. Оценка времени — около {minutes} мин.",
+        "optional_eta": "Скачиваю {name} ({size}). Осталось около {eta}.",
+        "eta_min": "{count} мин",
+        "eta_sec": "{count} с",
+        "models_skipped": "Подходящей карты NVIDIA нет, поэтому обычные модели не скачивались.",
         "settings_save": "Сохранить",
         "settings_saved": "Сохранено.",
         "about": "О программе",
@@ -278,6 +313,28 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "settings_download": "Herunterladen",
         "settings_downloading": "Wird geladen…",
+        "repair_title": "Gemeinsame Dateien prüfen",
+        "repair_checking": "Gemeinsame Dateien werden geprüft.",
+        "repair_reusing": (
+            "{name} wird wiederverwendet. Eine andere Voxprint-App hat die Datei schon."
+        ),
+        "repair_installing": "{name} wird installiert ({size}).",
+        "repair_broken": "{name} wird repariert.",
+        "driver_missing": (
+            "Kein NVIDIA-Treiber gefunden. Einen aktuellen Treiber installieren: {url}."
+        ),
+        "driver_old": (
+            "Der NVIDIA-Treiber ist {version}. Die CUDA-Laufzeit braucht {minimum} oder neuer. "
+            "Aktuellen Treiber installieren: {url}. Bis dahin nutzt Plotweaver Vulkan."
+        ),
+        "driver_ok": "NVIDIA-Treiber {version}.",
+        "optional_notice": "{name} ist {size}. Geschätzte Zeit etwa {minutes} Min.",
+        "optional_eta": "{name} wird geladen ({size}). Noch etwa {eta}.",
+        "eta_min": "{count} Min",
+        "eta_sec": "{count} Sek",
+        "models_skipped": (
+            "Keine passende NVIDIA-GPU, daher wurden die Standardmodelle nicht geladen."
+        ),
         "settings_save": "Speichern",
         "settings_saved": "Gespeichert.",
         "about": "Info",

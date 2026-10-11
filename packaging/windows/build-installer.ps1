@@ -1,6 +1,6 @@
 # Build the full Windows setup from a staged runtime and Inno Setup.
 # Python, dependencies, and llama.cpp b11476 are inside the setup.
-# Model weights are not.
+# plotweaver-provision.cmd fills the shared folder when the user runs setup.
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent

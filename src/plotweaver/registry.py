@@ -1,9 +1,10 @@
 """Model registry, shared GGUF folder, and SHA-256 checks.
 
-Weights live in `<models>/llm` (the suite folder Audiobook Builder uses).
-Every entry records a confirmed base licence. Apache-2.0 and MIT are accepted.
-An empty licence is refused, including with --allow-other-license, because an
-untagged tune has nothing to record. Heretic is not a registry entry.
+Weights live in ``<shared>/models/llm``. A matching file already stored under
+the older ``<home>/models/llm`` path is reused. Every entry records a confirmed
+base licence. Apache-2.0 and MIT are accepted. An empty licence is refused,
+including with --allow-other-license, because an untagged tune has nothing to
+record. Heretic is not a registry entry.
 """
 
 from __future__ import annotations
@@ -13,15 +14,15 @@ import json
 import os
 import re
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, assert_never
 
-import httpx
-
 from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
-from plotweaver.paths import gguf_dir, repo_root
+from plotweaver.fetch import stream_download
+from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root
 from plotweaver.settings import model_tier_override
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
@@ -333,7 +334,11 @@ def bakeoff_skip_reason(entry: RegistryEntry, *, free_gb: float) -> str | None:
 
 
 def download_model(
-    entry: RegistryEntry, store: Path | None = None, *, allow_other: bool = False
+    entry: RegistryEntry,
+    store: Path | None = None,
+    *,
+    allow_other: bool = False,
+    on_progress: Callable[[str], None] | None = None,
 ) -> Path:
     """Download one enabled registry file into the shared model folder and check it."""
     if not entry.enabled:
@@ -352,26 +357,27 @@ def download_model(
     folder = store or gguf_dir()
     folder.mkdir(parents=True, exist_ok=True)
     claim_user(folder.parent)
+    legacy = legacy_models_dir()
+    if legacy.resolve() != folder.parent.resolve():
+        claim_user(legacy)
     target = folder / entry.filename
     url = (
         f"https://huggingface.co/{entry.repo}/resolve/{entry.revision}/"
         f"{entry.filename}?download=true"
     )
+    if target.is_file():
+        try:
+            verify_file(target, size=entry.size, sha256=entry.sha256)
+        except PlotweaverError:
+            target.unlink()
     if not target.is_file():
-        partial = target.with_suffix(target.suffix + ".partial")
-        headers = {"User-Agent": "plotweaver"}
-        with httpx.stream(
-            "GET",
+        stream_download(
             url,
-            headers=headers,
-            follow_redirects=True,
-            timeout=httpx.Timeout(3600.0, connect=30.0),
-        ) as response:
-            response.raise_for_status()
-            with partial.open("wb") as handle:
-                for chunk in response.iter_bytes(1024 * 1024):
-                    handle.write(chunk)
-        partial.replace(target)
+            target,
+            total=entry.size,
+            on_progress=on_progress,
+            label=entry.filename,
+        )
     verify_file(target, size=entry.size, sha256=entry.sha256)
     manifest = {
         "id": entry.id,

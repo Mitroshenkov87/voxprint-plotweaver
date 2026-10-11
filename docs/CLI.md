@@ -29,6 +29,12 @@ Argparse usage errors are not JSON.
 
 `models list --dry-run` still reads the registry, because the list is the result of that read, and then writes nothing.
 
+## `plotweaver --selftest --json`
+
+Checks the shared suite files, repairs a missing or corrupt one, and prints one JSON object. Progress stays on stderr. `ok` is false when the NVIDIA driver is below the CUDA minimum or a required file could not be repaired. The driver message includes `https://www.nvidia.com/Download/index.aspx`. This is not `plotweaver gui --selftest`, which writes a one-chapter mock book.
+
+`plotweaver provision` is what the Windows setup and the Linux package run. `plotweaver release-shared` drops Plotweaver from `manifest.json` and leaves a file another app still uses.
+
 ## `--json` objects
 
 Every object has `ok` (boolean), `command` (string), and `code` (integer, the process exit code). Commands that accept `--dry-run` also have `dry_run` (boolean).

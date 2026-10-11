@@ -1,7 +1,8 @@
 """Stage a relocatable Plotweaver tree: Python, dependencies, and llama.cpp.
 
 The Windows installer and the Linux package both ship this directory.
-Model weights are not included. They download on first run.
+Shared runtimes and the stock model are installed by ``plotweaver provision``
+when the user runs the installer, not while this package is built.
 """
 
 from __future__ import annotations
@@ -43,6 +44,14 @@ exec "$ROOT/python/bin/python3" -m plotweaver gui "$@"
 """
 _GUI_CMD = """@echo off\r
 "%~dp0python\\pythonw.exe" -m plotweaver gui %*\r
+"""
+_PROVISION_SH = """#!/bin/sh
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+exec "$ROOT/python/bin/python3" -m plotweaver provision
+"""
+_PROVISION_CMD = """@echo off\r
+"%~dp0python\\python.exe" -m plotweaver provision\r
+if errorlevel 1 pause\r
 """
 
 
@@ -162,6 +171,10 @@ def _copy_payload(dest: Path) -> None:
     gui.write_text(_GUI_SH, encoding="utf-8", newline="\n")
     gui.chmod(0o755)
     (dest / "plotweaver-gui.cmd").write_text(_GUI_CMD, encoding="utf-8", newline="\n")
+    provision = dest / "plotweaver-provision.sh"
+    provision.write_text(_PROVISION_SH, encoding="utf-8", newline="\n")
+    provision.chmod(0o755)
+    (dest / "plotweaver-provision.cmd").write_text(_PROVISION_CMD, encoding="utf-8", newline="\n")
     for script in (dest / "scripts").glob("*.sh"):
         script.chmod(script.stat().st_mode | 0o755)
 

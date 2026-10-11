@@ -8,7 +8,7 @@ Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages.
 - An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
 - A 16 GB card keeps 2 GB free and uses the 16 GB model tier. A 24 GB card keeps 3 GB free and uses the 24 GB tier. Cards between those sizes use the 16 GB tier. Settings can override the choice when the card can run it.
 
-The installer includes the app, Python 3.14, the Python dependencies, and the pinned llama.cpp b11476 Vulkan runtime. Model weights download on the first real run.
+The installer includes the app, Python 3.14, the Python dependencies, and the pinned llama.cpp b11476 Vulkan runtime. During setup it checks Python, the Vulkan and CUDA llama.cpp runtimes, the NVIDIA driver, and the stock model for this card. Anything missing is installed then, with progress on screen, into the shared suite folder. Least-censored models stay optional. The 0.2.0 RC4 downloads below do not include that step yet. It ships with the next release.
 
 ## Download and install
 
@@ -18,7 +18,7 @@ Windows:
 
 1. Download `VoxprintPlotweaver-0.2.0rc4-win64-setup.exe`.
 2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc4-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc4-win64-setup.exe` line in `SHA256SUMS`.
-3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver` and adds a Voxprint entry to the Start menu. Administrator rights are not required.
+3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver`, adds a Voxprint entry to the Start menu, and installs missing shared files under `%LOCALAPPDATA%\Voxprint\shared`. Administrator rights are not required.
 
 Linux, Debian package:
 
@@ -28,6 +28,8 @@ sudo dpkg -i voxprint-plotweaver_0.2.0rc4_amd64.deb
 sudo apt-get install -f
 ```
 
+The package installer runs `plotweaver provision` as the user who invoked sudo. That step fills `~/.local/share/voxprint/shared`.
+
 The menu entry is Voxprint AI Plotweaver. The files live in `/opt/voxprint-plotweaver`.
 
 Linux, tarball (any distribution with the libraries named in the `.deb` control file):
@@ -35,17 +37,22 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 ```bash
 sha256sum -c SHA256SUMS
 tar -xzf voxprint-plotweaver-0.2.0rc4-linux-x86_64.tar.gz
+./voxprint-plotweaver/plotweaver-provision.sh
 ./voxprint-plotweaver/plotweaver-gui.sh
 ```
 
-## First run and model download
+## Shared files
 
-Open the app on the NVIDIA machine. The first real book reads the GPU, selects the 16 GB or 24 GB tier, and downloads the stock models that fit into the shared suite folder:
+The installer puts shared files in one place:
 
-- Windows: `%LOCALAPPDATA%\Voxprint\models\llm`
-- Linux: `~/.local/share/voxprint/models/llm`
+- Windows: `%LOCALAPPDATA%\Voxprint\shared\` (`runtime\`, `models\`, `tools\`)
+- Linux: `~/.local/share/voxprint/shared/`
 
-A card under 24 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card also installs T-pro-it-2.1. A model file already downloaded by Audiobook Builder is reused. Each file is checked by revision, size, and SHA-256.
+GGUF weights go in `shared/models/llm`. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it. Older copies under `<home>/models/llm` stay where Audiobook Builder expects them.
+
+Every launch, and `plotweaver --selftest --json`, checks those files and repairs a missing or corrupt one. The window shows progress in plain language. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
+
+A card under 24 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card also installs T-pro-it-2.1. Each file is checked by revision, size, and SHA-256.
 
 Least-censored models are a separate download from Settings, and only when a published file fits the card. On 16 GB those are the Forge Qwen 27B Q3_K_M and the Forge abliterated T-lite IQ4_XS and Q5_K_M. On 24 GB the card also offers the Forge Qwen 27B Q5 and the Forge Gemma 31B Q4_K_M. The Gemma 31B IQ3_XXS row stays disabled until `plotweaver models import-forge-manifest` fills it. A Russian book prefers the larger installed Forge T-lite. Plotweaver does not abliterate or quantize weights.
 
