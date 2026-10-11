@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from plotweaver.registry import (
     bakeoff_skip_reason,
     claim_user,
     detected_tier,
+    download_model,
     import_forge_manifest,
     is_stock,
     load_registry,
@@ -165,8 +167,8 @@ def test_registry_lists_confirmed_apache_models() -> None:
     for entry in entries:
         if entry.enabled:
             assert entry.license == "apache-2.0"
-            assert entry.revision
-            assert entry.sha256
+            assert re.fullmatch(r"[0-9a-f]{64}", entry.sha256), entry.id
+            assert re.fullmatch(r"[0-9a-f]{40}", entry.revision), entry.id
         assert entry.base_license == "apache-2.0"
         assert entry.base_repo
         assert entry.tier == entry.card
@@ -473,7 +475,7 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
                 "models": [
                     {
                         "id": "gemma-4-31b-abliterated-iq3-xxs",
-                        "revision": "rev-1",
+                        "revision": "ab" * 20,
                         "sha256": digest,
                         "size": 120,
                         "repo": "Mitroshenkov87/voxprint-model-forge",
@@ -492,7 +494,7 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
         entry for entry in load_registry(registry) if entry.id == "gemma-4-31b-abliterated-iq3-xxs"
     )
     assert filled.enabled is True
-    assert filled.revision == "rev-1"
+    assert filled.revision == "ab" * 20
     assert filled.sha256 == digest
     assert filled.size == 120
     assert filled.repo == "Mitroshenkov87/voxprint-model-forge"
@@ -549,6 +551,34 @@ def test_generic_quant_moves_onto_the_model_id(tmp_path: Path) -> None:
         if item.id == "t-lite-it-2.1-abliterated-q5"
     )
     assert stored_filename(bare) == "t-lite-it-2.1-abliterated-q5-Q5_K_M.gguf"
+
+
+def test_download_refuses_an_enabled_model_without_a_sha256(tmp_path: Path) -> None:
+    payload = b"keep"
+    entry = RegistryEntry(
+        id="untagged",
+        role="main",
+        repo="example/model",
+        filename="model.gguf",
+        sha256="",
+        size=len(payload),
+        license="apache-2.0",
+        min_vram_gb=1,
+        context=8192,
+        moe=False,
+        notes="",
+        revision="ab" * 20,
+        base_repo="example/base",
+        base_license="apache-2.0",
+        tier="16gb",
+        enabled=True,
+    )
+    target = tmp_path / entry.filename
+    target.write_bytes(payload)
+    with pytest.raises(PlotweaverError, match="no SHA-256"):
+        download_model(entry, tmp_path)
+    assert target.read_bytes() == payload
+    assert not target.with_suffix(".gguf.partial").exists()
 
 
 def _manifest(folder: Path, model_id: str) -> Path:

@@ -51,6 +51,22 @@ def test_version_is_shared() -> None:
     assert "release_title" in workflow
 
 
+def test_ci_verifies_tool_archives_and_drops_checkout_credentials() -> None:
+    root = repo_root()
+    ci = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    docs = (root / ".github" / "workflows" / "docs.yml").read_text(encoding="utf-8")
+    epub = "33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c  epubcheck.zip"
+    leaks = "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  gitleaks.tar.gz"
+    assert epub in ci
+    assert leaks in ci
+    assert ci.index(epub) < ci.index("unzip -q epubcheck.zip")
+    assert ci.index(leaks) < ci.index("tar -xzf gitleaks.tar.gz")
+    assert ci.count("persist-credentials: false") == 5
+    assert docs.count("persist-credentials: false") == 1
+    assert "contents: read" in ci.split("jobs:", 1)[0]
+    assert "contents: write" in ci.split("release:", 1)[1].split("steps:", 1)[0]
+
+
 def test_appinfo_does_not_import_the_package() -> None:
     tree = ast.parse(
         (repo_root() / "src" / "plotweaver" / "appinfo.py").read_text(encoding="utf-8")

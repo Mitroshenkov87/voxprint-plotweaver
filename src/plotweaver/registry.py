@@ -24,13 +24,14 @@ from voxprint_common.hashing import sha256_file
 
 from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
-from plotweaver.fetch import stream_download
+from plotweaver.fetch import require_sha256, stream_download
 from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root
 from plotweaver.settings import model_tier_override
 from plotweaver.textio import read_text
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_REVISION = re.compile(r"^[0-9a-f]{40}$")
 _BARE_QUANT = re.compile(r"^(?:IQ|Q)[A-Z0-9_]*\.gguf$")
 TIER_16: Literal["16gb"] = "16gb"
 TIER_24: Literal["24gb"] = "24gb"
@@ -90,7 +91,7 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             context=int(row.get("context") or 8192),
             moe=bool(row.get("moe")),
             notes=str(row.get("notes") or ""),
-            revision=str(row.get("revision") or ""),
+            revision=str(row.get("revision") or "").lower(),
             base_repo=str(row.get("base_repo") or ""),
             base_revision=str(row.get("base_revision") or ""),
             base_license=str(row.get("base_license") or ""),
@@ -103,8 +104,8 @@ def load_registry(path: Path) -> list[RegistryEntry]:
             languages=_languages(row),
         )
         if entry.enabled and (
-            not entry.revision
-            or not entry.sha256
+            _REVISION.fullmatch(entry.revision) is None
+            or _SHA256.fullmatch(entry.sha256) is None
             or entry.size <= 0
             or not entry.base_repo
             or not entry.base_license
@@ -418,6 +419,7 @@ def download_model(
             f"{entry.id} is disabled until Voxprint Model Forge publishes it "
             "with a revision and SHA-256. Plotweaver does not abliterate or quantize."
         )
+    digest = require_sha256(entry.sha256, entry.id)
     if not licence_allowed(entry, allow_other=allow_other):
         raise PlotweaverError(
             f"{entry.id} is licensed {entry.license!r} "
@@ -441,7 +443,7 @@ def download_model(
     )
     if target.is_file():
         try:
-            verify_file(target, size=entry.size, sha256=entry.sha256)
+            verify_file(target, size=entry.size, sha256=digest)
         except PlotweaverError:
             target.unlink()
     if not target.is_file():
@@ -451,14 +453,14 @@ def download_model(
             total=entry.size,
             on_progress=on_progress,
             label=local_name,
-            sha256=entry.sha256,
+            sha256=digest,
         )
-    verify_file(target, size=entry.size, sha256=entry.sha256)
+    verify_file(target, size=entry.size, sha256=digest)
     manifest = {
         "id": entry.id,
         "repo": entry.repo,
         "revision": entry.revision,
-        "files": [{"path": local_name, "sha256": entry.sha256, "size": entry.size}],
+        "files": [{"path": local_name, "sha256": digest, "size": entry.size}],
         "license": canonical_licence(entry.license),
         "base_repo": entry.base_repo,
         "base_revision": entry.base_revision,
@@ -540,8 +542,10 @@ def import_forge_manifest(
 
 
 def _forge_updates(row: dict[str, object]) -> dict[str, str]:
-    revision = _forge_text(row, "revision")
+    revision = _forge_text(row, "revision").lower()
     digest = _forge_text(row, "sha256").lower()
+    if _REVISION.fullmatch(revision) is None:
+        raise PlotweaverError("forge manifest revision must be a 40-hex commit")
     if _SHA256.fullmatch(digest) is None:
         raise PlotweaverError("forge manifest sha256 must be 64 hex characters")
     size = row.get("size")

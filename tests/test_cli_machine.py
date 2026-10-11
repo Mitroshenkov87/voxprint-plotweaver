@@ -145,7 +145,7 @@ def test_import_dry_run_does_not_write(tmp_path: Path, capsys: pytest.CaptureFix
                 "models": [
                     {
                         "id": "gemma-4-31b-abliterated-iq3-xxs",
-                        "revision": "rev-1",
+                        "revision": "ab" * 20,
                         "sha256": "ab" * 32,
                         "size": 120,
                     }
