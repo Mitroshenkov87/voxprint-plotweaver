@@ -47,9 +47,9 @@ Inside that folder:
 
 Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each component and deletes files only when `refs` is empty. A component Audiobook Builder still lists is left in place.
 
-## Older layout
+## Model weights
 
-Audiobook Builder and Movie Dubber still read `<home>/models/llm` and `<home>/models/.users.json`. Plotweaver keeps writing `plotweaver: true` in that users file. When a GGUF there matches the registry size and SHA-256, the installer hard-links it into `shared/models/llm` and does not download it again. The older file is not deleted.
+Plotweaver stores GGUF files under the suite models root from voxprint-common, `<home>/models/llm`. On Windows that is `%LOCALAPPDATA%\Voxprint\models\llm`. On Linux it is `~/.local/share/voxprint/models/llm`. `PLOTWEAVER_MODELS` and `VOXPRINT_MODELS_DIR` override it. A matching file already in `shared/models/llm` from an older Plotweaver install is hard-linked and not downloaded again. Audiobook Builder copies in the same `<home>/models/llm` folder are reused. Plotweaver still writes `plotweaver: true` in `<home>/models/.users.json`. The older file is not deleted.
 
 ## What the installer checks
 

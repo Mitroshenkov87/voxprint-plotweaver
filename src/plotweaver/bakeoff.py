@@ -33,6 +33,7 @@ from plotweaver.registry import (
 )
 from plotweaver.runner import run_book
 from plotweaver.store import Project
+from plotweaver.textio import read_text
 from plotweaver.vxbook import legacy_pair
 
 
@@ -76,7 +77,7 @@ def synopses_dir() -> Path:
 def load_synopses() -> list[Synopsis]:
     found: list[Synopsis] = []
     for path in sorted(synopses_dir().glob("*.md")):
-        meta, body = _front_matter(path.read_text(encoding="utf-8"))
+        meta, body = _front_matter(read_text(path))
         found.append(
             Synopsis(
                 id=str(meta.get("id") or path.stem),
@@ -314,7 +315,7 @@ def _export_prose(export: Path) -> str | None:
         return plain
     for candidate in (export / "book.md", export / "audiobook" / "book.md"):
         if candidate.is_file():
-            return candidate.read_text(encoding="utf-8")
+            return read_text(candidate)
     return None
 
 

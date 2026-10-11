@@ -19,7 +19,7 @@ from plotweaver.manifest import (
     register_resource,
     unregister_app,
 )
-from plotweaver.paths import legacy_models_dir, repo_root, shared_dir
+from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root, shared_dir
 from plotweaver.registry import RegistryEntry, load_registry
 from plotweaver.suite import release_shared, repair_shared
 
@@ -180,10 +180,11 @@ def test_reuse_links_a_verified_legacy_file(
 ) -> None:
     _isolate(monkeypatch, tmp_path)
     entry = _entry()
-    legacy = legacy_models_dir() / "llm" / entry.filename
+    legacy = shared_dir() / "models" / "llm" / entry.filename
     legacy.parent.mkdir(parents=True)
     legacy.write_bytes(b"abc")
     users = legacy_models_dir() / ".users.json"
+    users.parent.mkdir(parents=True)
     users.write_text('{"audiobook-builder": true}\n', encoding="utf-8")
     monkeypatch.setattr("plotweaver.suite.load_registry", lambda _path: [entry])
 
@@ -193,7 +194,7 @@ def test_reuse_links_a_verified_legacy_file(
     monkeypatch.setattr("plotweaver.suite.download_model", fail_download)
     notes: list[str] = []
     repaired = repair_shared(notes.append)
-    dest = shared_dir() / "models" / "llm" / entry.filename
+    dest = gguf_dir() / entry.filename
     assert repaired == [entry.id]
     assert dest.is_file()
     assert dest.samefile(legacy)
@@ -214,7 +215,7 @@ def test_reuse_links_a_verified_legacy_file(
 def test_repair_refetches_a_corrupt_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _isolate(monkeypatch, tmp_path)
     entry = _entry()
-    dest = shared_dir() / "models" / "llm" / entry.filename
+    dest = gguf_dir() / entry.filename
     dest.parent.mkdir(parents=True)
     dest.write_bytes(b"zzz")
     monkeypatch.setattr("plotweaver.suite.load_registry", lambda _path: [entry])

@@ -96,6 +96,32 @@ def test_vm_brief_is_short_and_dark() -> None:
     assert brief.target_words == 800
 
 
+def test_summary_reads_powershell_encodings(tmp_path: Path) -> None:
+    (tmp_path / "mode.txt").write_bytes("1".encode("utf-8-sig"))
+    (tmp_path / "doctor.txt").write_bytes("NVIDIA\n".encode("utf-16"))
+    summary = write_summary(tmp_path).read_text(encoding="utf-8")
+    assert "Mode: mock." in summary
+    assert "NVIDIA" in summary
+
+
+def test_vm_test_ps1_writes_utf8_and_does_not_raise_none() -> None:
+    text = (repo_root() / "scripts" / "vm_test.ps1").read_text(encoding="utf-8")
+    assert "raise SystemExit(1) if info is None else print" not in text
+    assert "print(detected_tier(info.total_gb)) if info else sys.exit(1)" in text
+    assert "Out-File -Encoding utf8" in text
+    assert "Invoke-Captured" in text
+    assert "save_main_window" in text
+    for line in text.splitlines():
+        if line.strip().startswith("#"):
+            continue
+        assert " > " not in line
+        assert ">(" not in line
+        if "Invoke-Captured" in line:
+            assert '""' not in line
+    assert "out = ''" in text
+    assert 'out = ""' not in text
+
+
 def test_vm_test_script_parses() -> None:
     script = repo_root() / "scripts" / "vm_test.sh"
     powershell = repo_root() / "scripts" / "vm_test.ps1"

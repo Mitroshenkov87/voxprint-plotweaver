@@ -19,6 +19,7 @@ from voxprint_common.gpu_lock import is_stale as is_stale
 from voxprint_common.gpu_lock import lock_path as lock_path
 
 from plotweaver.appinfo import LOCK_OWNER
+from plotweaver.textio import read_text
 
 __all__ = ["LOCK_OWNER", "gpu_job", "is_stale", "lock_path", "read_lock"]
 
@@ -30,7 +31,7 @@ def read_lock(path: Path | None = None) -> dict[str, Any] | None:
     """
     target = path or lock_path()
     try:
-        text = target.read_text(encoding="utf-8-sig")
+        text = read_text(target)
     except FileNotFoundError:
         return None
     except OSError:

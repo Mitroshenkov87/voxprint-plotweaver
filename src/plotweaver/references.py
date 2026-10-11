@@ -17,6 +17,7 @@ from docx import Document
 from ebooklib import ITEM_DOCUMENT, epub
 
 from plotweaver.errors import PlotweaverError
+from plotweaver.textio import read_text
 
 _MORPH = pymorphy3.MorphAnalyzer()
 _WORD = re.compile(r"[A-Za-zА-Яа-яЁё0-9]+", re.UNICODE)
@@ -61,7 +62,7 @@ def read_reference(path: Path) -> str:
     """Plain text from txt, md, docx, or epub. The file stays on this machine."""
     suffix = path.suffix.lower()
     if suffix in {".txt", ".md"}:
-        return path.read_text(encoding="utf-8")
+        return read_text(path)
     if suffix == ".docx":
         document = Document(str(path))
         return "\n".join(paragraph.text for paragraph in document.paragraphs)

@@ -21,6 +21,7 @@ from plotweaver.fetch import stream_download
 from plotweaver.hardware import driver_allows_cuda
 from plotweaver.paths import llama_cuda_dir, llama_runtime_dir, repo_root
 from plotweaver.registry import verify_file
+from plotweaver.textio import read_text
 
 LLAMA_BUILD = "b11476"
 _RELEASE_BASE = f"https://github.com/ggml-org/llama.cpp/releases/download/{LLAMA_BUILD}/"
@@ -216,7 +217,7 @@ def _ready_marked(folder: Path, marker_text: str) -> Path | None:
     if not marker.is_file():
         return None
     try:
-        tag = marker.read_text(encoding="utf-8").strip()
+        tag = read_text(marker).strip()
     except OSError:
         return None
     if tag != marker_text:
@@ -239,5 +240,12 @@ def _fetch_verified(
             return
         except PlotweaverError:
             dest.unlink()
-    stream_download(url, dest, total=size, on_progress=on_progress, label=label)
+    stream_download(
+        url,
+        dest,
+        total=size,
+        on_progress=on_progress,
+        label=label,
+        sha256=sha256,
+    )
     verify_file(dest, size=size, sha256=sha256)

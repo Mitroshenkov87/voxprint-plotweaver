@@ -63,8 +63,8 @@ def test_empty_partial_is_removed_and_a_partial_can_resume(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dest = tmp_path / "model.gguf"
-    empty = dest.with_suffix(".gguf.partial")
-    empty.write_bytes(b"")
+    partial = dest.with_suffix(".gguf.partial")
+    partial.write_bytes(b"abc")
     calls: list[dict[str, str]] = []
 
     def fail_then_resume(method: str, url: str, **kwargs: object) -> _Response:
@@ -77,12 +77,38 @@ def test_empty_partial_is_removed_and_a_partial_can_resume(
         return _Response(206, [b"def"])
 
     monkeypatch.setattr("plotweaver.fetch.httpx.stream", fail_then_resume)
+    monkeypatch.setattr("plotweaver.fetch.time.sleep", lambda _seconds: None)
+    stream_download(
+        "http://127.0.0.1/x",
+        dest,
+        total=6,
+        on_progress=None,
+        label="x",
+        sha256="bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721",
+    )
+    assert dest.read_bytes() == b"abcdef"
+    assert calls[0].get("Range") == "bytes=3-"
+    assert calls[1]["Range"] == "bytes=3-"
+    assert not partial.exists()
+
+
+def test_download_retries_ten_times_and_keeps_a_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dest = tmp_path / "model.gguf"
+    partial = dest.with_suffix(".gguf.partial")
+    partial.write_bytes(b"abc")
+    calls = {"n": 0}
+
+    def always_down(method: str, url: str, **kwargs: object) -> _Response:
+        del method, url, kwargs
+        calls["n"] += 1
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr("plotweaver.fetch.httpx.stream", always_down)
+    monkeypatch.setattr("plotweaver.fetch.time.sleep", lambda _seconds: None)
     with pytest.raises(PlotweaverError, match="Could not download"):
         stream_download("http://127.0.0.1/x", dest, total=6, on_progress=None, label="x")
-    assert not empty.exists()
-    kept = dest.with_suffix(".gguf.partial")
-    kept.write_bytes(b"abc")
-    stream_download("http://127.0.0.1/x", dest, total=6, on_progress=None, label="x")
-    assert dest.read_bytes() == b"abcdef"
-    assert calls[1]["Range"] == "bytes=3-"
-    assert not kept.exists()
+    assert calls["n"] == 10
+    assert partial.read_bytes() == b"abc"
+    assert not dest.exists()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -26,7 +27,12 @@ def test_version_is_shared() -> None:
     assert list((root / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert "voxprint-common==0.1.*" in project
+    assert "voxprint-common==0.1.1" in project
+    wheels = root / "packaging" / "wheels"
+    assert (wheels / "voxprint_common-0.1.1-py3-none-any.whl").is_file()
+    assert (wheels / "voxprint_common-0.1.1-py3-none-any.whl.sha256").is_file()
+    assert (wheels / "voxprint_common-0.1.1.tar.gz").is_file()
+    assert (wheels / "voxprint_common-0.1.1.tar.gz.sha256").is_file()
     assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
@@ -43,6 +49,17 @@ def test_version_is_shared() -> None:
     assert "APP_VERSION" in windows
     assert "APP_VERSION" in linux
     assert "release_title" in workflow
+
+
+def test_appinfo_does_not_import_the_package() -> None:
+    tree = ast.parse(
+        (repo_root() / "src" / "plotweaver" / "appinfo.py").read_text(encoding="utf-8")
+    )
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            assert all(not alias.name.startswith("plotweaver") for alias in node.names)
+        if isinstance(node, ast.ImportFrom):
+            assert not (node.module or "").startswith("plotweaver")
 
 
 def test_choose_cpython_prefers_the_patch_install(tmp_path: Path) -> None:

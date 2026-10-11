@@ -6,6 +6,7 @@ from pathlib import Path
 
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.paths import repo_root
+from plotweaver.textio import read_text
 
 MARS_TITLE = "Пыль над Аресом"
 MARS_TARGET_WORDS = 6000
@@ -24,7 +25,7 @@ def mars_outline_path(root: Path | None = None) -> Path:
 
 def mars_request(root: Path | None = None) -> BookRequest:
     """Short Russian science-fiction book: invented crew, SpaceX as the company."""
-    synopsis = mars_synopsis_path(root).read_text(encoding="utf-8").strip()
+    synopsis = read_text(mars_synopsis_path(root)).strip()
     return BookRequest(
         title=MARS_TITLE,
         language=Language.RU,

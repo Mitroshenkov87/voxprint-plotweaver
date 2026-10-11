@@ -27,6 +27,7 @@ from plotweaver.errors import PlotweaverError
 from plotweaver.fetch import stream_download
 from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root
 from plotweaver.settings import model_tier_override
+from plotweaver.textio import read_text
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -69,7 +70,7 @@ class RegistryEntry:
 
 def load_registry(path: Path) -> list[RegistryEntry]:
     """Read the model rows from a registry TOML file."""
-    payload = tomllib.loads(path.read_text(encoding="utf-8"))
+    payload = tomllib.loads(read_text(path))
     rows = payload.get("model") or []
     if not isinstance(rows, list):
         raise PlotweaverError(f"{path} has no [[model]] entries")
@@ -176,7 +177,7 @@ def claim_user(store: Path, user: str = "plotweaver") -> None:
     data: dict[str, bool] = {}
     if path.is_file():
         try:
-            loaded = json.loads(path.read_text(encoding="utf-8-sig"))
+            loaded = json.loads(read_text(path))
         except UnicodeError, json.JSONDecodeError:
             loaded = None
         if isinstance(loaded, dict):
@@ -198,6 +199,12 @@ def registry_path() -> Path:
 def is_stock(entry: RegistryEntry) -> bool:
     """Stock models are the default install. Abliterated rows are optional."""
     return entry.enabled and not entry.optional and not entry.uncensored
+
+
+def stock_for_tier(entries: list[RegistryEntry], *, total_gb: float) -> list[RegistryEntry]:
+    """Stock models for the detected tier only. A 24 GB card does not also take 16 GB files."""
+    selected = resolve_tier(total_gb)
+    return [entry for entry in entries if is_stock(entry) and entry_tier(entry) == selected]
 
 
 def fits_vram(entry: RegistryEntry, free_gb: float) -> bool:
@@ -444,6 +451,7 @@ def download_model(
             total=entry.size,
             on_progress=on_progress,
             label=local_name,
+            sha256=entry.sha256,
         )
     verify_file(target, size=entry.size, sha256=entry.sha256)
     manifest = {
@@ -500,14 +508,14 @@ def import_forge_manifest(
     ids without writing the registry.
     """
     path = registry or registry_path()
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload = json.loads(read_text(manifest))
     if not isinstance(payload, dict):
         raise PlotweaverError("forge manifest must be a JSON object")
     rows = payload.get("models")
     if not isinstance(rows, list) or not rows:
         raise PlotweaverError("forge manifest needs a non-empty models list")
     known = {entry.id: entry for entry in load_registry(path)}
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     enabled: list[str] = []
     for row in rows:
         if not isinstance(row, dict):

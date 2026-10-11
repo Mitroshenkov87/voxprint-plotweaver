@@ -42,6 +42,7 @@ from plotweaver.prompts import (
 from plotweaver.references import compare_texts, measure_style, read_reference
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
+from plotweaver.textio import read_text
 from plotweaver.textutil import prepare_prose
 from plotweaver.vxbook import build_character_speakers, emitted_chapter_id, even_utc_now, name_key
 
@@ -484,7 +485,7 @@ class _Engine:
         generated = _book_text(self.project)
         report = None
         for ref in files:
-            found = compare_texts(generated, ref.read_text(encoding="utf-8"))
+            found = compare_texts(generated, read_text(ref))
             if report is None or found.flagged:
                 report = found
             if found.flagged:
@@ -587,7 +588,7 @@ class _Engine:
             folder = self.project.root / "references"
             files = sorted(folder.glob("*.txt"))
             if files:
-                excerpt = files[0].read_text(encoding="utf-8")[:1200]
+                excerpt = read_text(files[0])[:1200]
             card = complete_json(
                 self.backend,
                 _messages(style_prompt(request, "\n".join(measured), excerpt)),

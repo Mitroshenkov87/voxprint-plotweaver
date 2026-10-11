@@ -68,7 +68,9 @@ from plotweaver.settings import (
 )
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
+from plotweaver.textio import read_text
 from plotweaver.ui.brief_form import BriefForm
+from plotweaver.ui.fonts import register_ui_fonts, ui_font
 from plotweaver.ui.i18n import tr
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.theme import TEXT, TEXT_ON_PRIMARY, build_style, enable_acrylic
@@ -145,6 +147,10 @@ class MainWindow(QMainWindow):
 
     def __init__(self, mock: bool = False) -> None:
         super().__init__()
+        register_ui_fonts()
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            app.setFont(ui_font(10))
         self.mock_default = mock
         self.setWindowTitle(tr("app"))
         self.resize(960, 680)
@@ -639,7 +645,7 @@ class MainWindow(QMainWindow):
 
     def _show_guide(self) -> None:
         path = writing_guide_path()
-        text = path.read_text(encoding="utf-8") if path.is_file() else tr("help_brief")
+        text = read_text(path) if path.is_file() else tr("help_brief")
         dialog = QDialog(self)
         dialog.setWindowTitle(tr("help_brief"))
         dialog.resize(720, 560)

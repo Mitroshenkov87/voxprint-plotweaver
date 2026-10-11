@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from plotweaver.textio import read_text
+
 _STAGES = (
     "story bible",
     "outline",
@@ -56,7 +58,7 @@ def metric_totals(path: Path) -> dict[str, float]:
     tokens = 0
     seconds = 0.0
     if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in read_text(path).splitlines():
             if not line.strip():
                 continue
             try:
@@ -79,7 +81,7 @@ def write_summary(root: Path) -> Path:
     """Write summary.md for the directory scripts/vm_test.sh produced."""
     mode = "gpu"
     mode_path = root / "mode.txt"
-    if mode_path.is_file() and mode_path.read_text(encoding="utf-8").strip() == "1":
+    if mode_path.is_file() and read_text(mode_path).strip() == "1":
         mode = "mock"
     lines = [
         "# VM test",
@@ -131,6 +133,7 @@ def write_summary(root: Path) -> Path:
             "- `screenshots/progress.png`: progress screen mid-run.",
             "- `screenshots/result.png`: result screen with the export paths.",
             "- `screenshots/settings-tier.png`: Settings model tier panel.",
+            "- `screenshots/main-window.png`: the real main window at 1920x1080.",
             "",
         ]
     )
@@ -155,7 +158,7 @@ def _check_line(path: Path, label: str) -> str:
 def _doctor_text(path: Path) -> str:
     if not path.is_file():
         return "Doctor output was not recorded."
-    text = path.read_text(encoding="utf-8").strip()
+    text = read_text(path).strip()
     if not text:
         return "Doctor output was empty."
     return text
@@ -231,14 +234,14 @@ def _peak_text(path: Path) -> str:
 def _read_text(path: Path) -> str:
     if not path.is_file():
         return ""
-    return path.read_text(encoding="utf-8").strip()
+    return read_text(path).strip()
 
 
 def _read_json(path: Path) -> dict[str, object]:
     if not path.is_file():
         return {}
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
+        loaded = json.loads(read_text(path))
     except json.JSONDecodeError:
         return {}
     if isinstance(loaded, dict):

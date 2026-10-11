@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 license = "Apache-2.0"
 authors = [{ name = "Aleksandr Mitroshenkov" }]
 dependencies = [
-  "voxprint-common==0.1.*",
+  "voxprint-common==0.1.1",
   "PySide6-Essentials>=6.10",
   "httpx>=0.28",
   "python-docx>=1.2",
@@ -55,7 +55,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-plotweaver = ["data/fb2/*", "data/splash.jpg", "ui/icons/*.svg", "data/writing-a-brief.md"]
+plotweaver = ["data/fb2/*", "data/splash.jpg", "ui/icons/*.svg", "ui/fonts/*", "data/writing-a-brief.md"]
 
 [tool.ruff]
 target-version = "py314"

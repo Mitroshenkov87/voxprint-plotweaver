@@ -28,6 +28,8 @@ from voxprint_common.runtime_manifest import (
 )
 
 from plotweaver.errors import PlotweaverError
+from plotweaver.paths import models_dir
+from plotweaver.textio import read_text
 
 MANIFEST_NAME = "manifest.json"
 APP_ID = "plotweaver"
@@ -113,6 +115,7 @@ def register_resource(
     files: dict[str, str],
     app: str = APP_ID,
     source: str = "",
+    model_roots: tuple[Path, ...] = (),
 ) -> None:
     """Record one component and add ``app`` to its refs."""
     target = manifest_path(shared)
@@ -134,6 +137,7 @@ def register_resource(
             path=path,
             sha256=digest,
             manifest=target,
+            model_roots=model_roots,
         )
     except CommonManifestError as exc:
         raise ManifestError(str(exc)) from exc
@@ -195,7 +199,7 @@ def _remember(
     source: str,
 ) -> None:
     with exclusive_lock(lock_path(path)):
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(read_text(path))
         components = payload.get("components")
         if not isinstance(components, dict) or resource_id not in components:
             raise ManifestError(f"{resource_id} was not recorded")
@@ -210,6 +214,9 @@ def _remember(
 
 
 def _resource_dir(shared: Path, resource: Resource) -> Path:
+    raw = Path(resource.path)
+    if raw.is_absolute():
+        return raw
     base = (shared / resource.path).resolve()
     root = shared.resolve()
     if base != root and root not in base.parents:
@@ -217,15 +224,26 @@ def _resource_dir(shared: Path, resource: Resource) -> Path:
     return base
 
 
+def _inside(target: Path, root: Path) -> bool:
+    return target == root or root in target.parents
+
+
 def _delete_files(shared: Path, resource: Resource) -> None:
     base = _resource_dir(shared, resource)
     root = shared.resolve()
-    if resource.kind == "runtime" and base != root and root in base.parents and base.is_dir():
+    allowed = (root, models_dir().resolve(), base)
+    if (
+        resource.kind == "runtime"
+        and not Path(resource.path).is_absolute()
+        and _inside(base, root)
+        and base != root
+        and base.is_dir()
+    ):
         shutil.rmtree(base)
         return
     for name in resource.files:
         target = (base / name).resolve()
-        if target != root and root not in target.parents:
+        if not any(_inside(target, folder) for folder in allowed):
             continue
         if target.is_file():
             target.unlink()

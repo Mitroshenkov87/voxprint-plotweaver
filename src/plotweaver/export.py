@@ -23,6 +23,7 @@ from plotweaver.appinfo import APP_NAME, APP_VERSION
 from plotweaver.domain import ExportFormat, Gender
 from plotweaver.errors import assert_never
 from plotweaver.paths import repo_root
+from plotweaver.textio import read_text
 from plotweaver.vxbook import (
     BlockKind,
     VxBlock,
@@ -150,7 +151,7 @@ def fb2_schema_dir() -> Path:
 
 @cache
 def genre_codes() -> frozenset[str]:
-    text = (fb2_schema_dir() / "FictionBookGenres.xsd").read_text(encoding="utf-8")
+    text = read_text(fb2_schema_dir() / "FictionBookGenres.xsd")
     return frozenset(_GENRE_ENUM.findall(text))
 
 

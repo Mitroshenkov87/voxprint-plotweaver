@@ -47,6 +47,7 @@ from plotweaver.paths import (
     legacy_models_dir,
     llama_cuda_dir,
     llama_runtime_dir,
+    models_dir,
     repo_root,
     shared_dir,
     shared_runtime_dir,
@@ -56,14 +57,14 @@ from plotweaver.registry import (
     RegistryEntry,
     claim_user,
     download_model,
-    is_stock,
     load_registry,
-    model_offered,
     registry_path,
+    stock_for_tier,
     stored_filename,
     verify_file,
     weight_path,
 )
+from plotweaver.textio import read_text
 from plotweaver.ui.i18n import tr
 
 Progress = Callable[[str], None]
@@ -185,25 +186,35 @@ def _install_stock(say: Progress) -> list[str]:
         return []
     repaired: list[str] = []
     try:
-        entries = load_registry(registry_path())
+        chosen = stock_for_tier(load_registry(registry_path()), total_gb=gpu.total_gb)
     except PlotweaverError as exc:
         raise PlotweaverError(str(exc)) from None
-    for entry in entries:
-        if not is_stock(entry):
-            continue
-        if not model_offered(entry, total_gb=gpu.total_gb, free_gb=gpu.free_gb):
-            continue
+    pending = [entry for entry in chosen if _needs_bytes(entry)]
+    if pending:
+        say(tr("repair_stock_total").format(size=format_size(sum(entry.size for entry in pending))))
+    for entry in chosen:
         if _place_model(entry, say):
             repaired.append(entry.id)
     return repaired
 
 
-def _place_model(entry: RegistryEntry, say: Progress) -> bool:
-    """Return True when this call installed or repaired the file."""
+def _needs_bytes(entry: RegistryEntry) -> bool:
+    dest = _model_dest(entry)
+    return not _trusted(dest, size=entry.size, sha256=entry.sha256)
+
+
+def _model_dest(entry: RegistryEntry) -> Path:
     dest = weight_path(gguf_dir(), entry)
     local_name = stored_filename(entry)
     if dest.name != local_name:
-        dest = gguf_dir() / local_name
+        return gguf_dir() / local_name
+    return dest
+
+
+def _place_model(entry: RegistryEntry, say: Progress) -> bool:
+    """Return True when this call installed or repaired the file."""
+    dest = _model_dest(entry)
+    local_name = stored_filename(entry)
     if _trusted(dest, size=entry.size, sha256=entry.sha256):
         _register_model(entry, _legacy_apps())
         return False
@@ -231,41 +242,51 @@ def _matching_legacy(entry: RegistryEntry) -> Path | None:
     names = [stored_filename(entry)]
     if entry.filename not in names:
         names.append(entry.filename)
+    folders = (legacy_models_dir() / "llm", shared_dir() / "models" / "llm")
     for name in names:
-        source = legacy_models_dir() / "llm" / name
-        if not source.is_file():
-            continue
-        try:
-            if source.resolve() == dest.resolve():
+        for folder in folders:
+            source = folder / name
+            if not source.is_file():
                 continue
-        except OSError:
-            continue
-        try:
-            verify_file(source, size=entry.size, sha256=entry.sha256)
-        except PlotweaverError, OSError:
-            continue
-        return source
+            found = _accepted_legacy(source, dest, entry)
+            if found is not None:
+                return found
     return None
+
+
+def _accepted_legacy(source: Path, dest: Path, entry: RegistryEntry) -> Path | None:
+    try:
+        if source.resolve() == dest.resolve():
+            return None
+    except OSError:
+        return None
+    try:
+        verify_file(source, size=entry.size, sha256=entry.sha256)
+    except PlotweaverError, OSError:
+        return None
+    return source
 
 
 def _register_model(entry: RegistryEntry, extra_apps: tuple[str, ...]) -> None:
     dest = gguf_dir() / stored_filename(entry)
+    parent = dest.parent.resolve()
     root = shared_dir().resolve()
     try:
-        relative = dest.parent.resolve().relative_to(root).as_posix()
+        recorded = parent.relative_to(root).as_posix()
     except ValueError:
-        return
+        recorded = parent.as_posix()
     apps = tuple(dict.fromkeys((APP_ID, *extra_apps)))
     for app in apps:
         register_resource(
             shared_dir(),
             entry.id,
             kind="model",
-            path=relative,
+            path=recorded,
             nbytes=entry.size,
             files={stored_filename(entry): entry.sha256.lower()},
             app=app,
             source=entry.repo,
+            model_roots=(models_dir(),),
         )
 
 
@@ -274,7 +295,7 @@ def _legacy_apps() -> tuple[str, ...]:
     if not path.is_file():
         return ()
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8-sig"))
+        loaded = json.loads(read_text(path))
     except OSError, json.JSONDecodeError:
         return ()
     if not isinstance(loaded, dict):
@@ -287,7 +308,7 @@ def _drop_legacy_user(store: Path, user: str) -> None:
     if not path.is_file():
         return
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8-sig"))
+        loaded = json.loads(read_text(path))
     except OSError, json.JSONDecodeError:
         return
     if not isinstance(loaded, dict) or user not in loaded:
@@ -351,7 +372,7 @@ def _marker_is(folder: Path, expected: str) -> bool:
     if not marker.is_file():
         return False
     try:
-        return marker.read_text(encoding="utf-8").strip() == expected
+        return read_text(marker).strip() == expected
     except OSError:
         return False
 
@@ -430,7 +451,7 @@ def _python_record(folder: Path) -> Path | None:
 def _python_ready(folder: Path) -> bool:
     binary = _find_python(folder)
     marker = folder / "VERSION"
-    marker_text = marker.read_text(encoding="utf-8") if marker.is_file() else ""
+    marker_text = read_text(marker) if marker.is_file() else ""
     if binary is not None and _marker_version(marker_text):
         return True
     pointer = folder / "interpreter.json"
@@ -444,7 +465,7 @@ def _python_ready(folder: Path) -> bool:
 
 def _pointer_ok(pointer: Path) -> bool:
     try:
-        data = json.loads(pointer.read_text(encoding="utf-8"))
+        data = json.loads(read_text(pointer))
     except OSError, json.JSONDecodeError:
         return False
     if not isinstance(data, dict):
@@ -540,7 +561,7 @@ def _load_stamps() -> dict[str, object]:
     if not path.is_file():
         return {}
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
+        loaded = json.loads(read_text(path))
     except OSError, json.JSONDecodeError:
         return {}
     files = loaded.get("files") if isinstance(loaded, dict) else None
