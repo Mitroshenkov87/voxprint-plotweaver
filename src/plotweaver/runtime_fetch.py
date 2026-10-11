@@ -1,13 +1,12 @@
-"""HTTP download that reports size and a plain-language time estimate.
+"""Package-time download of the pinned llama.cpp archive.
 
-A dropped connection resumes the ``.partial`` file with an HTTP Range request.
-Ten attempts back off, then the bytes are hashed and renamed into place.
+``install_pinned_runtime`` is the only caller. The installed app locates the
+binary the installer shipped and does not fetch it.
 """
 
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import time
 from collections.abc import Callable
@@ -16,46 +15,14 @@ from pathlib import Path
 import httpx
 from voxprint_common.hashing import sha256_file
 
+from plotweaver.bytesize import format_eta, format_size
 from plotweaver.errors import PlotweaverError
+from plotweaver.registry import require_sha256
 from plotweaver.ui.i18n import tr
 
-_MIB = 1024 * 1024
 _GIB = 1024 * 1024 * 1024
 _ATTEMPTS = 10
 _RESERVE = 2 * _GIB
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
-
-
-def require_sha256(sha256: str, label: str) -> str:
-    """Refuse a model whose registry entry has no 64-hex SHA-256."""
-    digest = (sha256 or "").strip().lower()
-    if _SHA256.fullmatch(digest) is None:
-        raise PlotweaverError(
-            f"Refusing to download or load {label}. The registry entry has no SHA-256."
-        )
-    return digest
-
-
-def format_size(nbytes: int) -> str:
-    """Render a byte count as GB or MB."""
-    if nbytes >= _GIB:
-        return f"{nbytes / _GIB:.1f} GB"
-    if nbytes >= _MIB:
-        return f"{nbytes / _MIB:.0f} MB"
-    return f"{nbytes} B"
-
-
-def format_eta(seconds: float) -> str:
-    """Render a remaining time as minutes or seconds."""
-    if seconds >= 90:
-        return tr("eta_min").format(count=max(1, round(seconds / 60)))
-    return tr("eta_sec").format(count=max(1, round(seconds)))
-
-
-def estimate_minutes(nbytes: int) -> int:
-    """Rough minutes at 20 MB/s, at least one."""
-    seconds = nbytes / (20 * _MIB)
-    return max(1, round(seconds / 60))
 
 
 def stream_download(

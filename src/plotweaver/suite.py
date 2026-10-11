@@ -23,17 +23,10 @@ from voxprint_common.selftest import document as checks_document
 
 from plotweaver.appinfo import version_label
 from plotweaver.atomic import write_json
+from plotweaver.bytesize import format_size
 from plotweaver.errors import PlotweaverError
-from plotweaver.fetch import format_size
 from plotweaver.hardware import driver_status, is_supported, query_gpu
-from plotweaver.llama_release import (
-    CUDA_MARKER,
-    LLAMA_BUILD,
-    bundled_runtime_dir,
-    ensure_pinned_runtime,
-    pinned_asset,
-    pinned_cuda_asset,
-)
+from plotweaver.llama_release import CUDA_MARKER, LLAMA_BUILD, bundled_runtime_dir
 from plotweaver.manifest import (
     APP_ID,
     ManifestError,
@@ -42,6 +35,7 @@ from plotweaver.manifest import (
     register_resource,
     unregister_app,
 )
+from plotweaver.mdl_progress import install_log_path, run_download
 from plotweaver.paths import (
     gguf_dir,
     legacy_models_dir,
@@ -56,7 +50,6 @@ from plotweaver.paths import (
 from plotweaver.registry import (
     RegistryEntry,
     claim_user,
-    download_model,
     load_registry,
     registry_path,
     stock_for_tier,
@@ -151,15 +144,17 @@ def selftest_report() -> dict[str, object]:
 
 
 def provision_main() -> int:
-    """Installer entry. Progress goes to stderr. Failures stay one plain sentence."""
+    """Copy a bundled runtime, then run VOXPrint MDL. A failed download still returns 0."""
     try:
         repair_shared(lambda message: print(message, file=sys.stderr))
     except PlotweaverError as exc:
         print(str(exc), file=sys.stderr)
-        return 1
     except OSError as exc:
         print(str(exc), file=sys.stderr)
-        return 1
+    try:
+        run_download(log=install_log_path())
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
     return 0
 
 
@@ -230,11 +225,8 @@ def _place_model(entry: RegistryEntry, say: Progress) -> bool:
         _remember(dest, size=entry.size, sha256=entry.sha256)
         _register_model(entry, _legacy_apps())
         return True
-    say(tr("repair_installing").format(name=local_name, size=format_size(entry.size)))
-    download_model(entry, dest.parent, on_progress=say)
-    _remember(dest, size=entry.size, sha256=entry.sha256)
-    _register_model(entry, _legacy_apps())
-    return True
+    say(tr("models_not_ready"))
+    return False
 
 
 def _matching_legacy(entry: RegistryEntry) -> Path | None:
@@ -329,30 +321,15 @@ def _install_vulkan(say: Progress) -> None:
         _replace_tree(bundled, folder)
         _register_runtime("llama-cpp-b11476-vulkan", folder, "vulkan")
         return
-    asset = pinned_asset("windows" if sys.platform == "win32" else "linux")
-    if asset is None:
-        raise PlotweaverError("llama.cpp b11476 is published for Windows and Linux x64.")
-    say(
-        tr("repair_installing").format(
-            name="llama.cpp b11476 Vulkan",
-            size=format_size(asset.size),
-        )
+    raise PlotweaverError(
+        "llama.cpp b11476 is not installed. The installer ships the Vulkan runtime."
     )
-    ensure_pinned_runtime(folder, asset, LLAMA_BUILD, on_progress=say)
-    _register_runtime("llama-cpp-b11476-vulkan", folder, "vulkan")
 
 
-def _install_cuda(say: Progress) -> None:
+def _install_cuda(_say: Progress) -> None:
     folder = llama_cuda_dir()
     if (folder / ".complete").is_file() and _marker_is(folder, CUDA_MARKER):
         _register_runtime("llama-cpp-b11476-cuda", folder, "cuda")
-        return
-    asset = pinned_cuda_asset("windows" if sys.platform == "win32" else "linux")
-    if asset is None:
-        return
-    say(tr("repair_installing").format(name="llama.cpp b11476 CUDA", size=format_size(asset.size)))
-    ensure_pinned_runtime(folder, asset, CUDA_MARKER, on_progress=say)
-    _register_runtime("llama-cpp-b11476-cuda", folder, "cuda")
 
 
 def _bundled_llama() -> Path | None:

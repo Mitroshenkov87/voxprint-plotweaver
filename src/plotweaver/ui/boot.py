@@ -80,15 +80,34 @@ class _Boot(QObject):
     def _finished(self, outcome: object) -> None:
         self.dialog.close()
         if isinstance(outcome, Failed):
-            QMessageBox.critical(None, tr("repair_title"), outcome.message or tr("repair_title"))
-            self.code = 1
-            self.splash.finish()
-            self.app.quit()
+            self._not_ready(outcome.message)
             return
         if isinstance(outcome, Ready):
             self._open_main()
             return
         raise RuntimeError("provisioning returned an unknown result")
+
+    def _not_ready(self, message: str) -> None:
+        box = QMessageBox()
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(tr("manage_models"))
+        box.setText(message or tr("models_not_ready"))
+        manage = box.addButton(tr("manage_models"), QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Close)
+        box.exec()
+        if box.clickedButton() is manage:
+            # mdl_ui builds the progress dialog. Keep it off the splash import.
+            from plotweaver.mdl_ui import manage_models
+            from plotweaver.ready import ensure_ready
+
+            manage_models()
+            again = ensure_ready(self._on_progress)
+            if isinstance(again, Ready):
+                self._open_main()
+                return
+        self.code = 1
+        self.splash.finish()
+        self.app.quit()
 
     def _open_main(self) -> None:
         from PySide6.QtCore import QTimer

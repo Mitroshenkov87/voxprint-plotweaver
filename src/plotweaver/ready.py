@@ -1,8 +1,13 @@
-"""One provisioning entry for the window.
+"""One readiness gate for the window.
 
-The GUI calls :func:`ensure_ready` and nothing else in this module. When
-``voxprint-mdl`` arrives in voxprint-common, replace the body of
-:func:`ensure_ready`. The window stays the same.
+The main window opens only when :func:`voxprint_common.mdl.ready` is true.
+Otherwise the window shows a short notice and Manage models.
+
+``voxprint_common.mdl.ensure_ready(app, progress_cb)`` was checked against the
+0.2.1 wheel before this shim was written. ``progress_cb`` is
+``(fraction, message)``, and the call enqueues a download. That is not the
+gate: a missing set stays closed until Manage models, or the installer, has
+run ``voxprint-mdl download``.
 """
 
 from __future__ import annotations
@@ -10,36 +15,32 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from plotweaver.errors import PlotweaverError
+from voxprint_common.mdl import ready as mdl_ready
+from voxprint_common.mdl.status import StatusError
 
 
 @dataclass(frozen=True)
 class Ready:
-    """Required files are present. The main window may open."""
+    """MDL reports ready. The main window may open."""
 
 
 @dataclass(frozen=True)
 class Failed:
-    """Provisioning stopped. ``message`` is one plain sentence."""
+    """Models are not ready. ``message`` is one plain sentence."""
 
     message: str
 
 
 def ensure_ready(progress_cb: Callable[[str], None]) -> Ready | Failed:
-    """Install or repair required files and report each step.
+    """Return ready only when the MDL status file says so.
 
-    ``progress_cb`` receives plain sentences, including the model name, size,
-    speed, and remaining time while a download is moving. The call does not
-    draw a window.
+    ``progress_cb`` receives one plain sentence. This function does not
+    download and does not draw a window.
     """
-    # The window calls this function only. The suite import stays inside it so a
-    # later voxprint-mdl body can replace the call without loading suite at import.
-    from plotweaver.suite import repair_shared
-
+    progress_cb("Checking models.")
     try:
-        repair_shared(progress_cb)
-    except PlotweaverError as exc:
+        if mdl_ready():
+            return Ready()
+    except StatusError as exc:
         return Failed(str(exc))
-    except OSError as exc:
-        return Failed(str(exc))
-    return Ready()
+    return Failed("models not ready")

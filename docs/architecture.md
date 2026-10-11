@@ -1,6 +1,6 @@
 # Architecture
 
-Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Oreg, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. `docs/vm-test.md` is the short RTX 4090 check.
+Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Shti, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. Model files are downloaded by VOXPrint MDL. `docs/vm-test.md` is the short RTX 4090 check.
 
 ## Pipeline
 
@@ -29,7 +29,7 @@ Off: the main model does every step. A refusal is kept as a narrator paragraph a
 
 On: pass 1 drafts the book with the stock model. A scene beat marked dark, or a refusal on a dark scene, becomes a placeholder (beats, point of view, emotional goal, links to the neighbouring scenes). Pass 2 loads one least-censored model, fills every placeholder from the neighbouring text, and proofreads the book before unloading. There is no second verification model and no rollback loop. Least-censored models come from Model Forge. A Russian book uses the forge abliterated T-lite when that file is installed and the tier allows it. Otherwise pass 2 uses the largest installed forge model for the tier. When none is installed, pass 2 uses the stock drafter (T-pro on 24 GB, Gemma 4 12B on 16 GB). The book form's Standard / Least censored choice is separate from the VRAM tier. Settings offers the forge download when a published file fits the card. Plotweaver downloads finished GGUF files pinned by revision and SHA-256. It does not abliterate, quantize, or fit weights.
 
-`plotweaver models import-forge-manifest FILE` writes a 40-hex revision, a 64-hex SHA-256, and size into a disabled row and enables it. Stock rows are refused. The file is JSON: `{"models":[{"id":"...","revision":"...","sha256":"...","size":1}]}`. Optional keys are `repo`, `filename`, and `min_vram_gb`.
+VOXPrint MDL downloads the stock set from `voxprint-app-models.json` and `mdl.json`. The window opens only when MDL reports ready. Manage models runs `voxprint-mdl download --app plotweaver --json` and draws those events.
 
 ## VRAM-aware model tiers
 

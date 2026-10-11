@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -18,21 +19,30 @@ def test_version_is_shared() -> None:
     root = repo_root()
     payload = json.loads((root / "BUILD.json").read_text(encoding="utf-8"))
     assert payload["version"] == "0.2.0"
-    assert payload["prerelease"] == "rc6"
-    assert payload["codename"] == "Oreg"
+    assert payload["prerelease"] == "rc7"
+    assert payload["codename"] == "Shti"
     assert payload["build"] is None
-    assert APP_VERSION == "0.2.0rc6"
-    assert version_label() == '0.2.0 RC · build dev "Oreg"'
-    assert release_title(52) == '0.2.0 RC · build 52 "Oreg"'
-    assert list((root / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
+    assert APP_VERSION == "0.2.0rc7"
+    assert version_label() == '0.2.0 RC · build dev "Shti"'
+    assert release_title(52) == '0.2.0 RC · build 52 "Shti"'
+    assert list((root / "packaging" / "wheels").glob("voxprint_common-0.2.*.whl"))
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert "voxprint-common==0.1.1" in project
+    pin = (
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/"
+        "releases/download/v0.2.1/voxprint_common-0.2.1-py3-none-any.whl"
+    )
+    assert pin in project
     wheels = root / "packaging" / "wheels"
-    assert (wheels / "voxprint_common-0.1.1-py3-none-any.whl").is_file()
-    assert (wheels / "voxprint_common-0.1.1-py3-none-any.whl.sha256").is_file()
-    assert (wheels / "voxprint_common-0.1.1.tar.gz").is_file()
-    assert (wheels / "voxprint_common-0.1.1.tar.gz.sha256").is_file()
+    wheel = wheels / "voxprint_common-0.2.1-py3-none-any.whl"
+    assert wheel.is_file()
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    assert digest == "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
+    requirements = (root / "packaging" / "requirements-common.txt").read_text(encoding="utf-8")
+    assert f"--hash=sha256:{digest}" in requirements
+    assert (wheels / "voxprint_common-0.2.1-py3-none-any.whl.sha256").is_file()
+    assert (wheels / "voxprint_common-0.2.1.tar.gz").is_file()
+    assert (wheels / "voxprint_common-0.2.1.tar.gz.sha256").is_file()
     assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
@@ -82,7 +92,9 @@ def test_suite_install_layout() -> None:
     assert r"{app}\voxprint-plotweaver.exe" in installer
     assert "skipifsilent" in installer
     assert "postinstall" in installer
-    assert installer.index("plotweaver-provision.cmd") < installer.index("skipifsilent")
+    assert installer.index("mdl-progress") < installer.index("skipifsilent")
+    assert "WizardSilent" in installer
+    assert "--gui" not in installer
     assert r"{localappdata}\Voxprint\Plotweaver" in installer
     assert "DefaultDirName={localappdata}" not in installer
     assert "/opt/voxprint-ai-suite/plotweaver" in linux
@@ -150,5 +162,5 @@ def test_bundled_runtime_is_used_before_a_download(
     def fail_download(folder: Path) -> Path:
         raise AssertionError(f"download attempted: {folder}")
 
-    monkeypatch.setattr("plotweaver.llama_release._ensure_in", fail_download)
+    monkeypatch.setattr("plotweaver.llama_release.install_pinned_runtime", fail_download)
     assert ensure_llama_server() == binary

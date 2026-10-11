@@ -66,9 +66,9 @@ def _check_tree(root: Path) -> bool:
     if dev:
         print(f"{root} includes plotweaver_dev: {dev[0]}", file=sys.stderr)
         failed = True
-    wheels = list((root / "wheels").glob("voxprint_common-0.1.*.whl"))
+    wheels = list((root / "wheels").glob("voxprint_common-0.2.*.whl"))
     if not wheels:
-        print(f"{root}/wheels is missing the voxprint-common 0.1 wheel", file=sys.stderr)
+        print(f"{root}/wheels is missing the voxprint-common 0.2 wheel", file=sys.stderr)
         failed = True
     for llm in root.rglob("plotweaver/llm.py"):
         text = llm.read_text(encoding="utf-8")

@@ -8,6 +8,7 @@ when the user runs the installer, not while this package is built.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -24,13 +25,14 @@ _COPY_FILES = (
     "NOTICE",
     "BUILD.json",
 )
+_COMMON_SHA256 = "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
 _FETCH = """
 from pathlib import Path
 import sys
-from plotweaver.llama_release import LLAMA_BUILD, ensure_llama_server, find_server
+from plotweaver.llama_release import LLAMA_BUILD, find_server, install_pinned_runtime
 
 folder = Path(sys.argv[1])
-binary = ensure_llama_server(folder)
+binary = install_pinned_runtime(folder)
 if find_server(folder) != binary:
     raise SystemExit("llama-server was not unpacked")
 marker = (folder / ".complete").read_text(encoding="utf-8").strip()
@@ -56,11 +58,12 @@ _GUI_CMD = """@echo off\r
 """
 _PROVISION_SH = """#!/bin/sh
 ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-exec "$ROOT/python/bin/python3" -m plotweaver provision
+"$ROOT/python/bin/python3" -m plotweaver mdl-progress --quiet --installer
+exit 0
 """
 _PROVISION_CMD = """@echo off\r
-"%~dp0python\\python.exe" -m plotweaver provision\r
-if errorlevel 1 pause\r
+"%~dp0python\\python.exe" -m plotweaver mdl-progress --quiet --installer\r
+exit /b 0\r
 """
 _LAUNCHER_CS = r"""
 using System;
@@ -146,11 +149,14 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _common_wheel() -> Path:
-    """Vendored voxprint-common 0.1.1 wheel. Installers must not fetch it."""
-    matches = sorted((_ROOT / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
-    if not matches:
-        raise SystemExit("packaging/wheels is missing voxprint-common 0.1")
-    return matches[-1]
+    """Vendored voxprint-common 0.2.1 wheel. Installers must not fetch it."""
+    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.2.1-py3-none-any.whl"
+    if not wheel.is_file():
+        raise SystemExit("packaging/wheels is missing voxprint-common 0.2.1")
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    if digest != _COMMON_SHA256:
+        raise SystemExit(f"voxprint-common wheel sha256 is {digest}")
+    return wheel
 
 
 def _bundle_common(wheels: Path, wheel: Path, dest: Path) -> None:
@@ -245,6 +251,9 @@ def _copy_payload(dest: Path) -> None:
         shutil.copytree(_ROOT / name, dest / name, symlinks=True, ignore=ignore)
     for name in _COPY_FILES:
         shutil.copy2(_ROOT / name, dest / name)
+    data = _ROOT / "src" / "plotweaver" / "data"
+    for name in ("mdl.json", "voxprint-app-models.json"):
+        shutil.copy2(data / name, dest / name)
     _write_script(dest / "voxprint-plotweaver", _GUI_SH)
     _write_script(dest / "voxprint-plotweaver-cli", _CLI_SH)
     _write_script(dest / "plotweaver", _ALIAS_SH)

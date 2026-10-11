@@ -17,10 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from plotweaver.errors import PlotweaverError
-from plotweaver.fetch import stream_download
 from plotweaver.hardware import driver_allows_cuda
 from plotweaver.paths import llama_cuda_dir, llama_runtime_dir, repo_root
 from plotweaver.registry import verify_file
+from plotweaver.runtime_fetch import stream_download
 from plotweaver.textio import read_text
 
 LLAMA_BUILD = "b11476"
@@ -163,18 +163,19 @@ def ensure_pinned_runtime(
     return binary
 
 
-def _ensure_in(folder: Path) -> Path:
+def install_pinned_runtime(dest: Path) -> Path:
+    """Download the pinned Vulkan archive into ``dest``. Packaging calls this."""
     system = "windows" if sys.platform == "win32" else "linux"
     asset = pinned_asset(system)
     if asset is None:
         raise PlotweaverError("llama.cpp b11476 is published for Windows and Linux x64.")
-    return ensure_pinned_runtime(folder, asset, LLAMA_BUILD)
+    return ensure_pinned_runtime(dest, asset, LLAMA_BUILD)
 
 
 def ensure_llama_server(dest: Path | None = None) -> Path:
-    """Return b11476 ``llama-server``.
+    """Return b11476 ``llama-server`` without downloading it.
 
-    ``PLOTWEAVER_LLAMA_SERVER`` wins. An explicit ``dest`` is the Vulkan tree.
+    ``PLOTWEAVER_LLAMA_SERVER`` wins. An explicit ``dest`` is that Vulkan tree.
     Otherwise a ready CUDA build is used when the driver is new enough, then
     the shared Vulkan tree, then the copy shipped next to the app.
     """
@@ -182,7 +183,12 @@ def ensure_llama_server(dest: Path | None = None) -> Path:
     if override is not None:
         return override
     if dest is not None:
-        return _ensure_in(dest)
+        found = _ready_server(dest)
+        if found is not None:
+            return found
+        raise PlotweaverError(
+            "llama.cpp b11476 is not installed. The installer ships the Vulkan runtime."
+        )
     if driver_allows_cuda():
         cuda = _ready_marked(llama_cuda_dir(), CUDA_MARKER)
         if cuda is not None:
@@ -195,7 +201,9 @@ def ensure_llama_server(dest: Path | None = None) -> Path:
         found = _ready_server(bundled)
         if found is not None:
             return found
-    return _ensure_in(llama_runtime_dir())
+    raise PlotweaverError(
+        "llama.cpp b11476 is not installed. The installer ships the Vulkan runtime."
+    )
 
 
 def os_environ_server() -> Path | None:

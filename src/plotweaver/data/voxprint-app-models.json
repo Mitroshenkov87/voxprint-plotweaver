@@ -1,0 +1,17 @@
+{
+  "schema": "voxprint-app-models/1",
+  "app_id": "plotweaver",
+  "tiers": {
+    "16gb": ["t-lite-it-2.1-q4", "gemma-4-12b-it-q4"],
+    "24gb": ["t-pro-it-2.1-q4"]
+  },
+  "runtimes": ["llama.cpp-b11476-cuda", "llama.cpp-b11476-vulkan"],
+  "optional": [
+    {"id": "qwen3.6-27b-abliterated-q5", "min_vram_gib": 20},
+    {"id": "gemma-4-31b-abliterated-q4", "min_vram_gib": 20},
+    {"id": "qwen3.6-27b-abliterated-q3-k-m", "min_vram_gib": 13},
+    {"id": "gemma-4-31b-abliterated-iq3-xxs", "min_vram_gib": 12},
+    {"id": "t-lite-it-2.1-abliterated-q5", "min_vram_gib": 6.5},
+    {"id": "t-lite-it-2.1-abliterated-iq4-xs", "min_vram_gib": 5}
+  ]
+}

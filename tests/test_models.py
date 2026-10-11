@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from plotweaver.cli import main
 from plotweaver.domain import BookRequest, Language, ModelTier, request_from_dict, request_to_dict
 from plotweaver.errors import PlotweaverError
 from plotweaver.install import assign_book_models, ensure_default_install, ensure_uncensored_models
@@ -152,12 +151,12 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert q5_lite.size == 5_850_952_896
     assert q5_lite.min_vram_gb == 6.5
     waiting = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-iq3-xxs")
-    assert waiting.enabled is False
-    assert waiting.revision == ""
-    assert waiting.sha256 == ""
-    assert waiting.size == 0
-    assert waiting.filename == "gemma-4-31b-abliterated-IQ3_XXS.gguf"
-    assert "import-forge-manifest" in waiting.notes
+    assert waiting.enabled is True
+    assert waiting.revision == "26495e1a45d8bde085a0681c3c43044eff5c8ac5"
+    assert waiting.sha256 == "c7bb8f9f4bdb396fb40a5beb617de27132cda6727b885e82f635340f353c5340"
+    assert waiting.size == 12_077_502_368
+    assert waiting.filename == "IQ3_XXS.gguf"
+    assert waiting.min_vram_gb == 12
     fit = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-iq4-xs")
     assert fit.enabled is False
     assert fit.default is False
@@ -247,7 +246,6 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert offered_16 == [
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
-        "t-lite-it-2.1-q5",
     ]
     offered_24 = [
         entry.id
@@ -258,7 +256,6 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
         "t-pro-it-2.1-q4",
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
-        "t-lite-it-2.1-q5",
     ]
     assert tier_headroom_gb(16) == 2
     assert tier_headroom_gb(24) == 3
@@ -296,7 +293,7 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert t_pro.tier == "24gb"
     assert bakeoff_skip_reason(t_pro, free_gb=14)
     placeholder = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-iq3-xxs")
-    assert placeholder.enabled is False
+    assert placeholder.enabled is True
     assert placeholder.tier == "16gb"
 
 
@@ -351,36 +348,31 @@ def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> N
     assert russian_small.main_model_id == "qwen3.6-27b-abliterated-q3-k-m"
 
 
-def test_uncensored_download_is_separate_from_the_default_install(
+def test_uncensored_count_does_not_download(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    downloaded: list[str] = []
+    def fail_download(*_args: object, **_kwargs: object) -> Path:
+        raise AssertionError("download attempted")
 
-    def fake_download(entry, store, *, allow_other: bool = False, on_progress=None):  # noqa: ANN001
-        del allow_other, on_progress
-        downloaded.append(entry.id)
-        target = store / stored_filename(entry)
-        target.write_bytes(b"x")
-        return target
-
-    monkeypatch.setattr("plotweaver.install.download_model", fake_download)
-    assert ensure_default_install(free_gb=16, total_gb=16, store=tmp_path) == 3
-    assert "mistral-small-3.2-24b-q4" not in downloaded
-    assert "t-pro-it-2.1-q4" not in downloaded
-    assert ensure_default_install(free_gb=22, total_gb=24, store=tmp_path) == 1
-    assert "qwen3.6-27b-abliterated-q3-k-m" not in downloaded
-    assert "t-pro-it-2.1-q4" in downloaded
-    assert "mistral-small-3.2-24b-q4" not in downloaded
+    monkeypatch.setattr("plotweaver.registry.download_model", fail_download)
+    assert ensure_default_install(free_gb=16, total_gb=16, store=tmp_path) == 0
+    assert ensure_default_install(free_gb=22, total_gb=24, store=tmp_path) == 0
     with pytest.raises(PlotweaverError, match="least-censored"):
         ensure_uncensored_models(total_vram_gb=6, free_gb=1, store=tmp_path)
-    assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 3
-    assert "qwen3.6-27b-abliterated-q5" not in downloaded
-    assert "qwen3.6-27b-abliterated-q3-k-m" in downloaded
-    assert "t-lite-it-2.1-abliterated-iq4-xs" in downloaded
-    assert "t-lite-it-2.1-abliterated-q5" in downloaded
-    assert ensure_uncensored_models(total_vram_gb=24, free_gb=22, store=tmp_path) == 2
-    assert "qwen3.6-27b-abliterated-q5" in downloaded
-    assert "gemma-4-31b-abliterated-q4" in downloaded
+    assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 0
+    entries = load_registry(repo_root() / "bakeoff" / "models.toml")
+    for entry in entries:
+        if entry.id in {
+            "gemma-4-12b-it-q4",
+            "t-lite-it-2.1-q4",
+            "qwen3.6-27b-abliterated-q3-k-m",
+            "gemma-4-31b-abliterated-iq3-xxs",
+            "t-lite-it-2.1-abliterated-iq4-xs",
+            "t-lite-it-2.1-abliterated-q5",
+        }:
+            (tmp_path / stored_filename(entry)).write_bytes(b"x")
+    assert ensure_default_install(free_gb=16, total_gb=16, store=tmp_path) == 2
+    assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 4
 
 
 def test_stock_for_tier_excludes_the_other_tier() -> None:
@@ -389,27 +381,13 @@ def test_stock_for_tier_excludes_the_other_tier() -> None:
     assert [entry.id for entry in stock_for_tier(entries, total_gb=16)] == [
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
-        "t-lite-it-2.1-q5",
     ]
 
 
-def test_fresh_24gb_install_downloads_only_t_pro(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    downloaded: list[str] = []
-
-    def fake_download(entry, store, *, allow_other: bool = False, on_progress=None):  # noqa: ANN001
-        del allow_other, on_progress
-        downloaded.append(entry.id)
-        target = store / stored_filename(entry)
-        target.write_bytes(b"x")
-        return target
-
-    monkeypatch.setattr("plotweaver.install.download_model", fake_download)
+def test_fresh_24gb_install_does_not_download(tmp_path: Path) -> None:
     fresh = tmp_path / "fresh"
     fresh.mkdir()
-    assert ensure_default_install(free_gb=22, total_gb=24, store=fresh) == 1
-    assert downloaded == ["t-pro-it-2.1-q4"]
+    assert ensure_default_install(free_gb=22, total_gb=24, store=fresh) == 0
 
 
 def test_uncensored_models_setting_defaults_off(
@@ -474,7 +452,7 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
             {
                 "models": [
                     {
-                        "id": "gemma-4-31b-abliterated-iq3-xxs",
+                        "id": "qwen3.6-27b-abliterated-iq4-xs",
                         "revision": "ab" * 20,
                         "sha256": digest,
                         "size": 120,
@@ -487,11 +465,9 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    assert (
-        main(["models", "import-forge-manifest", str(manifest), "--registry", str(registry)]) == 0
-    )
+    assert import_forge_manifest(manifest, registry) == ["qwen3.6-27b-abliterated-iq4-xs"]
     filled = next(
-        entry for entry in load_registry(registry) if entry.id == "gemma-4-31b-abliterated-iq3-xxs"
+        entry for entry in load_registry(registry) if entry.id == "qwen3.6-27b-abliterated-iq4-xs"
     )
     assert filled.enabled is True
     assert filled.revision == "ab" * 20

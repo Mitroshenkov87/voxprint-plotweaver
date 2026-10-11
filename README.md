@@ -1,6 +1,6 @@
 # VOXPrint AI Plotweaver
 
-VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Oreg. `voxprint-plotweaver-cli --version` prints `0.2.0 RC · build N "Oreg"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Shti. `voxprint-plotweaver-cli --version` prints `0.2.0 RC · build N "Shti"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -8,27 +8,27 @@ VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages.
 - An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
 - A card under 23.5 GB keeps 2 GB free and uses the 16 GB model tier. A card of 23.5 GB or more keeps 3 GB free and uses the 24 GB tier. Settings can override the choice when the card can run it.
 
-The installer includes the app, Python 3.14, the Python dependencies (including voxprint-common 0.1, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. During setup it checks Python, the Vulkan and CUDA llama.cpp runtimes, the NVIDIA driver, and the stock model for this card. Anything missing is installed then, with progress on screen, into the shared suite folder. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
+The installer includes the app, Python 3.14, the Python dependencies (including voxprint-common 0.2.1, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. After the files are copied, setup runs `voxprint-mdl download --app plotweaver --json` and shows that progress. A silent install writes the same events to `%LOCALAPPDATA%\Voxprint\logs\plotweaver-mdl-install.log` on Windows and `~/.local/share/voxprint/logs/plotweaver-mdl-install.log` on Linux, and it does not open a window. A failed download does not fail setup. The app then says the models are not ready and offers Manage models. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
 
 ## Download and install
 
-Release files are on the [v0.2.0-rc6 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc6). Download `SHA256SUMS` with the installer and check it before you run anything.
+Release files are on the project [releases page](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases). Download `SHA256SUMS` with the installer and check it before you run anything.
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc6-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc6-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc6-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc7-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc7-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc7-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs to `C:\Program Files\VOXPrint AI Suite\Plotweaver` and needs administrator rights. The Start menu folder is VOXPrint AI Suite and the shortcut is VOXPrint AI Plotweaver. The window is `voxprint-plotweaver.exe`. `voxprint-plotweaver-cli` is added to PATH. Provisioning fills `%LOCALAPPDATA%\Voxprint\shared` while the setup window is still open. A silent install (`/SILENT` or `/VERYSILENT`) does not open the window. An interactive install offers Launch only after that step has finished.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc6_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc7_amd64.deb
 sudo apt-get install -f
 ```
 
-The package installer runs `voxprint-plotweaver-cli provision` as the user who invoked sudo. That step fills `~/.local/share/voxprint/shared`. It does not open the window.
+The package installer runs `voxprint-plotweaver-cli mdl-progress --quiet --installer` as the user who invoked sudo. That step logs to `~/.local/share/voxprint/logs/plotweaver-mdl-install.log`. It does not open the window, and a failed download does not fail the package.
 
 The menu entry is VOXPrint AI Plotweaver. The files live in `/opt/voxprint-ai-suite/plotweaver`. `voxprint-plotweaver-cli` is on PATH.
 
@@ -36,8 +36,8 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc6-linux-x86_64.tar.gz
-voxprint-plotweaver-cli provision
+sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc7-linux-x86_64.tar.gz
+voxprint-plotweaver-cli mdl-progress --quiet --installer
 ```
 
 An upgrade removes the previous program folder (`%LOCALAPPDATA%\Voxprint\Plotweaver` on Windows, `/opt/voxprint-plotweaver` on Linux), updates the shortcuts and PATH, and keeps models and shared files. `plotweaver` remains on PATH for this release and prints `plotweaver is deprecated; use voxprint-plotweaver-cli`.
@@ -51,11 +51,11 @@ The installer puts shared files in one place:
 
 GGUF weights go in the suite models folder, `<home>/models/llm` (`%LOCALAPPDATA%\Voxprint\models\llm` on Windows, `~/.local/share/voxprint/models/llm` on Linux). `PLOTWEAVER_MODELS` or `VOXPRINT_MODELS_DIR` overrides that folder. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded and a copy left in `shared/models/llm` by an older Plotweaver install. A Forge file whose published name is only the quant, such as `Q5_K_M.gguf`, is stored as the registry id plus that name so two models cannot overwrite each other. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it.
 
-Every launch, and `voxprint-plotweaver-cli --selftest --json`, checks those files and repairs a missing or corrupt one. When something is still missing, the window that opens is the provisioning progress (which model, its size, the speed, and the time left). The main window opens when that step reports ready. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
+Every launch checks whether VOXPrint MDL reports the models ready. The main window opens only then. Otherwise the app shows a short notice and Manage models, which follows `voxprint-mdl download --app plotweaver --json`. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
 
-A card under 23.5 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A card of 23.5 GB or more installs T-pro-it-2.1 only. Setup shows that total, then checks free disk (the file size, plus 10%, plus 2 GB) before each download and stops instead of filling the drive. Each file is checked by revision, size, and SHA-256.
+A card under 23.5 GB installs Gemma 4 12B Q4_K_M plus T-lite-it-2.1 Q4_K_M, and keeps 2 GB of VRAM free. A card of 23.5 GB or more installs T-pro-it-2.1 Q4_K_M only. Setup shows MDL's progress. MDL checks free disk (the file size, plus 10%, plus 2 GB) before the download. Each file is checked by revision, size, and SHA-256.
 
-Least-censored models are a separate download from Settings, and only when a published file fits the card. On 16 GB those are the Forge Qwen 27B Q3_K_M and the Forge abliterated T-lite IQ4_XS and Q5_K_M. On 24 GB the card also offers the Forge Qwen 27B Q5 and the Forge Gemma 31B Q4_K_M. The Gemma 31B IQ3_XXS row stays disabled until `plotweaver models import-forge-manifest` fills it. A Russian book prefers the larger installed Forge T-lite. Plotweaver does not abliterate or quantize weights.
+Least-censored models are optional and stay out of that stock set. On 16 GB the published files are the Forge Qwen 27B Q3_K_M, the Forge abliterated T-lite IQ4_XS and Q5_K_M, and Gemma 4 31B IQ3_XXS. On 24 GB the card also offers the Forge Qwen 27B Q5 and the Forge Gemma 31B Q4_K_M. Manage models downloads the ones that fit. A Russian book prefers the larger installed Forge T-lite. Plotweaver does not abliterate or quantize weights.
 
 Settings also has an advanced VRAM-tier override (Auto, 16 GB, 24 GB). The 24 GB choice stays disabled when the card cannot run a published 24 GB model.
 
@@ -93,7 +93,7 @@ Import `book.vxbook` into Audiobook Builder. Import `book.sound.vxbook` when you
 
 - The setup refuses Windows older than 11 24H2 (build 26100).
 - A GPU whose name does not contain RTX, or whose compute capability is below 8.9, is refused. Install the current NVIDIA driver. On Linux the package also needs the Vulkan loader (`libvulkan1`), which the `.deb` depends on.
-- The first real run needs a network connection and enough free disk for the GGUF files (several gigabytes for the 16 GB tier, more when T-pro is included). A failed download can be started again from the app. Finished files are checked before use.
+- The first real run needs a network connection and enough free disk for the GGUF files (several gigabytes for the 16 GB tier, more when T-pro is included). Manage models can start a failed download again. Finished files are checked before use.
 - Settings says no published least-censored model fits this card when every forge row for the tier is still disabled or too large for the card.
 - `sha256sum -c SHA256SUMS` must succeed before you install. A mismatch means the download is incomplete or not the file this release published.
 - The **Mock model (no GPU)** checkbox writes a deterministic sample without a GPU. It is for a trial of the window, not for a novel you will keep.

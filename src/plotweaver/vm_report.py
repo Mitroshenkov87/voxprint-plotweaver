@@ -98,7 +98,7 @@ def write_summary(root: Path) -> Path:
         _check_line(root / "checks" / "pytest.log", "pytest"),
         _check_line(root / "checks" / "run-dry.json", "run --json --dry-run"),
         _check_line(root / "checks" / "vxbook-dry.json", "vxbook validate --json --dry-run"),
-        _check_line(root / "checks" / "import-dry.json", "import-forge-manifest --json --dry-run"),
+        _check_line(root / "checks" / "mdl-status.json", "voxprint-mdl status --app plotweaver"),
         "",
         "## GPU",
         "",

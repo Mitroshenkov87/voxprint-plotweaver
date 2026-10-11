@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from plotweaver.errors import PlotweaverError
-from plotweaver.fetch import stream_download
+from plotweaver.runtime_fetch import stream_download
 
 
 class _Usage:
@@ -41,7 +41,7 @@ class _Response:
 
 
 def test_disk_short_names_drive_and_sizes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("plotweaver.fetch.shutil.disk_usage", lambda _path: _Usage(1024))
+    monkeypatch.setattr("plotweaver.runtime_fetch.shutil.disk_usage", lambda _path: _Usage(1024))
     dest = tmp_path / "model.gguf"
     with pytest.raises(PlotweaverError, match="Not enough disk space") as caught:
         stream_download(
@@ -77,8 +77,8 @@ def test_empty_partial_is_removed_and_a_partial_can_resume(
             raise httpx.ConnectError("down")
         return _Response(206, [b"def"])
 
-    monkeypatch.setattr("plotweaver.fetch.httpx.stream", fail_then_resume)
-    monkeypatch.setattr("plotweaver.fetch.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("plotweaver.runtime_fetch.httpx.stream", fail_then_resume)
+    monkeypatch.setattr("plotweaver.runtime_fetch.time.sleep", lambda _seconds: None)
     stream_download(
         "http://127.0.0.1/x",
         dest,
@@ -106,8 +106,8 @@ def test_download_retries_ten_times_and_keeps_a_partial(
         calls["n"] += 1
         raise httpx.ConnectError("down")
 
-    monkeypatch.setattr("plotweaver.fetch.httpx.stream", always_down)
-    monkeypatch.setattr("plotweaver.fetch.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("plotweaver.runtime_fetch.httpx.stream", always_down)
+    monkeypatch.setattr("plotweaver.runtime_fetch.time.sleep", lambda _seconds: None)
     with pytest.raises(PlotweaverError, match="Could not download"):
         stream_download(
             "http://127.0.0.1/x",
@@ -132,7 +132,7 @@ def test_download_refuses_a_model_without_a_sha256(
         del method, url, kwargs
         raise AssertionError("download started")
 
-    monkeypatch.setattr("plotweaver.fetch.httpx.stream", fail_if_called)
+    monkeypatch.setattr("plotweaver.runtime_fetch.httpx.stream", fail_if_called)
     for digest in ("", "abc", "AB" * 31):
         with pytest.raises(PlotweaverError, match="no SHA-256"):
             stream_download(

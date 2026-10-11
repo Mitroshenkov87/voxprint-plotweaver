@@ -24,13 +24,24 @@ from voxprint_common.hashing import sha256_file
 
 from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
-from plotweaver.fetch import require_sha256, stream_download
 from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root
 from plotweaver.settings import model_tier_override
 from plotweaver.textio import read_text
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def require_sha256(sha256: str, label: str) -> str:
+    """Refuse a model whose registry entry has no 64-hex SHA-256."""
+    digest = (sha256 or "").strip().lower()
+    if _SHA256.fullmatch(digest) is None:
+        raise PlotweaverError(
+            f"Refusing to download or load {label}. The registry entry has no SHA-256."
+        )
+    return digest
+
+
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
 _BARE_QUANT = re.compile(r"^(?:IQ|Q)[A-Z0-9_]*\.gguf$")
 TIER_16: Literal["16gb"] = "16gb"
@@ -399,11 +410,37 @@ def migrate_generic_weight(folder: Path, entry: RegistryEntry) -> Path | None:
 
 
 def weight_path(folder: Path, entry: RegistryEntry) -> Path:
-    """Installed weight, after a verified generic quant has been renamed by hardlink."""
+    """Installed weight, after a verified generic quant has been renamed by hardlink.
+
+    VOXPrint MDL stores the bytes at ``<models>/blobs/<sha256>``. A missing
+    file in ``folder`` is hardlinked from that blob when the size matches.
+    """
     migrated = migrate_generic_weight(folder, entry)
     if migrated is not None and migrated.is_file():
         return migrated
-    return folder / stored_filename(entry)
+    stored = folder / stored_filename(entry)
+    if stored.is_file():
+        return stored
+    adopted = _adopt_blob(folder, entry)
+    if adopted is not None:
+        return adopted
+    return stored
+
+
+def _adopt_blob(folder: Path, entry: RegistryEntry) -> Path | None:
+    digest = entry.sha256.lower()
+    if len(digest) != 64:
+        return None
+    blob = folder.parent / "blobs" / digest
+    if not blob.is_file() or blob.stat().st_size != entry.size:
+        return None
+    stored = folder / stored_filename(entry)
+    stored.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(blob, stored)
+    except OSError:
+        return blob
+    return stored
 
 
 def download_model(
@@ -413,7 +450,12 @@ def download_model(
     allow_other: bool = False,
     on_progress: Callable[[str], None] | None = None,
 ) -> Path:
-    """Download one enabled registry file into the shared model folder and check it."""
+    """Return one verified local weight. Plotweaver does not download it.
+
+    Missing bytes are fetched by VOXPrint MDL. This function hardlinks a blob
+    MDL already stored and refuses a file that is not there yet.
+    """
+    del on_progress
     if not entry.enabled:
         raise PlotweaverError(
             f"{entry.id} is disabled until Voxprint Model Forge publishes it "
@@ -435,25 +477,18 @@ def download_model(
     if legacy.resolve() != folder.parent.resolve():
         claim_user(legacy)
     local_name = stored_filename(entry)
-    target = folder / local_name
-    migrate_generic_weight(folder, entry)
-    url = (
-        f"https://huggingface.co/{entry.repo}/resolve/{entry.revision}/"
-        f"{entry.filename}?download=true"
-    )
+    target = weight_path(folder, entry)
+    if target.is_file() and target.name != local_name:
+        target = folder / local_name
     if target.is_file():
         try:
             verify_file(target, size=entry.size, sha256=digest)
         except PlotweaverError:
-            target.unlink()
+            if target.is_file() and target.parent == folder:
+                target.unlink()
     if not target.is_file():
-        stream_download(
-            url,
-            target,
-            total=entry.size,
-            on_progress=on_progress,
-            label=local_name,
-            sha256=digest,
+        raise PlotweaverError(
+            f"{entry.id} is not installed. Open Manage models to download it with VOXPrint MDL."
         )
     verify_file(target, size=entry.size, sha256=digest)
     manifest = {

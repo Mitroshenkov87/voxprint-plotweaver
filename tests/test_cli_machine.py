@@ -13,6 +13,7 @@ from plotweaver.cli import main
 from plotweaver.domain import BookRequest, Language
 from plotweaver.export import export_output_names
 from plotweaver.paths import repo_root
+from plotweaver.registry import import_forge_manifest
 from plotweaver.store import Project
 from plotweaver.vxbook import BlockKind, VxBlock, VxChapter, VxSpeaker, write_vxbook
 
@@ -23,7 +24,7 @@ def test_version_flag_is_the_display_label(capsys: pytest.CaptureFixture[str]) -
     assert caught.value.code == 0
     assert capsys.readouterr().out.strip() == version_label()
     assert main(["version"]) == 0
-    assert capsys.readouterr().out.strip() == '0.2.0 RC · build dev "Oreg"'
+    assert capsys.readouterr().out.strip() == '0.2.0 RC · build dev "Shti"'
 
 
 def test_plotweaver_alias_warns_once(
@@ -45,12 +46,12 @@ def test_stamp_replaces_the_dev_marker(tmp_path: Path, monkeypatch: pytest.Monke
     stamped.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     assert stamp_build(stamped, 52) == 52
     monkeypatch.setenv("PLOTWEAVER_BUILD_JSON", str(stamped))
-    assert version_label() == '0.2.0 RC · build 52 "Oreg"'
+    assert version_label() == '0.2.0 RC · build 52 "Shti"'
     final = json.loads(stamped.read_text(encoding="utf-8"))
     final["prerelease"] = None
     final["build"] = 9
     stamped.write_text(json.dumps(final), encoding="utf-8")
-    assert version_label() == '0.2.0 · build 9 "Oreg"'
+    assert version_label() == '0.2.0 · build 9 "Shti"'
 
 
 def test_run_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -145,7 +146,7 @@ def test_models_list_json_shape(capsys: pytest.CaptureFixture[str]) -> None:
     }
 
 
-def test_import_dry_run_does_not_write(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_import_dry_run_does_not_write(tmp_path: Path) -> None:
     registry = tmp_path / "models.toml"
     registry.write_text(
         (repo_root() / "bakeoff" / "models.toml").read_text(encoding="utf-8"),
@@ -158,7 +159,7 @@ def test_import_dry_run_does_not_write(tmp_path: Path, capsys: pytest.CaptureFix
             {
                 "models": [
                     {
-                        "id": "gemma-4-31b-abliterated-iq3-xxs",
+                        "id": "qwen3.6-27b-abliterated-iq4-xs",
                         "revision": "ab" * 20,
                         "sha256": "ab" * 32,
                         "size": 120,
@@ -168,23 +169,9 @@ def test_import_dry_run_does_not_write(tmp_path: Path, capsys: pytest.CaptureFix
         ),
         encoding="utf-8",
     )
-    assert (
-        main(
-            [
-                "models",
-                "import-forge-manifest",
-                str(manifest),
-                "--registry",
-                str(registry),
-                "--dry-run",
-                "--json",
-            ]
-        )
-        == 0
-    )
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["writes"] is False
-    assert payload["models"] == ["gemma-4-31b-abliterated-iq3-xxs"]
+    assert import_forge_manifest(manifest, registry, dry_run=True) == [
+        "qwen3.6-27b-abliterated-iq4-xs"
+    ]
     assert registry.read_bytes() == before
 
 

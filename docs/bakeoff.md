@@ -13,7 +13,7 @@ bash scripts/bakeoff.sh
 That command:
 
 1. Installs Python dependencies if this checkout is not importable yet.
-2. Downloads every enabled GGUF in `bakeoff/models.toml` that fits free VRAM, including the abliterated candidates, into `~/.local/share/voxprint/models/llm`. T-pro is the 24 GB stock drafter. Gemma 4 12B Q4_K_M is the 16 GB stock drafter and the same file Audiobook Builder uses. T-lite-it-2.1 Q4_K_M (5.03 GB) and Q5_K_M (5.85 GB) are the stock 16 GB Russian candidates. Both official GGUFs are Apache-2.0. The Forge T-lite files are a separate in-house ablation, not those stock quants. On 16 GB the enabled least-censored files are Forge Qwen Q3_K_M and both Forge T-lite quants. On 24 GB the bake-off also downloads Forge Qwen Q5 and Forge Gemma 31B Q4_K_M. Disabled placeholders, including Gemma IQ3_XXS, are skipped. Each manifest records the quant licence and the confirmed base licence (Apache-2.0).
+2. Uses the GGUF files VOXPrint MDL has already stored under `~/.local/share/voxprint/models/llm`. T-pro Q4_K_M is the 24 GB stock drafter. Gemma 4 12B Q4_K_M and T-lite-it-2.1 Q4_K_M are the 16 GB stock set. T-lite Q5_K_M is optional and is not stock. On 16 GB the enabled least-censored files include Forge Qwen Q3_K_M, both Forge T-lite quants, and Gemma 4 31B IQ3_XXS. On 24 GB the set also includes Forge Qwen Q5 and Forge Gemma 31B Q4_K_M. Disabled placeholders are skipped. Each manifest records the quant licence and the confirmed base licence (Apache-2.0).
 3. Uses the bundled llama.cpp b11476 Vulkan `llama-server` when the installer shipped one. Otherwise downloads it into the shared `llm/llama.cpp-b11476` tree. An existing Audiobook Builder copy is reused.
 4. Writes every synopsis in `bakeoff/synopses/` as three chapters with dark themes off, one candidate at a time.
 5. Writes them again with dark themes on: T-pro drafts, then each least-censored model fills placeholders in one swap and proofreads. The judge scores every export, including the Russian prose from those dark-scene passes.
@@ -30,15 +30,11 @@ That command:
 | t-lite-it-2.1-abliterated-q5 | 16 GB | Russian least censored | Apache-2.0 | t-tech/T-lite-it-2.1, Apache-2.0 |
 | qwen3.6-27b-abliterated-q5 | 24 GB | least censored | Apache-2.0 | huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF, Apache-2.0 |
 | gemma-4-31b-abliterated-q4 | 24 GB | least censored | Apache-2.0 | paperscarecrow/Gemma-4-31B-it-abliterated, Apache-2.0 |
-| gemma-4-31b-abliterated-iq3-xxs | 16 GB, disabled | least censored placeholder | Apache-2.0 | paperscarecrow/Gemma-4-31B-it-abliterated, Apache-2.0 |
+| gemma-4-31b-abliterated-iq3-xxs | 16 GB, on demand | least censored | Apache-2.0 | paperscarecrow/Gemma-4-31B-it-abliterated, Apache-2.0 |
 
-Stock install is Gemma and both official T-lite quants on 16 GB, plus T-pro on 24 GB. Least censored is a Model Forge file. Qwen Q3_K_M and both Forge T-lite quants fit 16 GB, so Settings shows that download on a 16 GB card. The Forge T-lite card is an ablation, not the official stock GGUF. Its Q5 section used a 24 GB evaluation budget, and the file itself fits 16 GB (min_vram_gb 6.5), so the row stays on 16 GB. Qwen Q5 is 18.5 GB with KV and does not fit 16 GB after 2 GB headroom, so it stays on 24 GB. Gemma Q4 stays on 24 GB at min_vram_gb 18. Gemma IQ3_XXS is named on the card and is not in the pinned revision, so that row stays disabled until `plotweaver models import-forge-manifest` fills it. Other 16 GB fit rows with empty hashes stay disabled. TheDrummer tunes are omitted because their cards have no licence tag.
+Stock install is Gemma 4 12B Q4 and T-lite Q4 on 16 GB, plus T-pro Q4 on 24 GB. Least censored is a Model Forge file. Qwen Q3_K_M, both Forge T-lite quants, and Gemma 4 31B IQ3_XXS fit 16 GB. The Forge T-lite card is an ablation, not the official stock GGUF. Qwen Q5 is 18.5 GB with KV and does not fit 16 GB after 2 GB headroom, so it stays on 24 GB. Gemma Q4 stays on 24 GB at min_vram_gb 18. Other 16 GB fit rows with empty hashes stay disabled. TheDrummer tunes are omitted because their cards have no licence tag.
 
-Fill one placeholder, or several, from a JSON manifest:
-
-```bash
-plotweaver models import-forge-manifest forge-manifest.json
-```
+Manage models asks VOXPrint MDL for an on-demand file. A Forge publication still uses this JSON shape when a row is filled by hand:
 
 ```json
 {

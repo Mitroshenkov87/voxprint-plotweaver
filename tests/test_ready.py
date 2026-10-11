@@ -1,30 +1,35 @@
-"""ensure_ready is the only provisioning result the window needs."""
+"""ensure_ready opens the window only when MDL reports ready."""
 
 from __future__ import annotations
 
-import pytest
+import inspect
+from pathlib import Path
 
-from plotweaver.errors import PlotweaverError
+import pytest
+from voxprint_common.mdl.status import JobState, Status, save_status
+
 from plotweaver.ready import Failed, Ready, ensure_ready
 
 
-def test_ensure_ready_reports_progress(monkeypatch: pytest.MonkeyPatch) -> None:
-    def repair(progress: object) -> list[str]:
-        assert callable(progress)
-        progress("Downloading t-pro (4.0 GB at 10 MB/s). About 1 minute left.")
-        return ["t-pro"]
+def test_mdl_ensure_ready_downloads_so_the_gate_does_not_call_it() -> None:
+    from voxprint_common.mdl.queue import ensure_ready as mdl_ensure_ready
 
-    monkeypatch.setattr("plotweaver.suite.repair_shared", repair)
+    params = list(inspect.signature(mdl_ensure_ready).parameters)
+    assert params == ["app", "progress_cb"]
+
+
+def test_missing_status_is_not_ready(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    notes: list[str] = []
+    result = ensure_ready(notes.append)
+    assert isinstance(result, Failed)
+    assert result.message == "models not ready"
+    assert notes == ["Checking models."]
+
+
+def test_ready_status_opens_the_gate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    save_status(Status(JobState.READY))
     notes: list[str] = []
     assert isinstance(ensure_ready(notes.append), Ready)
-    assert notes == ["Downloading t-pro (4.0 GB at 10 MB/s). About 1 minute left."]
-
-
-def test_ensure_ready_returns_a_sentence(monkeypatch: pytest.MonkeyPatch) -> None:
-    def repair(_progress: object) -> list[str]:
-        raise PlotweaverError("Not enough disk space on C:. Need 8.0 GB, 1.0 GB free.")
-
-    monkeypatch.setattr("plotweaver.suite.repair_shared", repair)
-    result = ensure_ready(lambda _message: None)
-    assert isinstance(result, Failed)
-    assert result.message.startswith("Not enough disk space")
+    assert notes == ["Checking models."]

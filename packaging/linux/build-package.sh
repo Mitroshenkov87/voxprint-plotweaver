@@ -43,9 +43,10 @@ Maintainer: Aleksandr Mitroshenkov <https://github.com/Mitroshenkov87/voxprint-p
 Depends: libglib2.0-0t64 | libglib2.0-0, libegl1, libgl1, libxkbcommon0, libfontconfig1, libdbus-1-3, libx11-6, libxcb1, libvulkan1
 Description: VOXPrint AI Plotweaver
  Local synopsis-to-novel app. Python, dependencies, and llama.cpp b11476
- are included. The package installer runs voxprint-plotweaver-cli provision,
- which fills ~/.local/share/voxprint/shared when something is missing. It does not
- open the window.
+ are included. The package installer runs voxprint-mdl download for
+ plotweaver and logs to ~/.local/share/voxprint/logs/plotweaver-mdl-install.log.
+ A failed download does not fail the package. It does not open the window.
+ Shared files stay under ~/.local/share/voxprint/shared.
 EOF
 
 cat > "$PKG/usr/bin/voxprint-plotweaver-cli" << 'EOF'
@@ -65,9 +66,9 @@ APP=/opt/voxprint-ai-suite/plotweaver
 # Previous releases unpacked here. Shared files and models stay under the home directory.
 rm -rf /opt/voxprint-plotweaver
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
-  su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver provision"
+  su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver mdl-progress --quiet --installer" || true
 else
-  echo "Run voxprint-plotweaver-cli provision as your user to install shared files."
+  echo "Run voxprint-plotweaver-cli mdl-progress --quiet --installer as your user."
 fi
 EOF
 

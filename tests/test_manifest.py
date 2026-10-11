@@ -188,10 +188,6 @@ def test_reuse_links_a_verified_legacy_file(
     users.write_text('{"audiobook-builder": true}\n', encoding="utf-8")
     monkeypatch.setattr("plotweaver.suite.load_registry", lambda _path: [entry])
 
-    def fail_download(*_args: object, **_kwargs: object) -> Path:
-        raise AssertionError("download attempted")
-
-    monkeypatch.setattr("plotweaver.suite.download_model", fail_download)
     notes: list[str] = []
     repaired = repair_shared(notes.append)
     dest = gguf_dir() / entry.filename
@@ -212,27 +208,20 @@ def test_reuse_links_a_verified_legacy_file(
     assert "plotweaver" not in text
 
 
-def test_repair_refetches_a_corrupt_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_repair_drops_a_corrupt_model_without_downloading(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _isolate(monkeypatch, tmp_path)
     entry = _entry()
     dest = gguf_dir() / entry.filename
     dest.parent.mkdir(parents=True)
     dest.write_bytes(b"zzz")
     monkeypatch.setattr("plotweaver.suite.load_registry", lambda _path: [entry])
-    calls: list[str] = []
-
-    def fake_download(item: RegistryEntry, store: Path, **_kwargs: object) -> Path:
-        calls.append(item.id)
-        target = store / item.filename
-        target.write_bytes(b"abc")
-        return target
-
-    monkeypatch.setattr("plotweaver.suite.download_model", fake_download)
     notes: list[str] = []
-    assert repair_shared(notes.append) == [entry.id]
-    assert calls == [entry.id]
-    assert dest.read_bytes() == b"abc"
+    assert repair_shared(notes.append) == []
+    assert not dest.is_file()
     assert any("Repairing" in note for note in notes)
+    assert any("not ready" in note.lower() for note in notes)
 
 
 def test_old_driver_message_links_to_nvidia(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -272,8 +261,12 @@ def test_selftest_json_reports_the_driver(
 def test_installers_provision_the_shared_folder() -> None:
     windows = Path("packaging/windows/plotweaver.iss").read_text(encoding="utf-8")
     linux = Path("packaging/linux/build-package.sh").read_text(encoding="utf-8")
-    assert "plotweaver-provision.cmd" in windows
+    assert "mdl-progress" in windows
+    assert "--quiet" in windows
     assert "release-shared" in windows
-    assert "plotweaver provision" in linux
+    assert "mdl-progress --quiet --installer" in linux
+    assert "plotweaver-mdl-install.log" in linux
     assert "voxprint/shared" in linux
-    assert "plotweaver-provision.sh" in Path("packaging/assemble.py").read_text(encoding="utf-8")
+    assert "mdl-progress --quiet --installer" in Path("packaging/assemble.py").read_text(
+        encoding="utf-8"
+    )

@@ -96,19 +96,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_machine_args(listing)
     listing.set_defaults(func=_models_list)
-    forge = model_commands.add_parser(
-        "import-forge-manifest",
-        help="Enable placeholder rows from a Model Forge JSON manifest.",
-    )
-    forge.add_argument("file", type=Path)
-    forge.add_argument(
-        "--registry",
-        type=Path,
-        default=None,
-        help="Registry file to update. Defaults to bakeoff/models.toml.",
-    )
-    _add_machine_args(forge)
-    forge.set_defaults(func=_import_forge_manifest)
 
     sound = sub.add_parser("sound", help="Add VXBOOK v1.1 + sound extension v1 markup.")
     sound_commands = sound.add_subparsers(dest="sound_command", required=True)
@@ -135,9 +122,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     provision = sub.add_parser(
         "provision",
-        help="Install missing shared files. The installer runs this.",
+        help="Copy the bundled runtime and run VOXPrint MDL. A failed download still exits 0.",
     )
     provision.set_defaults(func=_provision)
+    progress = sub.add_parser(
+        "mdl-progress",
+        help="Show progress from voxprint-mdl download --json. Plotweaver does not download.",
+    )
+    progress.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Write the installer log and do not open a window.",
+    )
+    progress.add_argument(
+        "--installer",
+        action="store_true",
+        help="Exit 0 even when the download fails.",
+    )
+    progress.set_defaults(func=_mdl_progress)
 
     release = sub.add_parser(
         "release-shared",
@@ -382,31 +384,26 @@ def _models_list(args: argparse.Namespace) -> int:
     return _emit(args, payload, "\n".join(lines))
 
 
-def _import_forge_manifest(args: argparse.Namespace) -> int:
-    from plotweaver.registry import import_forge_manifest, registry_path
+def _mdl_progress(args: argparse.Namespace) -> int:
+    from plotweaver.mdl_progress import install_log_path, run_download
 
-    if not args.file.is_file():
-        raise PlotweaverError(f"manifest not found: {args.file}")
-    path = args.registry or registry_path()
-    enabled = import_forge_manifest(args.file, path, dry_run=bool(args.dry_run))
-    payload: dict[str, Any] = {
-        "ok": True,
-        "command": "models.import-forge-manifest",
-        "dry_run": bool(args.dry_run),
-        "code": 0,
-        "registry": str(path.resolve()),
-        "manifest": str(args.file.resolve()),
-        "models": enabled,
-        "writes": not bool(args.dry_run),
-        "actions": [
-            "validate the Model Forge manifest",
-            "enable the listed placeholder rows"
-            if not args.dry_run
-            else "leave the registry unchanged",
-        ],
-    }
-    prefix = "dry-run\n" if args.dry_run else ""
-    return _emit(args, payload, prefix + "\n".join(enabled))
+    log = install_log_path() if args.installer or args.quiet else None
+    if args.quiet:
+        try:
+            code = run_download(log=log)
+        except OSError as exc:
+            print(str(exc), file=sys.stderr)
+            code = 1
+        return 0 if args.installer else code
+    # The dialog imports Qt. A silent install stays on the quiet path above.
+    from plotweaver.mdl_ui import show_progress_dialog
+
+    try:
+        code = show_progress_dialog()
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        code = 1
+    return 0 if args.installer else code
 
 
 def _version(_args: argparse.Namespace) -> int:

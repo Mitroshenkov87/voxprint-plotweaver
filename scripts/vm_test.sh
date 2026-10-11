@@ -52,6 +52,7 @@ pick_python() {
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
   uv venv --python 3.14 "$ROOT/.venv"
+  uv pip install --python "$ROOT/.venv/bin/python" --require-hashes --no-deps -r "$ROOT/packaging/requirements-common.txt"
   uv pip install --python "$ROOT/.venv/bin/python" --find-links "$ROOT/packaging/wheels" -e "$ROOT[dev]" -e "$ROOT/dev/plotweaver_dev"
   echo "$ROOT/.venv/bin/python"
 }
@@ -86,6 +87,35 @@ else
 fi
 
 status=0
+
+stop_plotweaver_llama() {
+  local home="${HOME}/.local/share/voxprint"
+  local install="/opt/voxprint-ai-suite/plotweaver"
+  local pid cmd
+  while read -r pid cmd; do
+    case "$cmd" in
+      "$home"*|"$install"*) kill "$pid" 2>/dev/null || true ;;
+    esac
+  done < <(ps -eo pid=,args= | awk '/llama-server/ && !/awk/')
+}
+trap stop_plotweaver_llama EXIT
+
+mdl_ready() {
+  if [[ "$MOCK" == "1" ]]; then
+    echo skipped > "$OUT/checks/mdl-status.json"
+    return 0
+  fi
+  if ! "$PY" -m voxprint_common.mdl status --app plotweaver --json >"$OUT/checks/mdl-status.json"; then
+    return 1
+  fi
+  PLOTWEAVER_VM_MDL="$OUT/checks/mdl-status.json" "$PY" -c '
+import json, os
+from pathlib import Path
+text = Path(os.environ["PLOTWEAVER_VM_MDL"]).read_text(encoding="utf-8").strip().splitlines()
+payload = json.loads(text[-1]) if text else {}
+raise SystemExit(0 if payload.get("ready") is True else 1)
+'
+}
 
 stamp_copy() {
   local dest="$1"
@@ -286,6 +316,11 @@ if [[ "$SMOKE" == "1" ]]; then
   if ! "$PY" -m plotweaver models list --json >"$OUT/checks/models.json"; then
     status=1
   fi
+  echo "smoke mdl status"
+  if ! mdl_ready; then
+    echo "models not ready" >&2
+    status=1
+  fi
   tier="$(detected_tier_name)" || status=1
   if [[ -n "${tier:-}" && "$status" -eq 0 ]]; then
     echo "smoke book $tier"
@@ -334,21 +369,6 @@ if ! "$PY" -m plotweaver vxbook validate \
   --dry-run --json >"$OUT/checks/vxbook-dry.json"; then
   status=1
 fi
-VM_ROOT="$ROOT" VM_OUT="$OUT/checks" "$PY" -c '
-import json, os
-from pathlib import Path
-root = Path(os.environ["VM_ROOT"])
-out = Path(os.environ["VM_OUT"])
-(out / "models.toml").write_text((root / "bakeoff" / "models.toml").read_text(encoding="utf-8"), encoding="utf-8")
-(out / "forge.json").write_text(json.dumps({"models": [{"id": "gemma-4-31b-abliterated-iq3-xxs", "revision": "ab" * 20, "sha256": "ab" * 32, "size": 1}]}), encoding="utf-8")
-'
-if ! "$PY" -m plotweaver models import-forge-manifest \
-  "$OUT/checks/forge.json" \
-  --registry "$OUT/checks/models.toml" \
-  --dry-run --json >"$OUT/checks/import-dry.json"; then
-  status=1
-fi
-
 echo "screenshots"
 if ! save_shots; then
   status=1
@@ -363,6 +383,7 @@ if ! save_main_window; then
 fi
 
 if [[ "$MOCK" == "1" ]]; then
+  mdl_ready || true
   echo "mock 16 GB pass"
   run_book 16gb || status=1
   echo "mock 24 GB pass"
@@ -377,25 +398,26 @@ else
     status=1
   fi
   if [[ "$status" -eq 0 ]]; then
-    echo "model download"
-    if ! "$PY" -c '
-from plotweaver.hardware import require_supported_gpu
-from plotweaver.install import ensure_default_install, ensure_uncensored_models
-gpu = require_supported_gpu()
-print(f"{gpu.name}: {gpu.free_gb:.1f} of {gpu.total_gb:.1f} GB free")
-print("stock", ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb))
-print("forge", ensure_uncensored_models(total_vram_gb=gpu.total_gb, free_gb=gpu.free_gb))
-' >"$OUT/checks/download.txt"; then
+    echo "mdl status"
+    if ! mdl_ready; then
+      echo "models not ready" >&2
       status=1
     fi
   fi
   if [[ "$status" -eq 0 ]]; then
     echo "16 GB pass"
     run_book 16gb || status=1
-    echo "24 GB pass"
-    run_book 24gb || status=1
-    if [[ -f "$OUT/24gb/project/export/book.vxbook" ]]; then
-      save_shots "$OUT/24gb/project/export" || status=1
+    detected="$(detected_tier_name)" || status=1
+    if [[ "${detected:-}" == "24gb" ]]; then
+      echo "24 GB pass"
+      run_book 24gb || status=1
+      export_dir="$OUT/24gb/project/export"
+    else
+      echo "24 GB pass skipped (card is ${detected:-unknown})"
+      export_dir="$OUT/16gb/project/export"
+    fi
+    if [[ -f "$export_dir/book.vxbook" ]]; then
+      save_shots "$export_dir" || status=1
     fi
     echo "Mars hand-off"
     if ! PLOTWEAVER_MARS_OUT="$OUT/mars" bash "$ROOT/scripts/e2e_mars.sh"; then

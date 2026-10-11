@@ -103,9 +103,9 @@ def test_settings_offers_abliterated_downloads_on_24gb(tmp_path: Path, monkeypat
     window.show()
     window._open_settings()
     assert window.uncensored_models.isEnabled() is True
-    assert window.download_uncensored.isEnabled() is False
+    assert window.manage_models.isEnabled() is True
     window.uncensored_models.setChecked(True)
-    assert window.download_uncensored.isEnabled() is True
+    assert window.manage_models.isEnabled() is True
     window._save_settings()
     assert uncensored_models_preference() is True
     model = window.vram_tier.model()
@@ -197,12 +197,12 @@ def test_suite_icons_and_splash() -> None:
     assert splash_art().is_file()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Oreg"'
+    assert window.about_text() == '0.2.0 RC · build dev "Shti"'
     save = next(
         button
-        for button in window.findChildren(type(window.download_uncensored))
+        for button in window.findChildren(type(window.manage_models))
         if button.text() == "Save"
     )
     assert not save.icon().isNull()
-    assert not window.download_uncensored.icon().isNull()
+    assert not window.manage_models.icon().isNull()
     del app

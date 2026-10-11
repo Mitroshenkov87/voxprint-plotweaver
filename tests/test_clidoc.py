@@ -16,7 +16,7 @@ def test_cli_reference_lists_the_live_commands() -> None:
         "## plotweaver scenario-mars",
         "## plotweaver vxbook validate",
         "## plotweaver models list",
-        "## plotweaver models import-forge-manifest",
+        "## plotweaver mdl-progress",
         "## plotweaver sound add",
         "## plotweaver brief draft",
     ):
