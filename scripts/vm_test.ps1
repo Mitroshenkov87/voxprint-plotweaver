@@ -312,7 +312,7 @@ $code = Invoke-Captured (Join-Path $Out "checks\vxbook-dry.json") "-" @(
 if ($code -ne 0) { $status = 1 }
 $env:VM_ROOT = $Root
 $env:VM_OUT = Join-Path $Out "checks"
-& $Py -c "import json, os; from pathlib import Path; root = Path(os.environ['VM_ROOT']); out = Path(os.environ['VM_OUT']); (out / 'models.toml').write_text((root / 'bakeoff' / 'models.toml').read_text(encoding='utf-8'), encoding='utf-8'); (out / 'forge.json').write_text(json.dumps({'models': [{'id': 'gemma-4-31b-abliterated-iq3-xxs', 'revision': 'pending', 'sha256': 'ab' * 32, 'size': 1}]}), encoding='utf-8')"
+& $Py -c "import json, os; from pathlib import Path; root = Path(os.environ['VM_ROOT']); out = Path(os.environ['VM_OUT']); (out / 'models.toml').write_text((root / 'bakeoff' / 'models.toml').read_text(encoding='utf-8'), encoding='utf-8'); (out / 'forge.json').write_text(json.dumps({'models': [{'id': 'gemma-4-31b-abliterated-iq3-xxs', 'revision': 'ab' * 20, 'sha256': 'ab' * 32, 'size': 1}]}), encoding='utf-8')"
 $code = Invoke-Captured (Join-Path $Out "checks\import-dry.json") "-" @(
     "-m", "plotweaver", "models", "import-forge-manifest",
     (Join-Path $Out "checks\forge.json"),

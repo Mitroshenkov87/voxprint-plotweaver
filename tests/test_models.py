@@ -553,6 +553,18 @@ def test_generic_quant_moves_onto_the_model_id(tmp_path: Path) -> None:
     assert stored_filename(bare) == "t-lite-it-2.1-abliterated-q5-Q5_K_M.gguf"
 
 
+def test_import_forge_manifest_rejects_an_unpinned_revision(tmp_path: Path) -> None:
+    registry = tmp_path / "models.toml"
+    registry.write_text(
+        (repo_root() / "bakeoff" / "models.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    manifest = _manifest(tmp_path, "gemma-4-31b-abliterated-iq3-xxs")
+    with pytest.raises(PlotweaverError, match="40-hex"):
+        import_forge_manifest(manifest, registry, dry_run=True)
+    assert registry.read_bytes() == (repo_root() / "bakeoff" / "models.toml").read_bytes()
+
+
 def test_download_refuses_an_enabled_model_without_a_sha256(tmp_path: Path) -> None:
     payload = b"keep"
     entry = RegistryEntry(

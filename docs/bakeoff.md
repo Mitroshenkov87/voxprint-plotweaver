@@ -45,8 +45,8 @@ plotweaver models import-forge-manifest forge-manifest.json
   "models": [
     {
       "id": "gemma-4-31b-abliterated-iq3-xxs",
-      "revision": "published-revision",
-      "sha256": "64-hex-characters",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "size": 1,
       "repo": "Mitroshenkov87/voxprint-gemma4-31b",
       "filename": "gemma-4-31b-abliterated-IQ3_XXS.gguf",
@@ -56,7 +56,7 @@ plotweaver models import-forge-manifest forge-manifest.json
 }
 ```
 
-`id`, `revision`, `sha256`, and `size` are required. `repo`, `filename`, and `min_vram_gb` are optional. The command enables that row. Stock rows are refused. Re-run it when Model Forge publishes a new hash.
+`id`, `revision`, `sha256`, and `size` are required. `revision` is a 40-hex commit and `sha256` is 64 hex. `repo`, `filename`, and `min_vram_gb` are optional. The command enables that row. Stock rows are refused. Re-run it when Model Forge publishes a new hash.
 
 Results:
 
