@@ -7,12 +7,13 @@ from pathlib import Path
 
 from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import QApplication, QComboBox
+from voxprint_common.ui.splash import HEIGHT, WIDTH, layout
 
 from plotweaver.appinfo import version_label
+from plotweaver.paths import splash_art
 from plotweaver.settings import model_tier_override, uncensored_models_preference
 from plotweaver.ui.i18n import STRINGS
 from plotweaver.ui.icons import ICON_NAMES, suite_icon
-from plotweaver.ui.splash import Splash
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
     CARD_PLAIN,
@@ -190,12 +191,13 @@ def test_suite_icons_and_splash() -> None:
     assert "floppy" not in blob.casefold()
     icon = suite_icon("save", "#f2f2f5")
     assert not icon.isNull()
-    splash = Splash()
-    splash.show()
-    assert splash.version_text == version_label()
+    boxes = layout()
+    assert boxes.width == WIDTH == 960
+    assert boxes.height == HEIGHT == 540
+    assert splash_art().is_file()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Chut"'
+    assert window.about_text() == '0.2.0 RC · build dev "Oreg"'
     save = next(
         button
         for button in window.findChildren(type(window.download_uncensored))
@@ -203,5 +205,4 @@ def test_suite_icons_and_splash() -> None:
     )
     assert not save.icon().isNull()
     assert not window.download_uncensored.icon().isNull()
-    splash.close()
     del app

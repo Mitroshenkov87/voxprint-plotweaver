@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from plotweaver.cli import main
+from plotweaver.errors import PlotweaverError
 from plotweaver.hardware import NVIDIA_DRIVER_PAGE, driver_status
 from plotweaver.install import optional_notice
 from plotweaver.manifest import (
@@ -116,6 +117,48 @@ def test_runtime_tree_is_removed_only_at_zero(
     )
     assert unregister_app(shared, "plotweaver") == ["python-3.14"]
     assert not marker.parent.exists()
+
+
+def test_old_manifest_keeps_other_apps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    shared = shared_dir()
+    shared.mkdir(parents=True)
+    target = shared / "models" / "llm" / "weights.gguf"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"abc")
+    old = {
+        "version": 1,
+        "resources": {
+            "example-model": {
+                "kind": "model",
+                "path": "models/llm",
+                "bytes": 3,
+                "files": {"weights.gguf": _DIGEST},
+                "apps": ["audiobook-builder", "plotweaver"],
+                "refcount": 2,
+                "source": "example/gemma",
+            }
+        },
+    }
+    (shared / "manifest.json").write_text(json.dumps(old), encoding="utf-8")
+    stored = load_manifest(shared)
+    assert stored["example-model"].apps == ("audiobook-builder", "plotweaver")
+    assert stored["example-model"].files["weights.gguf"] == _DIGEST
+    rewritten = json.loads((shared / "manifest.json").read_text(encoding="utf-8"))
+    assert rewritten["schema"] == 1
+    refs = rewritten["components"]["example-model"]["refs"]
+    assert refs == ["audiobook-builder", "plotweaver"]
+    assert unregister_app(shared, "plotweaver") == []
+    assert target.is_file()
+    assert load_manifest(shared)["example-model"].apps == ("audiobook-builder",)
+
+
+def test_mock_flag_names_the_dev_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    import plotweaver.optional_mock as optional_mock
+
+    monkeypatch.setattr(optional_mock, "_factory", None)
+    with pytest.raises(PlotweaverError, match="dev extra"):
+        optional_mock.mock_backend()
 
 
 def test_resource_path_cannot_escape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

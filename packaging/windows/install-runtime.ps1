@@ -3,7 +3,7 @@
 # Downloads uv, installs CPython 3.14, and installs this checkout into a venv.
 # Shared model files under LOCALAPPDATA\Voxprint\models are not touched.
 $ErrorActionPreference = "Stop"
-$AppRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AppRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $AppRoot
 
 $UvDir = Join-Path $env:LOCALAPPDATA "Voxprint\bin"
@@ -18,7 +18,7 @@ if (-not (Test-Path $Uv)) {
 & $Uv python install 3.14
 $Python = Join-Path $AppRoot ".venv\Scripts\python.exe"
 & $Uv venv --python 3.14 (Join-Path $AppRoot ".venv")
-& $Uv pip install --python $Python -e $AppRoot
+& $Uv pip install --python $Python --find-links (Join-Path $AppRoot "packaging\wheels") -e $AppRoot
 if (-not (Test-Path $Python)) {
     throw "Plotweaver venv was not created"
 }

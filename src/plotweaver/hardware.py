@@ -1,7 +1,10 @@
 """NVIDIA detection, the driver minimum, the suite VRAM budget, and the 83 C thermal rule.
 
 The product refuses to start a real job without an NVIDIA RTX 40-series GPU or newer
-(compute capability 8.9 or higher, and "RTX" in the device name). Tests set
+(compute capability 8.9 or higher, and "RTX" in the device name). The card size
+uses voxprint-common's probe: 23.5 GiB and above is the 24 GB tier. The driver
+floor stays 570.117 on Linux and 551.61 on Windows, the CUDA builds this app
+ships. The suite probe's 600-series gate is not used. Tests set
 PLOTWEAVER_FAKE_GPU instead of calling nvidia-smi.
 """
 
@@ -15,6 +18,8 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+
+from voxprint_common.gpu_probe import MIN_COMPUTE, gib_from_mib, query_gpus
 
 from plotweaver.errors import GpuUnsupported
 from plotweaver.ui.i18n import tr
@@ -52,11 +57,11 @@ class GpuInfo:
 
     @property
     def total_gb(self) -> float:
-        return self.total_mib / 1024
+        return gib_from_mib(self.total_mib)
 
     @property
     def free_gb(self) -> float:
-        return self.free_mib / 1024
+        return gib_from_mib(self.free_mib)
 
 
 def vram_headroom_gb(total_gb: float) -> float:
@@ -87,31 +92,17 @@ def query_gpu() -> GpuInfo | None:
     fake = os.environ.get("PLOTWEAVER_FAKE_GPU")
     if fake is not None:
         return _parse_fake(fake)
-    try:
-        proc = subprocess.run(
-            [
-                "nvidia-smi",
-                "--query-gpu=name,compute_cap,memory.total,memory.free",
-                "--format=csv,noheader,nounits",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=8,
-            check=False,
-            creationflags=_NO_WINDOW,
-        )
-    except OSError, subprocess.SubprocessError:
+    devices = query_gpus()
+    if not devices:
         return None
-    line = (proc.stdout or "").strip().splitlines()
-    if proc.returncode != 0 or not line:
+    gpu = devices[0]
+    if gpu.memory_mib is None or gpu.compute is None:
         return None
-    parts = [part.strip() for part in line[0].split(",")]
-    if len(parts) < 4:
+    free = _query_free_mib()
+    if free is None:
         return None
-    try:
-        return GpuInfo(parts[0], float(parts[1]), float(parts[2]), float(parts[3]))
-    except ValueError:
-        return None
+    major, minor = gpu.compute
+    return GpuInfo(gpu.name, float(f"{major}.{minor}"), float(gpu.memory_mib), free)
 
 
 @dataclass(frozen=True)
@@ -187,7 +178,35 @@ def _parse_fake_holders(raw: str) -> list[VramHolder]:
 
 def is_supported(info: GpuInfo) -> bool:
     """RTX 40-series (Ada, sm_89) or a newer RTX card."""
-    return info.compute_cap >= MIN_COMPUTE_CAP and "RTX" in info.name.upper()
+    major = int(info.compute_cap)
+    minor = int(round((info.compute_cap - major) * 10))
+    return (major, minor) >= MIN_COMPUTE and "RTX" in info.name.upper()
+
+
+def _query_free_mib() -> float | None:
+    """Free VRAM in MiB. The shared probe reports total memory only."""
+    try:
+        proc = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+            creationflags=_NO_WINDOW,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    line = (proc.stdout or "").strip().splitlines()
+    if proc.returncode != 0 or not line:
+        return None
+    try:
+        return float(line[0].split(",")[0].strip())
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)

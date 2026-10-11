@@ -17,6 +17,10 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from voxprint_common.runtime_manifest import cpu_onnxruntime_conflicts
+from voxprint_common.selftest import Check
+from voxprint_common.selftest import document as checks_document
+
 from plotweaver.appinfo import version_label
 from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
@@ -114,7 +118,20 @@ def selftest_report() -> dict[str, object]:
     resources = _resource_rows()
     if any(not bool(row["ok"]) for row in resources):
         error = error or "A shared file is missing or does not match its checksum."
-    ok = error == "" and status.ok
+    conflict = cpu_onnxruntime_conflicts()
+    onnx_detail = "CPU onnxruntime shadows onnxruntime-gpu" if conflict else ""
+    if conflict:
+        notes.append(
+            "CPU onnxruntime is installed. The shared runtime allows onnxruntime-gpu only."
+        )
+    ok = error == "" and status.ok and not conflict
+    checks = [
+        Check("driver", status.ok, status.message),
+        Check("shared", error == "", error),
+        Check("onnxruntime", not conflict, onnx_detail),
+    ]
+    for row in resources:
+        checks.append(Check(f"resource:{row['id']}", bool(row["ok"]), str(row["detail"])))
     return {
         "ok": ok,
         "version": version_label(),
@@ -128,6 +145,7 @@ def selftest_report() -> dict[str, object]:
         "repaired": repaired,
         "messages": notes,
         "resources": resources,
+        "checks": checks_document(checks)["checks"],
     }
 
 

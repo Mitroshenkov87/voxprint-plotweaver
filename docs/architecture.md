@@ -1,6 +1,6 @@
 # Architecture
 
-Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Chut, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. `docs/vm-test.md` is the short RTX 4090 check.
+Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Oreg, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. `docs/vm-test.md` is the short RTX 4090 check.
 
 ## Pipeline
 
@@ -19,7 +19,7 @@ Without `--yes`, autopilot stops after the bible and after the outline. Copilot 
 
 `llama-server` from llama.cpp b11476 (MIT, not vendored in git) serves an OpenAI-compatible completion on localhost. The installer prefers the CUDA build when the driver is new enough (Linux 570.117, Windows 551.61) and otherwise uses the Vulkan build Audiobook Builder pins. Both trees live in `<shared>/runtime`. The full installer also ships the Vulkan tree beside the app and copies it into the shared folder when that copy is missing. GGUF weights live in `<shared>/models/llm`. A file already stored under the older `<home>/models/llm` path, including Gemma 4 12B Q4_K_M, is hard-linked when its size and SHA-256 match and is not fetched again. `shared/manifest.json` records which apps use each resource. `<home>/models/.users.json` still records `plotweaver` next to the other suite apps. See `docs/shared.md`. The VRAM budget is free memory minus the larger of 2 GB and 8 percent of the card. `PLOTWEAVER_VRAM_BUDGET_CAP_GB` lowers that budget further, which is how the VM test emulates a 16 GB card on a 24 GB GPU. `PLOTWEAVER_METRICS`, when set to a file path, appends one JSON line per llama-server completion. If the weights do not fit, layers move to RAM; a mixture-of-experts model uses `--n-cpu-moe` instead. A spill halves context (floor 4096) and the batch. The KV cache is q8_0 only when the leftover after weights is above 3 GB and nothing spilled.
 
-The suite lock `%TEMP%/voxprint-gpu.lock` is JSON `{owner, pid, job, started, eta}` in UTC. Owner is `plotweaver`. The same process may re-enter. The lock is stale when the pid is gone or the eta is more than two hours in the past. It is held for the whole book and released when the run returns, including a run that is waiting at a gate.
+The suite lock `%TEMP%/voxprint-gpu.lock` is JSON `{app, stage, pid, started, eta}` in UTC. `app` is `plotweaver`. Older files that say `owner` and `job` are still accepted. The same process may re-enter. The lock is stale when the pid is gone or the eta is more than two hours in the past. It is held for the whole book and released when the run returns, including a run that is waiting at a gate.
 
 ## Dark themes
 

@@ -1,10 +1,19 @@
-"""Checkout root, the shared suite folder, and the suite settings file."""
+"""Checkout root, the shared suite folder, and the suite settings file.
+
+Suite home and the shared directory come from voxprint-common. Model files stay
+under ``<shared>/models`` (override ``PLOTWEAVER_MODELS``). voxprint-common's
+``models_dir()`` defaults to ``<home>/models``, which this app still reads as
+the older Audiobook Builder folder and does not use as the primary store.
+"""
 
 from __future__ import annotations
 
 import os
 import sys
 from pathlib import Path
+
+from voxprint_common.paths import home, state_dir
+from voxprint_common.paths import shared_dir as suite_shared_dir
 
 
 def _marked_root(start: Path) -> Path | None:
@@ -33,27 +42,13 @@ def repo_root() -> Path:
 
 
 def voxprint_home() -> Path:
-    """Suite home. ``VOXPRINT_HOME`` replaces the platform default.
-
-    Windows uses ``%LOCALAPPDATA%\\Voxprint``. Linux uses
-    ``$XDG_DATA_HOME/voxprint`` when that variable is set, otherwise
-    ``~/.local/share/voxprint``.
-    """
-    override = os.environ.get("VOXPRINT_HOME")
-    if override:
-        return Path(override)
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA")
-        root = Path(base) if base else Path.home() / "AppData" / "Local"
-        return root / "Voxprint"
-    data = os.environ.get("XDG_DATA_HOME")
-    base = Path(data) if data else Path.home() / ".local" / "share"
-    return base / "voxprint"
+    """Suite home. ``VOXPRINT_HOME`` replaces the platform default."""
+    return home()
 
 
 def shared_dir() -> Path:
     """Versioned suite folder: ``runtime/``, ``models/``, and ``tools/``."""
-    return voxprint_home() / "shared"
+    return suite_shared_dir()
 
 
 def shared_runtime_dir() -> Path:
@@ -88,11 +83,7 @@ def suite_state_dir() -> Path:
     override = os.environ.get("PLOTWEAVER_STATE")
     if override:
         return Path(override)
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA")
-        root = Path(base) if base else Path.home() / "AppData" / "Local"
-        return root / "Voxprint" / "state"
-    return Path.home() / ".local" / "share" / "voxprint" / "state"
+    return state_dir()
 
 
 def gguf_dir() -> Path:
@@ -118,3 +109,11 @@ def llama_cuda_dir() -> Path:
     if override:
         return Path(override)
     return shared_runtime_dir() / "llama.cpp-b11476-cuda"
+
+
+def splash_art() -> Path:
+    """Approved splash image. The packaged file wins, then ``assets/splash.jpg``."""
+    packaged = Path(__file__).resolve().parent / "data" / "splash.jpg"
+    if packaged.is_file():
+        return packaged
+    return repo_root() / "assets" / "splash.jpg"

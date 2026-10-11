@@ -1,0 +1,16 @@
+[project]
+name = "plotweaver-dev"
+version = "0.2.0"
+description = "Dev-only mock backend for Voxprint Plotweaver. Excluded from the app wheel and the installers."
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+plotweaver_dev = ["py.typed"]

@@ -1,24 +1,32 @@
-"""Atomic JSON and text writes so a crash never leaves a half file."""
+"""Atomic JSON and text writes so a crash never leaves a half file.
+
+The publish and the lock are voxprint-common. ``read_json`` stays here.
+"""
 
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
+from voxprint_common.atomic import (
+    LockTimeout,
+    exclusive_lock,
+    replace,
+    write_bytes,
+    write_json,
+    write_text,
+)
 
-def write_text(path: Path, text: str) -> None:
-    """Replace a text file by writing a temporary file and renaming it."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8", newline="\n")
-    os.replace(tmp, path)
-
-
-def write_json(path: Path, payload: Any) -> None:
-    """Write a JSON file the same way as write_text."""
-    write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+__all__ = [
+    "LockTimeout",
+    "exclusive_lock",
+    "read_json",
+    "replace",
+    "write_bytes",
+    "write_json",
+    "write_text",
+]
 
 
 def read_json(path: Path) -> Any:

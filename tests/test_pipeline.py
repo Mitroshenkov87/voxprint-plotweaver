@@ -5,8 +5,10 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+from plotweaver_dev.mock import MockBackend
+
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
-from plotweaver.llm import MockBackend, Task
+from plotweaver.llm import Task
 from plotweaver.runner import run_book
 from plotweaver.store import Project
 from plotweaver.vxbook import legacy_pair, validate_vxbook

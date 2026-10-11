@@ -64,11 +64,18 @@ pick_python() {
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
   uv venv --python 3.14 "$ROOT/.venv"
-  uv pip install --python "$ROOT/.venv/bin/python" -e "$ROOT"
+  uv pip install --python "$ROOT/.venv/bin/python" --find-links "$ROOT/packaging/wheels" -e "$ROOT"
   echo "$ROOT/.venv/bin/python"
 }
 
 PY="$(pick_python)"
+if [[ "$MOCK" == "1" ]] && ! "$PY" -c "import plotweaver_dev" >/dev/null 2>&1; then
+  if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+  fi
+  uv pip install --python "$PY" -e "$ROOT/dev/plotweaver_dev"
+fi
 "$PY" -m plotweaver scenario-mars --yes --export-dir "$OUT" --project "$OUT/project" "${ARGS[@]+"${ARGS[@]}"}"
 SOUND_ARGS=()
 if [[ "$MOCK" == "1" ]]; then

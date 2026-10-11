@@ -50,7 +50,8 @@ from plotweaver.hardware import query_gpu, require_supported_gpu
 from plotweaver.install import ensure_uncensored_models, prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
-from plotweaver.llm import LLMBackend, MockBackend
+from plotweaver.llm import LLMBackend
+from plotweaver.optional_mock import mock_backend
 from plotweaver.registry import (
     TierName,
     detected_tier,
@@ -134,7 +135,7 @@ class _RunThread(QThread):
 
 def _backend(mock: bool) -> LLMBackend:
     if mock:
-        return MockBackend()
+        return mock_backend()
     require_supported_gpu()
     return LlamaServer(ensure_llama_server())
 

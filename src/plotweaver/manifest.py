@@ -1,36 +1,46 @@
-"""Shared suite manifest.
+"""Shared suite manifest, schema 1, via voxprint-common.
 
-The file is ``manifest.json`` inside the shared directory, version 1, the same
-shape Canvas writes. A resource records its files, their SHA-256 hashes, and
-the apps that use it. ``refcount`` is the number of those apps. Uninstall
-deletes a resource only when that count reaches zero.
+The file is ``shared/manifest.json``. Top-level keys are ``schema`` and
+``components``. An older Plotweaver file (``version`` plus ``resources`` plus
+``apps``) is migrated on first read. Other apps' refs are kept. Unknown keys
+are kept. This module still deletes the bytes when the last ref leaves,
+which the shared library does not do.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
-import os
+import re
 import shutil
-import time
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from voxprint_common.atomic import exclusive_lock, write_json
+from voxprint_common.hashing import sha256_bytes, sha256_file
+from voxprint_common.runtime_manifest import (
+    ManifestError as CommonManifestError,
+)
+from voxprint_common.runtime_manifest import (
+    add_ref,
+    load,
+    lock_path,
+    remove_ref,
+)
+
 from plotweaver.errors import PlotweaverError
 
-MANIFEST_VERSION = 1
 MANIFEST_NAME = "manifest.json"
 APP_ID = "plotweaver"
+_SHA = re.compile(r"^[a-f0-9]{64}$")
 
 
 class ManifestError(PlotweaverError):
-    """The shared manifest could not be read."""
+    """The shared manifest could not be read or updated."""
 
 
 @dataclass(frozen=True)
 class Resource:
-    """One shared file set."""
+    """One shared file set, as Plotweaver's repair and uninstall still see it."""
 
     kind: str
     path: str
@@ -50,71 +60,47 @@ def manifest_path(shared: Path) -> Path:
     return shared / MANIFEST_NAME
 
 
+def file_sha256(path: Path) -> str:
+    """SHA-256 of one file, lowercase hex."""
+    return sha256_file(path)
+
+
 def load_manifest(shared: Path) -> dict[str, Resource]:
-    """Resources in the manifest. A missing file is an empty map."""
+    """Resources in the manifest. A missing file is an empty map.
+
+    A pre-schema-1 file is rewritten in place. Refs that belong to other apps
+    stay on the component.
+    """
     path = manifest_path(shared)
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError) as exc:
-        raise ManifestError("manifest.json could not be read") from exc
-    if not isinstance(data, dict) or int(data.get("version") or 0) != MANIFEST_VERSION:
-        raise ManifestError("manifest.json has an unknown version")
-    raw = data.get("resources")
-    if not isinstance(raw, dict):
-        raise ManifestError("manifest.json has no resources")
+        document = load(path)
+    except CommonManifestError as exc:
+        raise ManifestError(str(exc)) from exc
     resources: dict[str, Resource] = {}
-    for key, row in raw.items():
-        if not isinstance(row, dict):
-            raise ManifestError("a resource entry is not an object")
-        apps = tuple(str(item) for item in row.get("apps") or [])
-        files = row.get("files") or {}
-        if not isinstance(files, dict):
-            raise ManifestError("a resource file map is not an object")
+    for key, component in document.components.items():
+        files = component.extra.get("files")
+        mapped = (
+            {str(name): str(digest) for name, digest in files.items()}
+            if isinstance(files, dict)
+            else {}
+        )
+        raw_bytes = component.extra.get("bytes", component.extra.get("nbytes", 0))
+        try:
+            nbytes = int(raw_bytes) if isinstance(raw_bytes, int | float | str) else 0
+        except ValueError:
+            nbytes = 0
+        source = component.extra.get("source", "")
         resources[str(key)] = Resource(
-            kind=str(row.get("kind") or ""),
-            path=_safe_relative(str(row.get("path") or ".")),
-            nbytes=int(row.get("bytes") or 0),
-            files={str(name): str(digest) for name, digest in files.items()},
-            apps=apps,
-            source=str(row.get("source") or ""),
+            kind=component.kind,
+            path=component.path or ".",
+            nbytes=nbytes,
+            files=mapped,
+            apps=tuple(component.refs),
+            source=source if isinstance(source, str) else "",
         )
     return resources
-
-
-def save_manifest(shared: Path, resources: dict[str, Resource]) -> None:
-    """Write the manifest atomically."""
-    body = {
-        "version": MANIFEST_VERSION,
-        "resources": {
-            key: {
-                "kind": resource.kind,
-                "path": resource.path,
-                "bytes": resource.nbytes,
-                "files": resource.files,
-                "apps": list(resource.apps),
-                "refcount": resource.refcount,
-                "source": resource.source,
-            }
-            for key, resource in sorted(resources.items())
-        },
-    }
-    path = manifest_path(shared)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.tmp")
-    tmp.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
-    try:
-        for attempt in range(10):
-            try:
-                os.replace(tmp, path)
-                return
-            except PermissionError:
-                time.sleep(0.01 * (attempt + 1))
-        raise ManifestError(f"cannot replace {path.name}")
-    finally:
-        if tmp.exists():
-            tmp.unlink()
 
 
 def register_resource(
@@ -128,41 +114,49 @@ def register_resource(
     app: str = APP_ID,
     source: str = "",
 ) -> None:
-    """Record one resource and add ``app`` to it."""
-    resources = load_manifest(shared)
-    current = resources.get(resource_id)
-    apps = (app,) if current is None else tuple(dict.fromkeys((*current.apps, app)))
-    resources[resource_id] = Resource(
-        kind=kind,
-        path=_safe_relative(path),
-        nbytes=nbytes,
-        files=dict(files),
-        apps=apps,
-        source=source,
-    )
-    save_manifest(shared, resources)
+    """Record one component and add ``app`` to its refs."""
+    target = manifest_path(shared)
+    digest = _digest(files)
+    version = "1"
+    if target.is_file():
+        try:
+            current = load(target).components.get(resource_id)
+        except CommonManifestError as exc:
+            raise ManifestError(str(exc)) from exc
+        if current is not None and current.sha256 == digest:
+            version = current.version or "1"
+    try:
+        add_ref(
+            resource_id,
+            app,
+            kind=kind,
+            version=version,
+            path=path,
+            sha256=digest,
+            manifest=target,
+        )
+    except CommonManifestError as exc:
+        raise ManifestError(str(exc)) from exc
+    _remember(target, resource_id, files, nbytes, source)
 
 
 def unregister_app(shared: Path, app: str = APP_ID) -> list[str]:
-    """Drop ``app``. Delete a resource, and its files, only at refcount zero."""
-    resources = load_manifest(shared)
-    kept: dict[str, Resource] = {}
+    """Drop ``app``. Delete a component's files only when its refs become empty."""
+    target = manifest_path(shared)
+    if not target.is_file():
+        return []
+    stored = load_manifest(shared)
     removed: list[str] = []
-    for key, resource in resources.items():
-        apps = tuple(item for item in resource.apps if item != app)
-        if resource.apps and not apps:
+    for key, resource in stored.items():
+        if app not in resource.apps:
+            continue
+        if resource.refcount == 1:
             _delete_files(shared, resource)
             removed.append(key)
-            continue
-        kept[key] = Resource(
-            resource.kind,
-            resource.path,
-            resource.nbytes,
-            resource.files,
-            apps,
-            resource.source,
-        )
-    save_manifest(shared, kept)
+        try:
+            remove_ref(key, app, manifest=target)
+        except CommonManifestError as exc:
+            raise ManifestError(str(exc)) from exc
     return removed
 
 
@@ -185,19 +179,34 @@ def broken_files(shared: Path, resource: Resource) -> list[str]:
     return broken
 
 
-def file_sha256(path: Path) -> str:
-    """SHA-256 of one file, lowercase hex."""
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _digest(files: dict[str, str]) -> str:
+    if len(files) == 1:
+        only = str(next(iter(files.values()))).strip().lower()
+        if _SHA.fullmatch(only):
+            return only
+    return sha256_bytes(json.dumps(files, sort_keys=True, ensure_ascii=False).encode("utf-8"))
 
 
-def _safe_relative(path: str) -> str:
-    if not path or path.startswith(("/", "\\")) or ".." in Path(path).parts:
-        raise ManifestError("a resource path must stay inside the shared folder")
-    return Path(path).as_posix()
+def _remember(
+    path: Path,
+    resource_id: str,
+    files: dict[str, str],
+    nbytes: int,
+    source: str,
+) -> None:
+    with exclusive_lock(lock_path(path)):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        components = payload.get("components")
+        if not isinstance(components, dict) or resource_id not in components:
+            raise ManifestError(f"{resource_id} was not recorded")
+        row = components[resource_id]
+        if not isinstance(row, dict):
+            raise ManifestError(f"{resource_id} is not an object")
+        row["files"] = dict(files)
+        row["bytes"] = nbytes
+        if source:
+            row["source"] = source
+        write_json(path, payload)
 
 
 def _resource_dir(shared: Path, resource: Resource) -> Path:
