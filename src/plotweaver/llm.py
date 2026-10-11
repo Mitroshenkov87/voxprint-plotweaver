@@ -1,16 +1,28 @@
-"""Model call types, JSON completion with one repair, and the deterministic mock."""
+"""Model call types, JSON completion with one grammar retry, and the deterministic mock."""
 
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from plotweaver.domain import Task
 from plotweaver.errors import ModelOutputError, assert_never
-from plotweaver.jsontext import parse_json_object
+from plotweaver.jsontext import load_json_object
 from plotweaver.sound import mock_sound_document
+
+_LOG = logging.getLogger("plotweaver.llm")
+JSON_SCHEMA_FORMAT: dict[str, object] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "plotweaver_object",
+        "strict": False,
+        "schema": {"type": "object", "additionalProperties": True},
+    },
+}
 
 
 @dataclass
@@ -63,6 +75,7 @@ class LLMBackend(Protocol):
         temperature: float,
         max_tokens: int,
         json_mode: bool,
+        response_format: Mapping[str, object] | None = None,
     ) -> Completion:
         """One non-streaming completion."""
 
@@ -85,27 +98,30 @@ def complete_json(
     temperature: float,
     max_tokens: int,
 ) -> dict[str, object]:
-    """Ask for JSON. One repair call if the first reply does not parse. No further retries."""
+    """Ask for JSON. One grammar retry, then a lenient repair, then fail.
+
+    The log line names the path that succeeded: ``json_object``, ``repaired``,
+    ``json_schema``, or ``json_schema-repaired``.
+    """
     first = backend.complete(
         messages, temperature=temperature, max_tokens=max_tokens, json_mode=True
     )
-    parsed = parse_json_object(first.text)
+    parsed, how = load_json_object(first.text)
     if parsed is not None:
+        _LOG.info("JSON step succeeded via %s", "repaired" if how == "repaired" else "json_object")
         return parsed
-    original = messages[-1].content if messages else ""
-    repair = [
-        *messages,
-        ChatMessage("assistant", first.text),
-        ChatMessage(
-            "user",
-            original
-            + "\n\nYour previous reply was not a JSON object. Return one JSON object only.",
-        ),
-    ]
-    second = backend.complete(repair, temperature=0.2, max_tokens=max_tokens, json_mode=True)
-    parsed = parse_json_object(second.text)
+    second = backend.complete(
+        messages,
+        temperature=0.2,
+        max_tokens=max_tokens,
+        json_mode=True,
+        response_format=JSON_SCHEMA_FORMAT,
+    )
+    parsed, how = load_json_object(second.text)
     if parsed is None:
         raise ModelOutputError("the model did not return JSON")
+    label = "json_schema" if how == "plain" else "json_schema-repaired"
+    _LOG.info("JSON step succeeded via %s", label)
     return parsed
 
 
@@ -162,8 +178,9 @@ class MockBackend:
         temperature: float,
         max_tokens: int,
         json_mode: bool,
+        response_format: Mapping[str, object] | None = None,
     ) -> Completion:
-        del temperature, max_tokens, json_mode
+        del temperature, max_tokens, json_mode, response_format
         user = ""
         for message in reversed(messages):
             if message.role == "user":

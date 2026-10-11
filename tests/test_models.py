@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from plotweaver.paths import (
     shared_tools_dir,
 )
 from plotweaver.registry import (
+    RegistryEntry,
     bakeoff_skip_reason,
     claim_user,
     detected_tier,
@@ -29,10 +31,13 @@ from plotweaver.registry import (
     load_registry,
     model_offered,
     resolve_tier,
+    stored_filename,
+    tier_capacity_gb,
     tier_headroom_gb,
     tier_option_enabled,
     uncensored_offer_allowed,
     usable_vram_gb,
+    weight_path,
 )
 from plotweaver.settings import (
     model_tier_override,
@@ -255,15 +260,25 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert tier_headroom_gb(24) == 3
     assert usable_vram_gb(16, 16) == 14
     assert detected_tier(16) == "16gb"
+    assert detected_tier(23.4) == "16gb"
+    assert detected_tier(23.99) == "24gb"
     assert detected_tier(24) == "24gb"
+    assert tier_headroom_gb(23.99) == 3
     assert resolve_tier(16, "24gb") == "16gb"
+    assert resolve_tier(23.4, "24gb") == "16gb"
+    assert resolve_tier(23.99, "24gb") == "24gb"
     assert resolve_tier(24, "16gb") == "16gb"
+    assert tier_option_enabled("24gb", total_gb=23.99, free_gb=2) is True
     assert tier_option_enabled("24gb", total_gb=16, free_gb=14) is False
     assert tier_option_enabled("24gb", total_gb=24, free_gb=20) is True
     assert uncensored_offer_allowed(16) is True
     assert uncensored_offer_allowed(20) is True
     assert uncensored_offer_allowed(24) is True
-    assert uncensored_offer_allowed(8, 3) is False
+    assert uncensored_offer_allowed(8, 3) is True
+    assert uncensored_offer_allowed(6, 1) is False
+    t_pro_early = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
+    assert model_offered(t_pro_early, total_gb=23.99, free_gb=10) is True
+    assert tier_capacity_gb(23.99) >= t_pro_early.min_vram_gb
     qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
     assert qwen.optional is True and qwen.uncensored is True
     assert qwen.tier == "24gb"
@@ -302,7 +317,7 @@ def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> N
     )
     assign_book_models(small, free_gb=16, total_gb=16, store=tmp_path)
     assert small.main_model_id == "gemma-4-12b-it-q4"
-    (tmp_path / qwen_q3.filename).write_bytes(b"3")
+    (tmp_path / stored_filename(qwen_q3)).write_bytes(b"3")
     fitted = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
     assign_book_models(fitted, free_gb=14, total_gb=16, store=tmp_path)
     assert fitted.main_model_id == "gemma-4-12b-it-q4"
@@ -340,7 +355,7 @@ def test_uncensored_download_is_separate_from_the_default_install(
     def fake_download(entry, store, *, allow_other: bool = False, on_progress=None):  # noqa: ANN001
         del allow_other, on_progress
         downloaded.append(entry.id)
-        target = store / entry.filename
+        target = store / stored_filename(entry)
         target.write_bytes(b"x")
         return target
 
@@ -353,7 +368,7 @@ def test_uncensored_download_is_separate_from_the_default_install(
     assert "t-pro-it-2.1-q4" in downloaded
     assert "mistral-small-3.2-24b-q4" not in downloaded
     with pytest.raises(PlotweaverError, match="least-censored"):
-        ensure_uncensored_models(total_vram_gb=8, free_gb=3, store=tmp_path)
+        ensure_uncensored_models(total_vram_gb=6, free_gb=1, store=tmp_path)
     assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 3
     assert "qwen3.6-27b-abliterated-q5" not in downloaded
     assert "qwen3.6-27b-abliterated-q3-k-m" in downloaded
@@ -394,7 +409,7 @@ def test_russian_book_prefers_the_forge_t_lite(tmp_path: Path) -> None:
             "t-lite-it-2.1-abliterated-iq4-xs",
             "t-lite-it-2.1-abliterated-q5",
         }:
-            (tmp_path / entry.filename).write_bytes(b"x")
+            (tmp_path / stored_filename(entry)).write_bytes(b"x")
     russian_book = BookRequest(
         title="T",
         language=Language.RU,
@@ -460,6 +475,49 @@ def test_import_forge_manifest_enables_one_placeholder(tmp_path: Path) -> None:
         )
     with pytest.raises(PlotweaverError, match="not in the registry"):
         import_forge_manifest(_manifest(tmp_path, "missing-model"), registry)
+
+
+def test_short_vram_names_the_holder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("PLOTWEAVER_FAKE_VRAM_HOLDERS", "4242,llama-server.exe,20000")
+    request = BookRequest(title="T", language=Language.EN, synopsis="s")
+    with pytest.raises(PlotweaverError, match=r"llama-server.exe \(pid 4242, 20000 MiB\)"):
+        assign_book_models(request, free_gb=1, total_gb=4, store=tmp_path)
+
+
+def test_generic_quant_moves_onto_the_model_id(tmp_path: Path) -> None:
+    payload = b"weight"
+    digest = hashlib.sha256(payload).hexdigest()
+    entry = RegistryEntry(
+        id="qwen3.6-27b-abliterated-q3-k-m",
+        role="least-censored",
+        repo="example/forge",
+        filename="Q3_K_M.gguf",
+        sha256=digest,
+        size=len(payload),
+        license="apache-2.0",
+        min_vram_gb=13,
+        context=8192,
+        moe=False,
+        notes="",
+    )
+    generic = tmp_path / "Q3_K_M.gguf"
+    generic.write_bytes(payload)
+    path = weight_path(tmp_path, entry)
+    assert path.name == "qwen3.6-27b-abliterated-q3-k-m-Q3_K_M.gguf"
+    assert path.read_bytes() == payload
+    assert not generic.exists()
+    stock = next(
+        item
+        for item in load_registry(repo_root() / "bakeoff" / "models.toml")
+        if item.id == "gemma-4-12b-it-q4"
+    )
+    assert stored_filename(stock) == stock.filename
+    bare = next(
+        item
+        for item in load_registry(repo_root() / "bakeoff" / "models.toml")
+        if item.id == "t-lite-it-2.1-abliterated-q5"
+    )
+    assert stored_filename(bare) == "t-lite-it-2.1-abliterated-q5-Q5_K_M.gguf"
 
 
 def _manifest(folder: Path, model_id: str) -> Path:

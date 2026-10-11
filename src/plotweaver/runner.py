@@ -43,7 +43,7 @@ from plotweaver.references import compare_texts, measure_style, read_reference
 from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.textutil import prepare_prose
-from plotweaver.vxbook import build_character_speakers, even_utc_now, name_key
+from plotweaver.vxbook import build_character_speakers, emitted_chapter_id, even_utc_now, name_key
 
 Progress = Any
 
@@ -180,6 +180,14 @@ class _Engine:
         self.rewrites = 0
 
     def run(self) -> RunResult:
+        try:
+            return self._run()
+        except BaseException:
+            self.backend.unload()
+            self.resident = None
+            raise
+
+    def _run(self) -> RunResult:
         request = attach_context(self.project.request())
         main, low = _specs(request)
         self._use(main)
@@ -215,14 +223,21 @@ class _Engine:
             chapters = outline.get("chapters")
             if not isinstance(chapters, list) or not chapters:
                 raise ModelOutputError("the outline has no chapters")
+            rows = [item for item in chapters if isinstance(item, dict)]
+            _normalise_chapter_ids(rows)
+            outline["chapters"] = rows
             self.project.write_artefact("outline.json", outline)
             self.ck.mark("outline")
         if self._wait("outline"):
             return self._waiting("outline")
         outline = _obj(self.project.read_artefact("outline.json"))
         chapters = [item for item in _list(outline.get("chapters")) if isinstance(item, dict)]
+        if _normalise_chapter_ids(chapters):
+            outline["chapters"] = chapters
+            self.project.write_artefact("outline.json", outline)
         for index, chapter in enumerate(chapters, start=1):
-            chapter_id = str(chapter.get("id") or f"ch{index:02d}")
+            chapter_id = emitted_chapter_id(str(chapter.get("id") or ""), index, len(chapters))
+            chapter["id"] = chapter_id
             scene_gate = self._chapter(request, chapter, index)
             if scene_gate is not None:
                 return self._waiting(scene_gate)
@@ -257,7 +272,7 @@ class _Engine:
         )
 
     def _chapter(self, request: BookRequest, chapter: dict[str, Any], index: int) -> str | None:
-        chapter_id = str(chapter.get("id") or f"ch{index:02d}")
+        chapter_id = emitted_chapter_id(str(chapter.get("id") or ""), index, max(index, 1))
         bible = _obj(self.project.read_artefact("bible.json"))
         if not self.ck.done(f"beats:{chapter_id}"):
             self._log(f"beats {chapter_id}")
@@ -268,10 +283,16 @@ class _Engine:
                 temperature=0.4,
                 max_tokens=2048,
             )
+            scene_rows = [item for item in _list(beats.get("scenes")) if isinstance(item, dict)]
+            _bind_scene_ids(chapter_id, scene_rows)
+            beats["scenes"] = scene_rows
             self.project.write_artefact(f"beats/{chapter_id}.json", beats)
             self.ck.mark(f"beats:{chapter_id}")
         beats = _obj(self.project.read_artefact(f"beats/{chapter_id}.json"))
         scenes = [item for item in _list(beats.get("scenes")) if isinstance(item, dict)]
+        if _bind_scene_ids(chapter_id, scenes):
+            beats["scenes"] = scenes
+            self.project.write_artefact(f"beats/{chapter_id}.json", beats)
         for scene_index, scene in enumerate(scenes):
             scene_id = str(scene.get("id") or f"{chapter_id}-sc{scene_index + 1:02d}")
             scene["id"] = scene_id
@@ -798,6 +819,30 @@ def _render(
             )
         )
     return rendered
+
+
+def _normalise_chapter_ids(chapters: list[dict[str, Any]]) -> bool:
+    count = len(chapters)
+    changed = False
+    for index, chapter in enumerate(chapters, start=1):
+        current = str(chapter.get("id") or "")
+        nxt = emitted_chapter_id(current, index, count)
+        if nxt != current:
+            chapter["id"] = nxt
+            changed = True
+    return changed
+
+
+def _bind_scene_ids(chapter_id: str, scenes: list[dict[str, Any]]) -> bool:
+    changed = False
+    prefix = f"{chapter_id}-"
+    for index, scene in enumerate(scenes, start=1):
+        raw = str(scene.get("id") or "")
+        nxt = raw if raw.startswith(prefix) else f"{chapter_id}-sc{index:02d}"
+        if scene.get("id") != nxt:
+            scene["id"] = nxt
+            changed = True
+    return changed
 
 
 def _character_rows(project: Project) -> list[dict[str, object]]:

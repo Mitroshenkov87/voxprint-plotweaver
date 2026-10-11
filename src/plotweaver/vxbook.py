@@ -32,6 +32,7 @@ MIME = b"application/vnd.voxprint.book+zip"
 _FORMAT = "1.0"
 _APP = "plotweaver"
 _ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+_EMITTED_ID = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _DIRECTIVE = re.compile(r'^<!-- vx:([a-z][a-z0-9_]*)((?: [a-z][a-z0-9_]*="[^"<>]*")*) -->$')
 _ATTR = re.compile(r' ([a-z][a-z0-9_]*)="([^"<>]*)"')
 _CONF = re.compile(r"^(?:0(?:\.\d{1,2})?|1(?:\.0{1,2})?)$")
@@ -763,22 +764,46 @@ def _render_block(block: VxBlock, language: str) -> str:
             assert_never(unreachable)
 
 
+def emitted_chapter_id(raw: str, index: int, count: int) -> str:
+    """Letter-leading chapter id. ``1`` and ``2`` become ``ch01`` and ``ch02``.
+
+    Numbers are zero-padded to 2 digits, or 3 when the book has more than 99 chapters.
+    """
+    cleaned = raw.strip().lower()
+    if _EMITTED_ID.fullmatch(cleaned):
+        return cleaned
+    width = 3 if count > 99 else 2
+    return f"ch{index:0{width}d}"
+
+
 def _prepare_chapters(chapters: Sequence[VxChapter]) -> list[VxChapter]:
     source = list(chapters) or [VxChapter("ch01", "Chapter")]
     used: set[str] = set()
     prepared: list[VxChapter] = []
+    count = len(source)
     for index, chapter in enumerate(source, start=1):
-        fallback = f"ch{index:02d}"
-        raw = chapter.id.strip().lower()
-        base = raw if _ID.fullmatch(raw) else speaker_slug(chapter.id) or fallback
+        base = emitted_chapter_id(chapter.id, index, count)
         prepared.append(
             VxChapter(
-                id=_unique_id(base, used),
+                id=_unique_emitted(base, used),
                 title=_one_line(chapter.title) or "Chapter",
                 blocks=list(chapter.blocks),
             )
         )
     return prepared
+
+
+def _unique_emitted(base: str, used: set[str]) -> str:
+    candidate = base[:64]
+    number = 2
+    while candidate in used or not _EMITTED_ID.fullmatch(candidate):
+        suffix = f"_{number}"
+        candidate = base[: 64 - len(suffix)] + suffix
+        number += 1
+        if number > 10000:
+            raise PlotweaverError("could not assign a chapter id")
+    used.add(candidate)
+    return candidate
 
 
 def _ensure_narrator(speakers: Sequence[VxSpeaker]) -> list[VxSpeaker]:

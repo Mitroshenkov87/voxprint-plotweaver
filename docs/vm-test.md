@@ -6,9 +6,30 @@ One command on the RTX 4090 VM. Cheap checks run first. The GPU passes are two s
 bash scripts/vm_test.sh
 ```
 
-Run that from the repository root. The default output directory is `./out/vm-test`. `--out PATH` changes it. The folder contains `summary.md` and `vm-test-results.tar.gz`.
+On Windows:
 
-`--mock` runs the same checks, a mock book, the screenshots, and the Mars hand-off without a GPU and without downloading weights. The 4090 command does not pass `--mock`.
+```powershell
+powershell -File scripts/vm_test.ps1
+```
+
+Run that from the repository root. The default output directory is `./out/vm-test`. `--out PATH` (`-Out` in PowerShell) changes it. The folder contains `summary.md` and `vm-test-results.tar.gz`.
+
+`--mock` (`-Mock`) runs the same checks, a mock book, the screenshots, and the Mars hand-off without a GPU and without downloading weights. The 4090 command does not pass `--mock`.
+
+`--smoke` (`-Smoke`) is the short pass, about ten minutes: install check, `plotweaver doctor`, `plotweaver models list`, one chapter and one scene on the detected tier, then `vxbook validate`. It does not run the pytest subset, the second tier, the screenshots, or the Mars story.
+
+`--json` (`-Json`) prints one JSON object as the last line: `ok`, `exit`, `mode` (`full` or `smoke`), and `mock`.
+
+Exit codes for both scripts:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Every check passed. |
+| 1 | A check failed. |
+| 2 | Setup failed (unknown argument, or Python could not be prepared). |
+| 3 | No supported NVIDIA GPU, and the run is not `--mock`. |
+
+Neither script asks questions. A missing GPU on a non-mock run stops before the books.
 
 ## What the GPU command does
 
@@ -35,7 +56,7 @@ The script saves these offscreen Qt renders (`QT_QPA_PLATFORM=offscreen`) in `sc
 | `result.png` | Result screen listing `book.epub`, `book.fb2`, `book.vxbook`, and `book.sound.vxbook`. On a GPU run this is rendered again from the 24 GB export. |
 | `settings-tier.png` | Settings model tier panel |
 
-When no GPU is visible, the Settings panel is rendered against a stand-in RTX 4090 (24576 MiB total, 22000 MiB free) so the 24 GB tier is on screen. A real card uses its own detection.
+When no GPU is visible, the Settings panel is rendered against a stand-in RTX 4090 (24576 MiB total, 22000 MiB free) so the 24 GB tier is on screen. A real 4090 reports 24564 MiB, which is 23.99 GiB, and is still the 24 GB tier. The tier floor is 23.5 GB.
 
 ## Models this build expects
 
@@ -47,6 +68,6 @@ When no GPU is visible, the Settings panel is rendered against a stand-in RTX 40
 
 ## Requirements
 
-- Linux, an NVIDIA RTX 4090, the current driver, and `nvidia-smi` on `PATH`.
+- Linux or Windows, an NVIDIA RTX 4090, the current driver, and `nvidia-smi` on `PATH`. `scripts/vm_test.ps1` is the Windows command. `scripts/vm_test.sh` is the Linux command.
 - A network connection for the GGUF files. The shared folder needs tens of gigabytes free.
 - Python 3.14. The script installs a `.venv` with `uv` when this checkout cannot be imported yet.

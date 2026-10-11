@@ -17,12 +17,12 @@ def test_version_is_shared() -> None:
     root = repo_root()
     payload = json.loads((root / "BUILD.json").read_text(encoding="utf-8"))
     assert payload["version"] == "0.2.0"
-    assert payload["prerelease"] == "rc4"
-    assert payload["codename"] == "Tzaruf"
+    assert payload["prerelease"] == "rc5"
+    assert payload["codename"] == "Chut"
     assert payload["build"] is None
-    assert APP_VERSION == "0.2.0rc4"
-    assert version_label() == '0.2.0 RC · build dev "Tzaruf"'
-    assert release_title(52) == '0.2.0 RC · build 52 "Tzaruf"'
+    assert APP_VERSION == "0.2.0rc5"
+    assert version_label() == '0.2.0 RC · build dev "Chut"'
+    assert release_title(52) == '0.2.0 RC · build 52 "Chut"'
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
@@ -33,6 +33,7 @@ def test_version_is_shared() -> None:
     assert 'MyAppVersion "0.2.0rc2"' not in installer
     assert 'MyAppVersion "0.2.0rc3"' not in installer
     assert 'MyAppVersion "0.2.0rc4"' not in installer
+    assert 'MyAppVersion "0.2.0rc5"' not in installer
     assert "BUILD.json supplies MyAppVersion" in installer
     assert "APP_VERSION" in windows
     assert "APP_VERSION" in linux

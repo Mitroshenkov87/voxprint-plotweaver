@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -10,17 +11,22 @@ from PIL import features
 
 from plotweaver.appinfo import APP_VERSION
 from plotweaver.cli import main
+from plotweaver.llm import MockBackend
+from plotweaver.sound import add_sound
 from plotweaver.vxbook import (
     BlockKind,
     VxBlock,
     VxChapter,
     VxPart,
     VxSpeaker,
+    emitted_chapter_id,
     legacy_pair,
     pack_vxbook,
     validate_vxbook,
     write_vxbook,
 )
+
+_EMITTED = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 _MARKS = [
     "1. NARRATOR",
@@ -43,6 +49,43 @@ def _errors(path: Path) -> list[str]:
 def _members(root: Path) -> list[tuple[str, bytes]]:
     names = ["book.md", "speakers.json", "cast.json", "notes/author.md"]
     return [(name, (root / name).read_bytes()) for name in names]
+
+
+def test_digit_chapter_ids_are_emitted_as_ch01(tmp_path: Path) -> None:
+    assert emitted_chapter_id("1", 1, 2) == "ch01"
+    assert emitted_chapter_id("2", 2, 2) == "ch02"
+    assert emitted_chapter_id("100", 100, 100) == "ch100"
+    chapters = [
+        VxChapter("1", "One", [VxBlock(BlockKind.PARAGRAPH, text="The first room stayed quiet.")]),
+        VxChapter("2", "Two", [VxBlock(BlockKind.PARAGRAPH, text="The second room stayed quiet.")]),
+    ]
+    path = tmp_path / "book.vxbook"
+    write_vxbook(
+        path,
+        title="Rooms",
+        author="A",
+        language="en",
+        chapters=chapters,
+        speakers=[VxSpeaker("narrator", "narrator")],
+        created="2026-10-11T00:00:00Z",
+    )
+    with zipfile.ZipFile(path) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        book = archive.read("book.md").decode("utf-8")
+    ids = [row["id"] for row in manifest["chapters"]]
+    anchors = [row["anchor"] for row in manifest["chapters"]]
+    assert ids == ["ch01", "ch02"]
+    assert anchors == ids
+    assert all(_EMITTED.fullmatch(item) for item in [*ids, *anchors])
+    assert 'id="ch01"' in book and 'id="ch02"' in book
+    sounded = tmp_path / "book.sound.vxbook"
+    add_sound(path, sounded, MockBackend())
+    with zipfile.ZipFile(sounded) as archive:
+        document = json.loads(archive.read("sound.json"))
+    for scene in document["scenes"]:
+        assert scene["chapter"] in {"ch01", "ch02"}
+        assert _EMITTED.fullmatch(scene["chapter"])
+        assert _EMITTED.fullmatch(scene["id"])
 
 
 def test_spec_example_round_trip(tmp_path: Path) -> None:
