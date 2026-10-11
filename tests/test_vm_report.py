@@ -116,6 +116,8 @@ def test_vm_test_ps1_writes_utf8_and_does_not_raise_none() -> None:
             continue
         assert " > " not in line
         assert ">(" not in line
+        if "Invoke-Captured" in line:
+            assert '""' not in line
 
 
 def test_vm_test_script_parses() -> None:

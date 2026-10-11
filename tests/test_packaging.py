@@ -52,7 +52,9 @@ def test_version_is_shared() -> None:
 
 
 def test_appinfo_does_not_import_the_package() -> None:
-    tree = ast.parse((repo_root() / "src" / "plotweaver" / "appinfo.py").read_text(encoding="utf-8"))
+    tree = ast.parse(
+        (repo_root() / "src" / "plotweaver" / "appinfo.py").read_text(encoding="utf-8")
+    )
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             assert all(not alias.name.startswith("plotweaver") for alias in node.names)

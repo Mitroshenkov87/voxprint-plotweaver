@@ -112,12 +112,18 @@ if ($Mock) { "1" | Out-File -FilePath (Join-Path $Out "mode.txt") -Encoding utf8
 else { "0" | Out-File -FilePath (Join-Path $Out "mode.txt") -Encoding utf8 }
 
 function Invoke-Captured([string]$Stdout, [string]$Stderr, [string[]]$Cmd) {
+    # Windows PowerShell 5.1 drops an empty argument when it starts a program.
+    # "-" means this stream is not written to a file.
     $script = @'
 import subprocess
 import sys
 from pathlib import Path
 
 out, err, *cmd = sys.argv[1:]
+if out == "-":
+    out = ""
+if err == "-":
+    err = ""
 proc = subprocess.run(
     [sys.executable, *cmd],
     stdout=subprocess.PIPE,
@@ -135,6 +141,8 @@ if err:
             handle.write(proc.stderr)
     else:
         path.write_bytes(proc.stderr)
+elif proc.returncode and proc.stderr:
+    sys.stderr.buffer.write(proc.stderr)
 raise SystemExit(proc.returncode)
 '@
     & $Py -c $script $Stdout $Stderr @Cmd
@@ -190,7 +198,7 @@ function Invoke-Book([string]$Tier, [int]$Chapters = 2, [int]$Scenes = 1, [bool]
             Remove-Item Env:PLOTWEAVER_VRAM_BUDGET_CAP_GB -ErrorAction SilentlyContinue
             Set-Tier "24gb"
         }
-        Invoke-Captured (Join-Path $dir "doctor.txt") "" @("-m", "plotweaver", "doctor") | Out-Null
+        Invoke-Captured (Join-Path $dir "doctor.txt") "-" @("-m", "plotweaver", "doctor") | Out-Null
     }
     $env:PLOTWEAVER_METRICS = Join-Path $dir "metrics.jsonl"
     "" | Out-File -FilePath $env:PLOTWEAVER_METRICS -Encoding utf8
@@ -208,7 +216,7 @@ function Invoke-Book([string]$Tier, [int]$Chapters = 2, [int]$Scenes = 1, [bool]
     $elapsed = ((Get-Date) - $started).TotalSeconds
     "$elapsed" | Out-File -FilePath (Join-Path $dir "wall-seconds.txt") -Encoding utf8
     if ($code -ne 0) { return $code }
-    return Invoke-Captured (Join-Path $dir "vxbook-validate.json") "" @(
+    return Invoke-Captured (Join-Path $dir "vxbook-validate.json") "-" @(
         "-m", "plotweaver", "vxbook", "validate",
         (Join-Path $dir "project\export\book.vxbook"),
         "--json"
@@ -226,7 +234,7 @@ function Save-MainWindow {
     $prev = $env:QT_QPA_PLATFORM
     Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
     $shot = Join-Path $Out "screenshots\main-window.png"
-    $code = Invoke-Captured "" "" @(
+    $code = Invoke-Captured "-" "-" @(
         "-c",
         "from pathlib import Path; from plotweaver.ui.vm_shots import save_main_window; save_main_window(Path(r'$shot'))"
     )
@@ -251,14 +259,14 @@ if ($Smoke) {
     }
     Write-Output "smoke doctor"
     if ($Mock) {
-        $code = Invoke-Captured (Join-Path $Out "doctor.txt") "" @("-m", "plotweaver", "doctor", "--mock")
+        $code = Invoke-Captured (Join-Path $Out "doctor.txt") "-" @("-m", "plotweaver", "doctor", "--mock")
     }
     else {
-        $code = Invoke-Captured (Join-Path $Out "doctor.txt") "" @("-m", "plotweaver", "doctor")
+        $code = Invoke-Captured (Join-Path $Out "doctor.txt") "-" @("-m", "plotweaver", "doctor")
     }
     if ($code -ne 0) { $status = 1 }
     Write-Output "smoke models list"
-    $code = Invoke-Captured (Join-Path $Out "checks\models.json") "" @("-m", "plotweaver", "models", "list", "--json")
+    $code = Invoke-Captured (Join-Path $Out "checks\models.json") "-" @("-m", "plotweaver", "models", "list", "--json")
     if ($code -ne 0) { $status = 1 }
     $tier = Get-DetectedTier
     if (-not $tier) { $status = 1 }
@@ -286,7 +294,7 @@ $code = Invoke-Captured $pytestLog $pytestLog @(
 if ($code -ne 0) { $status = 1 }
 
 Write-Output "CLI smoke"
-$code = Invoke-Captured (Join-Path $Out "checks\run-dry.json") "" @(
+$code = Invoke-Captured (Join-Path $Out "checks\run-dry.json") "-" @(
     "-m", "plotweaver", "run",
     "--project", (Join-Path $Out "checks\dry-project"),
     "--brief", (Join-Path $Root "scripts\vm-brief.md"),
@@ -296,7 +304,7 @@ $code = Invoke-Captured (Join-Path $Out "checks\run-dry.json") "" @(
     "--dry-run", "--mock"
 )
 if ($code -ne 0) { $status = 1 }
-$code = Invoke-Captured (Join-Path $Out "checks\vxbook-dry.json") "" @(
+$code = Invoke-Captured (Join-Path $Out "checks\vxbook-dry.json") "-" @(
     "-m", "plotweaver", "vxbook", "validate",
     (Join-Path $Root "tests\fixtures\vxbook\manifest.json"),
     "--dry-run", "--json"
@@ -305,7 +313,7 @@ if ($code -ne 0) { $status = 1 }
 $env:VM_ROOT = $Root
 $env:VM_OUT = Join-Path $Out "checks"
 & $Py -c "import json, os; from pathlib import Path; root = Path(os.environ['VM_ROOT']); out = Path(os.environ['VM_OUT']); (out / 'models.toml').write_text((root / 'bakeoff' / 'models.toml').read_text(encoding='utf-8'), encoding='utf-8'); (out / 'forge.json').write_text(json.dumps({'models': [{'id': 'gemma-4-31b-abliterated-iq3-xxs', 'revision': 'pending', 'sha256': 'ab' * 32, 'size': 1}]}), encoding='utf-8')"
-$code = Invoke-Captured (Join-Path $Out "checks\import-dry.json") "" @(
+$code = Invoke-Captured (Join-Path $Out "checks\import-dry.json") "-" @(
     "-m", "plotweaver", "models", "import-forge-manifest",
     (Join-Path $Out "checks\forge.json"),
     "--registry", (Join-Path $Out "checks\models.toml"),
@@ -338,11 +346,11 @@ if ($Mock) {
 }
 else {
     Write-Output "GPU doctor"
-    $code = Invoke-Captured (Join-Path $Out "doctor.txt") "" @("-m", "plotweaver", "doctor")
+    $code = Invoke-Captured (Join-Path $Out "doctor.txt") "-" @("-m", "plotweaver", "doctor")
     if ($code -ne 0) { $status = 1 }
     if ($status -eq 0) {
         Write-Output "model download"
-        $code = Invoke-Captured (Join-Path $Out "checks\download.txt") "" @(
+        $code = Invoke-Captured (Join-Path $Out "checks\download.txt") "-" @(
             "-c",
             "from plotweaver.hardware import require_supported_gpu; from plotweaver.install import ensure_default_install, ensure_uncensored_models; gpu = require_supported_gpu(); print(f'{gpu.name}: {gpu.free_gb:.1f} of {gpu.total_gb:.1f} GB free'); print('stock', ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb)); print('forge', ensure_uncensored_models(total_vram_gb=gpu.total_gb, free_gb=gpu.free_gb))"
         )
@@ -374,7 +382,7 @@ foreach ($pair in @(
     )) {
     $book = Join-Path $Out "mars" $pair[0]
     if (Test-Path $book) {
-        $code = Invoke-Captured (Join-Path $Out "mars" $pair[1]) "" @(
+        $code = Invoke-Captured (Join-Path $Out "mars" $pair[1]) "-" @(
             "-m", "plotweaver", "vxbook", "validate", $book, "--json"
         )
         if ($code -ne 0) { $status = 1 }
