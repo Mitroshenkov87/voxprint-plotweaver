@@ -3,15 +3,16 @@
 The file is ``shared/manifest.json``. Top-level keys are ``schema`` and
 ``components``. An older Plotweaver file (``version`` plus ``resources`` plus
 ``apps``) is migrated on first read. Other apps' refs are kept. Unknown keys
-are kept. This module still deletes the bytes when the last ref leaves,
-which the shared library does not do.
+are kept. A file is removed only after :func:`remove_ref` reports that this
+app was the last ref. ``models/``, ``runtime/``, ``voices/``, ``cache/``, and
+the suite home are never one component and are never deleted.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,12 +29,13 @@ from voxprint_common.runtime_manifest import (
 )
 
 from plotweaver.errors import PlotweaverError
-from plotweaver.paths import models_dir
+from plotweaver.paths import legacy_models_dir, models_dir, shared_dir, voxprint_home
 from plotweaver.textio import read_text
 
 MANIFEST_NAME = "manifest.json"
 APP_ID = "plotweaver"
 _SHA = re.compile(r"^[a-f0-9]{64}$")
+_ROOT_NAMES = frozenset({"models", "runtime", "voices", "cache"})
 
 
 class ManifestError(PlotweaverError):
@@ -105,6 +107,16 @@ def load_manifest(shared: Path) -> dict[str, Resource]:
     return resources
 
 
+def refuse_shared_delete(path: Path) -> None:
+    """Raise when ``path`` is a shared root or an ancestor of one."""
+    target = path.resolve()
+    for root in _shared_delete_roots():
+        if target == root or target in root.parents:
+            raise ManifestError(
+                f"refusing to delete {path}: it is a shared root or an ancestor of one"
+            )
+
+
 def register_resource(
     shared: Path,
     resource_id: str,
@@ -118,6 +130,7 @@ def register_resource(
     model_roots: tuple[Path, ...] = (),
 ) -> None:
     """Record one component and add ``app`` to its refs."""
+    _refuse_component_path(shared, path)
     target = manifest_path(shared)
     digest = _digest(files)
     version = "1"
@@ -145,7 +158,7 @@ def register_resource(
 
 
 def unregister_app(shared: Path, app: str = APP_ID) -> list[str]:
-    """Drop ``app``. Delete a component's files only when its refs become empty."""
+    """Drop ``app``. Delete a file only when ``remove_ref`` drops the component."""
     target = manifest_path(shared)
     if not target.is_file():
         return []
@@ -154,13 +167,14 @@ def unregister_app(shared: Path, app: str = APP_ID) -> list[str]:
     for key, resource in stored.items():
         if app not in resource.apps:
             continue
-        if resource.refcount == 1:
-            _delete_files(shared, resource)
-            removed.append(key)
         try:
-            remove_ref(key, app, manifest=target)
+            gone = remove_ref(key, app, manifest=target)
         except CommonManifestError as exc:
             raise ManifestError(str(exc)) from exc
+        if not gone:
+            continue
+        _delete_files(shared, resource)
+        removed.append(key)
     return removed
 
 
@@ -228,22 +242,47 @@ def _inside(target: Path, root: Path) -> bool:
     return target == root or root in target.parents
 
 
+def _shared_delete_roots() -> tuple[Path, ...]:
+    home = voxprint_home().resolve()
+    shared = shared_dir().resolve()
+    found = [home, shared, models_dir().resolve(), legacy_models_dir().resolve()]
+    for base in (home, shared):
+        for name in _ROOT_NAMES:
+            found.append(base / name)
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for item in found:
+        key = os.path.normcase(str(item))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return tuple(unique)
+
+
+def _refuse_component_path(shared: Path, path: str) -> None:
+    text = path.strip().replace("\\", "/")
+    if not text or text in {".", "./"}:
+        raise ManifestError("a shared root cannot be one component")
+    raw = Path(text)
+    parts = raw.parts
+    if parts and parts[0].casefold() in _ROOT_NAMES and len(parts) == 1:
+        raise ManifestError("a shared root cannot be one component")
+    target = raw if raw.is_absolute() else shared / raw
+    refuse_shared_delete(target)
+
+
 def _delete_files(shared: Path, resource: Resource) -> None:
     base = _resource_dir(shared, resource)
+    refuse_shared_delete(base)
     root = shared.resolve()
     allowed = (root, models_dir().resolve(), base)
-    if (
-        resource.kind == "runtime"
-        and not Path(resource.path).is_absolute()
-        and _inside(base, root)
-        and base != root
-        and base.is_dir()
-    ):
-        shutil.rmtree(base)
-        return
     for name in resource.files:
         target = (base / name).resolve()
+        refuse_shared_delete(target)
         if not any(_inside(target, folder) for folder in allowed):
             continue
+        if target.is_dir():
+            raise ManifestError("refusing to delete a directory in the shared tree")
         if target.is_file():
             target.unlink()

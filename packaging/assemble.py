@@ -96,6 +96,34 @@ class Program {
 """
 
 
+def _refuse_suite_root(path: Path) -> None:
+    """Refuse a suite home, a shared root, or an ancestor of one.
+
+    Same refuse-list as ``plotweaver.manifest.refuse_shared_delete``. This
+    script runs before the staged tree exists, so it does not import it.
+    """
+    resolved = path.resolve()
+    homes: list[Path] = []
+    configured = os.environ.get("VOXPRINT_HOME", "").strip()
+    if configured:
+        homes.append(Path(configured))
+    local = os.environ.get("LOCALAPPDATA", "").strip()
+    if local:
+        homes.append(Path(local) / "Voxprint")
+    homes.append(Path.home() / ".local" / "share" / "voxprint")
+    protected: list[Path] = []
+    for item in homes:
+        root = item.resolve()
+        protected.append(root)
+        for name in ("shared", "models", "runtime", "voices", "cache"):
+            protected.append(root / name)
+            if name != "shared":
+                protected.append(root / "shared" / name)
+    for root in protected:
+        if resolved == root or resolved in root.parents:
+            raise SystemExit(f"refusing to delete {path}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Stage a full Plotweaver runtime.")
     parser.add_argument("--dest", type=Path, required=True)
@@ -103,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     dest = args.dest.resolve()
     if dest == _ROOT or dest in _ROOT.parents:
         raise SystemExit(f"refusing to stage into {dest}")
+    _refuse_suite_root(dest)
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
@@ -179,6 +208,7 @@ def _bundle_common(wheels: Path, wheel: Path, dest: Path) -> None:
 
 def _install_python(dest: Path) -> Path:
     parent = dest.parent / "_python_install"
+    _refuse_suite_root(parent)
     if parent.exists():
         shutil.rmtree(parent)
     parent.mkdir(parents=True)
@@ -187,6 +217,7 @@ def _install_python(dest: Path) -> Path:
     if not matches:
         raise SystemExit(f"no CPython install in {parent}")
     shutil.copytree(choose_cpython(matches), dest, symlinks=True)
+    _refuse_suite_root(parent)
     shutil.rmtree(parent)
     return dest
 

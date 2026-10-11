@@ -76,16 +76,12 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
-var
-  OldDir: string;
 begin
   if CurStep <> ssPostInstall then
     exit;
-  { Drop the previous program folder. Do not run its uninstaller: that would
-    release shared models. User data under %LOCALAPPDATA%\Voxprint stays. }
-  OldDir := ExpandConstant('{localappdata}\Voxprint\Plotweaver');
-  if CompareText(OldDir, ExpandConstant('{app}')) <> 0 then
-    DelTree(OldDir, True, True, True);
+  { Per-user shortcuts only. Do not delete %LOCALAPPDATA%\Voxprint or anything
+    outside {app}. A failed install rolls back only the files copied into {app}.
+    Uninstall runs release-shared, then Inno removes {app}. }
   DeleteFile(ExpandConstant('{userdesktop}\Voxprint AI Plotweaver.lnk'));
   DeleteFile(ExpandConstant('{userprograms}\Voxprint\Voxprint AI Plotweaver.lnk'));
   RemoveDir(ExpandConstant('{userprograms}\Voxprint'));

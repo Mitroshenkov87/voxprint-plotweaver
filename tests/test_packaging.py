@@ -95,7 +95,9 @@ def test_suite_install_layout() -> None:
     assert installer.index("mdl-progress") < installer.index("skipifsilent")
     assert "WizardSilent" in installer
     assert "--gui" not in installer
-    assert r"{localappdata}\Voxprint\Plotweaver" in installer
+    assert "DelTree" not in installer
+    assert "UninstallDelete" not in installer
+    assert r"{localappdata}" not in installer
     assert "DefaultDirName={localappdata}" not in installer
     assert "/opt/voxprint-ai-suite/plotweaver" in linux
     assert "/usr/bin/voxprint-plotweaver-cli" in linux
@@ -133,6 +135,21 @@ def test_choose_cpython_prefers_the_patch_install(tmp_path: Path) -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.choose_cpython([alias, concrete]) == concrete
+
+
+def test_assemble_refuses_a_suite_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "assemble_refuse", repo_root() / "packaging" / "assemble.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    home = tmp_path / "Voxprint"
+    monkeypatch.setenv("VOXPRINT_HOME", str(home))
+    for path in (home, home / "models", home / "shared" / "runtime", home / "cache", home.parent):
+        with pytest.raises(SystemExit, match="refusing to delete"):
+            module._refuse_suite_root(path)
+    module._refuse_suite_root(tmp_path / "build" / "stage")
 
 
 def test_marked_root_needs_both_markers(tmp_path: Path) -> None:

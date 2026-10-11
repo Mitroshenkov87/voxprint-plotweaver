@@ -32,6 +32,7 @@ from plotweaver.manifest import (
     ManifestError,
     file_sha256,
     load_manifest,
+    refuse_shared_delete,
     register_resource,
     unregister_app,
 )
@@ -215,6 +216,7 @@ def _place_model(entry: RegistryEntry, say: Progress) -> bool:
         return False
     if dest.is_file():
         say(tr("repair_broken").format(name=local_name))
+        refuse_shared_delete(dest)
         dest.unlink()
         _forget_stamp(dest)
     source = _matching_legacy(entry)
@@ -586,6 +588,7 @@ def _forget_stamp(path: Path) -> None:
 def _link_file(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
+        refuse_shared_delete(dest)
         dest.unlink()
     try:
         os.link(src, dest)
@@ -594,6 +597,8 @@ def _link_file(src: Path, dest: Path) -> None:
 
 
 def _replace_tree(src: Path, dest: Path) -> None:
+    """Replace one runtime folder that sits strictly inside ``runtime/``."""
+    refuse_shared_delete(dest)
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(src, dest, copy_function=_copy_link, symlinks=True)

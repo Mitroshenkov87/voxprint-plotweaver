@@ -10,6 +10,19 @@ PKG="$ROOT/packaging/linux/pkg"
 STAGE="$ROOT/build/stage"
 APP="$PKG/opt/voxprint-ai-suite/plotweaver"
 
+# Build directories inside this repo only. Not the suite home.
+case "$PKG" in
+  "$ROOT"/packaging/linux/pkg) ;;
+  *) echo "refusing to remove $PKG" >&2; exit 1 ;;
+esac
+case "$DIST" in
+  "$ROOT"/dist) ;;
+  *) echo "refusing to remove $DIST" >&2; exit 1 ;;
+esac
+case "$STAGE" in
+  "$ROOT"/build/stage) ;;
+  *) echo "refusing to remove $STAGE" >&2; exit 1 ;;
+esac
 rm -rf "$PKG" "$DIST" "$STAGE"
 mkdir -p "$DIST" "$PKG/usr/bin" "$PKG/usr/share/applications" "$PKG/usr/share/icons/hicolor/256x256/apps" "$PKG/DEBIAN"
 
@@ -63,7 +76,7 @@ cat > "$PKG/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
 set -eu
 APP=/opt/voxprint-ai-suite/plotweaver
-# Previous releases unpacked here. Shared files and models stay under the home directory.
+# Previous program prefix only. This is not the suite home and not a shared root.
 rm -rf /opt/voxprint-plotweaver
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
   su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver mdl-progress --quiet --installer" || true
@@ -76,6 +89,7 @@ cat > "$PKG/DEBIAN/prerm" << 'EOF'
 #!/bin/sh
 set -eu
 APP=/opt/voxprint-ai-suite/plotweaver
+# Drop Plotweaver's manifest refs only. Do not delete the suite home.
 if [ "$1" = remove ] || [ "$1" = purge ]; then
   if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
     su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver release-shared" || true
@@ -84,6 +98,7 @@ fi
 EOF
 chmod 755 "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/prerm"
 
+# The tarball is the program tree only. It has no uninstall script.
 TAR="voxprint-plotweaver-${VERSION}-linux-x86_64.tar.gz"
 DEB="voxprint-plotweaver_${VERSION}_amd64.deb"
 tar -C "$PKG" -czf "$DIST/$TAR" opt/voxprint-ai-suite usr/bin
