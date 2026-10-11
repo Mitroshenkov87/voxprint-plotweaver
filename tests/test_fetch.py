@@ -43,7 +43,7 @@ class _Response:
 def test_disk_short_names_drive_and_sizes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("plotweaver.fetch.shutil.disk_usage", lambda _path: _Usage(1024))
     dest = tmp_path / "model.gguf"
-    with pytest.raises(PlotweaverError, match="Not enough disk space on /") as caught:
+    with pytest.raises(PlotweaverError, match="Not enough disk space") as caught:
         stream_download(
             "http://127.0.0.1/model.gguf",
             dest,
@@ -51,8 +51,10 @@ def test_disk_short_names_drive_and_sizes(tmp_path: Path, monkeypatch: pytest.Mo
             on_progress=None,
             label="model.gguf",
         )
-    assert "GB free" in str(caught.value)
-    assert "Need" in str(caught.value)
+    message = str(caught.value)
+    assert f"Not enough disk space on {dest.anchor}" in message
+    assert "Need" in message
+    assert "GB free" in message
     assert not dest.exists()
     assert not dest.with_suffix(".gguf.partial").exists()
 
