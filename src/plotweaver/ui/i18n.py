@@ -6,7 +6,7 @@ import os
 
 STRINGS: dict[str, dict[str, str]] = {
     "en": {
-        "app": "Voxprint AI Plotweaver",
+        "app": "VOXPrint AI Plotweaver",
         "new": "New book",
         "subtitle": "A synopsis in. A novel out. Local models only.",
         "title": "Title",
@@ -70,7 +70,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "driver_ok": "NVIDIA driver {version}.",
         "optional_notice": "{name} is {size}. Estimated time about {minutes} min.",
-        "optional_eta": "Downloading {name} ({size}). About {eta} left.",
+        "optional_eta": "Downloading {name} ({size} at {speed}). About {eta} left.",
         "eta_min": "{count} min",
         "eta_sec": "{count} sec",
         "models_skipped": (
@@ -135,7 +135,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "brief_err_type": "{field} has the wrong type.",
     },
     "ru": {
-        "app": "Voxprint AI Plotweaver",
+        "app": "VOXPrint AI Plotweaver",
         "new": "Новая книга",
         "subtitle": "Синопсис на входе. Роман на выходе. Только локальные модели.",
         "title": "Название",
@@ -200,7 +200,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "driver_ok": "Драйвер NVIDIA {version}.",
         "optional_notice": "{name}: {size}. Оценка времени — около {minutes} мин.",
-        "optional_eta": "Скачиваю {name} ({size}). Осталось около {eta}.",
+        "optional_eta": "Скачиваю {name} ({size}, {speed}). Осталось около {eta}.",
         "eta_min": "{count} мин",
         "eta_sec": "{count} с",
         "models_skipped": "Подходящей карты NVIDIA нет, поэтому обычные модели не скачивались.",
@@ -263,7 +263,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "brief_err_type": "У поля {field} неверный тип.",
     },
     "de": {
-        "app": "Voxprint AI Plotweaver",
+        "app": "VOXPrint AI Plotweaver",
         "new": "Neues Buch",
         "subtitle": "Eine Synopsis hinein. Ein Roman heraus. Nur lokale Modelle.",
         "title": "Titel",
@@ -332,7 +332,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "driver_ok": "NVIDIA-Treiber {version}.",
         "optional_notice": "{name} ist {size}. Geschätzte Zeit etwa {minutes} Min.",
-        "optional_eta": "{name} wird geladen ({size}). Noch etwa {eta}.",
+        "optional_eta": "{name} wird geladen ({size}, {speed}). Noch etwa {eta}.",
         "eta_min": "{count} Min",
         "eta_sec": "{count} Sek",
         "models_skipped": (

@@ -1,60 +1,23 @@
-"""Command line: run a book, open the window, bake off models, or run the Mars scenario."""
+"""Command line: run a book, open the window, bake off models, or run the Mars scenario.
+
+The llama client and the export libraries are imported inside the command that
+uses them, so opening the window does not pay for them first.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
-from voxprint_common.ui.splash import Splash
-
 from plotweaver.appinfo import APP_NAME, version_label
-from plotweaver.bakeoff import run_bakeoff
 from plotweaver.brief import BookBrief, BriefError, apply_brief, parse_brief, render_markdown
-from plotweaver.buildstamp import suite_build_info
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import GpuUnsupported, PlotweaverError
-from plotweaver.export import export_output_names
-from plotweaver.hardware import (
-    driver_status,
-    require_supported_gpu,
-    vram_budget_gb,
-    vram_headroom_gb,
-)
-from plotweaver.install import prepare_real_models
-from plotweaver.llama_release import ensure_llama_server
-from plotweaver.llama_server import LlamaServer, apply_vram_budget_cap
-from plotweaver.llm import LLMBackend
-from plotweaver.optional_mock import mock_backend
-from plotweaver.paths import splash_art
-from plotweaver.registry import (
-    detected_tier,
-    import_forge_manifest,
-    load_registry,
-    model_public_row,
-    registry_path,
-    resolve_tier,
-    tier_headroom_gb,
-    usable_vram_gb,
-)
-from plotweaver.runner import draft_book_brief, export_book, run_book
-from plotweaver.scenarios import mars_request
-from plotweaver.sound import add_sound, resolve_vxbook
-from plotweaver.store import Project
-from plotweaver.suite import provision_main, release_shared, repair_shared, selftest_report
 from plotweaver.textio import read_text
-from plotweaver.ui.fonts import register_ui_fonts, ui_font
-from plotweaver.ui.i18n import tr
-from plotweaver.ui.theme import SPLASH
-from plotweaver.ui.window import MainWindow
-from plotweaver.vxbook import validate_vxbook
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -186,6 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Run one plotweaver command and return its exit code."""
+    _warn_deprecated_alias()
     raw = list(sys.argv[1:] if argv is None else argv)
     if raw and raw[0] == "--selftest" and set(raw) <= {"--selftest", "--json"}:
         return _selftest_command("--json" in raw)
@@ -197,6 +161,13 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(args, str(exc), 2)
     except PlotweaverError as exc:
         return _fail(args, str(exc), 1)
+
+
+def _warn_deprecated_alias() -> None:
+    """Print a one-line warning when the process was started as ``plotweaver``."""
+    stem = Path(sys.argv[0]).name.lower().removesuffix(".exe")
+    if stem == "plotweaver":
+        print("plotweaver is deprecated; use voxprint-plotweaver-cli", file=sys.stderr)
 
 
 def _add_book_args(parser: argparse.ArgumentParser) -> None:
@@ -304,10 +275,14 @@ def _emit(args: argparse.Namespace, payload: dict[str, Any], text: str) -> int:
 
 
 def _output_paths(directory: Path, formats: list[str], *, sound: bool) -> list[str]:
+    from plotweaver.export import export_output_names
+
     return [str((directory / name).resolve()) for name in export_output_names(formats, sound=sound)]
 
 
 def _vxbook_validate(args: argparse.Namespace) -> int:
+    from plotweaver.vxbook import validate_vxbook
+
     if args.dry_run:
         if not args.file.is_file():
             raise PlotweaverError(f"not a file: {args.file}")
@@ -345,6 +320,9 @@ def _vxbook_validate(args: argparse.Namespace) -> int:
 
 
 def _sound_add(args: argparse.Namespace) -> int:
+    from plotweaver.sound import add_sound, resolve_vxbook
+    from plotweaver.vxbook import validate_vxbook
+
     source = resolve_vxbook(args.src)
     if source.resolve() == args.output.resolve():
         raise PlotweaverError("sound markup writes a new file and leaves the original in place")
@@ -382,6 +360,8 @@ def _sound_add(args: argparse.Namespace) -> int:
 
 
 def _models_list(args: argparse.Namespace) -> int:
+    from plotweaver.registry import load_registry, model_public_row, registry_path
+
     path = args.registry or registry_path()
     if not path.is_file():
         raise PlotweaverError(f"registry not found: {path}")
@@ -403,6 +383,8 @@ def _models_list(args: argparse.Namespace) -> int:
 
 
 def _import_forge_manifest(args: argparse.Namespace) -> int:
+    from plotweaver.registry import import_forge_manifest, registry_path
+
     if not args.file.is_file():
         raise PlotweaverError(f"manifest not found: {args.file}")
     path = args.registry or registry_path()
@@ -433,6 +415,20 @@ def _version(_args: argparse.Namespace) -> int:
 
 
 def _doctor(args: argparse.Namespace) -> int:
+    from plotweaver.hardware import (
+        driver_status,
+        require_supported_gpu,
+        vram_budget_gb,
+        vram_headroom_gb,
+    )
+    from plotweaver.llama_server import apply_vram_budget_cap
+    from plotweaver.registry import (
+        detected_tier,
+        resolve_tier,
+        tier_headroom_gb,
+        usable_vram_gb,
+    )
+
     print(f"{APP_NAME} {version_label()}")
     if args.mock:
         print("Mock mode: the GPU check is skipped.")
@@ -457,7 +453,12 @@ def _doctor(args: argparse.Namespace) -> int:
     return 0
 
 
-def _backend(mock: bool) -> LLMBackend:
+def _backend(mock: bool) -> Any:
+    from plotweaver.hardware import require_supported_gpu
+    from plotweaver.llama_release import ensure_llama_server
+    from plotweaver.llama_server import LlamaServer
+    from plotweaver.optional_mock import mock_backend
+
     if mock:
         return mock_backend()
     require_supported_gpu()
@@ -547,6 +548,8 @@ def _read_brief_file(args: argparse.Namespace) -> BookBrief | None:
 
 
 def _brief_draft(args: argparse.Namespace) -> int:
+    from plotweaver.runner import draft_book_brief
+
     if not str(args.idea).strip():
         raise PlotweaverError("--idea is empty")
     if args.dry_run:
@@ -578,6 +581,10 @@ def _brief_draft(args: argparse.Namespace) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    from plotweaver.install import prepare_real_models
+    from plotweaver.runner import run_book
+    from plotweaver.store import Project
+
     exists = (args.project / "project.json").is_file()
     try:
         loaded = _read_brief_file(args)
@@ -685,6 +692,9 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def _export(args: argparse.Namespace) -> int:
+    from plotweaver.runner import export_book
+    from plotweaver.store import Project
+
     if not (args.project / "project.json").is_file():
         raise PlotweaverError(f"project not found: {args.project}")
     _check_export_dir(args.export_dir)
@@ -740,6 +750,10 @@ def _export(args: argparse.Namespace) -> int:
 
 
 def _scenario_mars(args: argparse.Namespace) -> int:
+    from plotweaver.runner import run_book
+    from plotweaver.scenarios import mars_request
+    from plotweaver.store import Project
+
     _check_export_dir(args.export_dir)
     if not args.mock and not args.main_gguf:
         raise PlotweaverError(
@@ -819,6 +833,8 @@ def _scenario_mars(args: argparse.Namespace) -> int:
 
 
 def _bakeoff(args: argparse.Namespace) -> int:
+    from plotweaver.bakeoff import run_bakeoff
+
     archive = run_bakeoff(
         args.results,
         mock=bool(args.mock),
@@ -830,61 +846,14 @@ def _bakeoff(args: argparse.Namespace) -> int:
 
 
 def _gui(args: argparse.Namespace) -> int:
-    os.environ.setdefault("PLOTWEAVER_NO_UPDATE_CHECK", "1")
-    if not args.mock and not args.selftest:
-        require_supported_gpu()
-    if args.selftest:
-        os.environ["PLOTWEAVER_UI_PROJECT"] = tempfile.mkdtemp(prefix="plotweaver-selftest-")
-        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    current = QApplication.instance()
-    app = current if isinstance(current, QApplication) else QApplication([])
-    register_ui_fonts()
-    app.setFont(ui_font(10))
-    if not args.mock and not args.selftest:
-        if not _repair_before_window(app):
-            return 1
-    splash = Splash(splash_art(), SPLASH, suite_build_info())
-    app.processEvents()
-    window = MainWindow(mock=bool(args.mock or args.selftest))
-    window.show()
-    if args.selftest:
-        splash.finish()
-        window.run_selftest()
-        return 0
+    from plotweaver.ui.boot import run_gui
 
-    def _retire() -> None:
-        splash.finish()
-
-    QTimer.singleShot(0, _retire)
-    return int(app.exec())
-
-
-def _repair_before_window(app: QApplication) -> bool:
-    dialog = QProgressDialog(tr("repair_checking"), "", 0, 0)
-    dialog.setCancelButton(None)
-    dialog.setWindowTitle(tr("repair_title"))
-    dialog.setMinimumDuration(0)
-    dialog.show()
-    app.processEvents()
-
-    def progress(message: str) -> None:
-        dialog.setLabelText(message)
-        app.processEvents()
-
-    try:
-        repair_shared(progress)
-    except Exception as exc:  # noqa: BLE001 - one sentence, never a traceback
-        dialog.close()
-        QMessageBox.critical(None, tr("repair_title"), _plain_message(exc))
-        return False
-    status = driver_status()
-    dialog.close()
-    if not status.ok:
-        QMessageBox.warning(None, tr("repair_title"), status.message)
-    return True
+    return run_gui(mock=bool(args.mock), selftest=bool(args.selftest))
 
 
 def _repair_or_raise(progress: Callable[[str], None]) -> None:
+    from plotweaver.suite import repair_shared
+
     try:
         repair_shared(progress)
     except OSError as exc:
@@ -897,6 +866,8 @@ def _plain_message(exc: BaseException) -> str:
 
 
 def _selftest_command(as_json: bool) -> int:
+    from plotweaver.suite import selftest_report
+
     try:
         report = selftest_report()
     except Exception as exc:  # noqa: BLE001 - one sentence, never a traceback
@@ -920,10 +891,14 @@ def _selftest_command(as_json: bool) -> int:
 
 
 def _provision(_args: argparse.Namespace) -> int:
+    from plotweaver.suite import provision_main
+
     return provision_main()
 
 
 def _release(_args: argparse.Namespace) -> int:
+    from plotweaver.suite import release_shared
+
     removed = release_shared()
     print("\n".join(removed) if removed else "shared files kept")
     return 0

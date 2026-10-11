@@ -15,6 +15,10 @@ Push-Location $Stage
 & $py -c "import PySide6.QtWidgets, plotweaver; from plotweaver.llama_release import find_server; from pathlib import Path; binary = find_server(Path('runtime') / 'llama.cpp-b11476'); assert binary is not None; print(plotweaver.__version__, binary)"
 if ($LASTEXITCODE -ne 0) { throw "staged interpreter failed" }
 Pop-Location
+foreach ($name in @("voxprint-plotweaver.exe", "voxprint-plotweaver-cli.exe", "plotweaver.exe")) {
+  $launcher = Join-Path $Stage $name
+  if (-not (Test-Path -LiteralPath $launcher)) { throw "missing $launcher" }
+}
 
 $Iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $Iscc)) { throw "Inno Setup 6 is not installed" }

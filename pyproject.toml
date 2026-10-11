@@ -1,7 +1,7 @@
 [project]
 name = "voxprint-plotweaver"
 dynamic = ["version"]
-description = "Voxprint AI Plotweaver writes a whole novel from a synopsis with local LLMs."
+description = "VOXPrint AI Plotweaver writes a whole novel from a synopsis with local LLMs."
 readme = "README.md"
 requires-python = ">=3.14"
 license = "Apache-2.0"
@@ -37,6 +37,7 @@ docs = [
 ]
 
 [project.scripts]
+voxprint-plotweaver-cli = "plotweaver.cli:main"
 plotweaver = "plotweaver.cli:main"
 
 [project.urls]

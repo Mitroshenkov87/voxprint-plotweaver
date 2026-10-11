@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Voxprint AI Plotweaver"
+APP_NAME = "VOXPrint AI Plotweaver"
 GITHUB_REPO = "Mitroshenkov87/voxprint-plotweaver"
 LOCK_OWNER = "plotweaver"
 DEV_BUILD = "dev"

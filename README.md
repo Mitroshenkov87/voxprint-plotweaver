@@ -1,6 +1,6 @@
-# Voxprint AI Plotweaver
+# VOXPrint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Oreg. `plotweaver --version` prints `0.2.0 RC · build N "Oreg"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Oreg. `voxprint-plotweaver-cli --version` prints `0.2.0 RC · build N "Oreg"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -18,7 +18,7 @@ Windows:
 
 1. Download `VoxprintPlotweaver-0.2.0rc6-win64-setup.exe`.
 2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc6-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc6-win64-setup.exe` line in `SHA256SUMS`.
-3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver`, adds a Voxprint entry to the Start menu, and installs missing shared files under `%LOCALAPPDATA%\Voxprint\shared`. Administrator rights are not required.
+3. Run the setup. It installs to `C:\Program Files\VOXPrint AI Suite\Plotweaver` and needs administrator rights. The Start menu folder is VOXPrint AI Suite and the shortcut is VOXPrint AI Plotweaver. The window is `voxprint-plotweaver.exe`. `voxprint-plotweaver-cli` is added to PATH. Provisioning fills `%LOCALAPPDATA%\Voxprint\shared` while the setup window is still open. A silent install (`/SILENT` or `/VERYSILENT`) does not open the window. An interactive install offers Launch only after that step has finished.
 
 Linux, Debian package:
 
@@ -28,18 +28,19 @@ sudo dpkg -i voxprint-plotweaver_0.2.0rc6_amd64.deb
 sudo apt-get install -f
 ```
 
-The package installer runs `plotweaver provision` as the user who invoked sudo. That step fills `~/.local/share/voxprint/shared`.
+The package installer runs `voxprint-plotweaver-cli provision` as the user who invoked sudo. That step fills `~/.local/share/voxprint/shared`. It does not open the window.
 
-The menu entry is Voxprint AI Plotweaver. The files live in `/opt/voxprint-plotweaver`.
+The menu entry is VOXPrint AI Plotweaver. The files live in `/opt/voxprint-ai-suite/plotweaver`. `voxprint-plotweaver-cli` is on PATH.
 
 Linux, tarball (any distribution with the libraries named in the `.deb` control file):
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf voxprint-plotweaver-0.2.0rc6-linux-x86_64.tar.gz
-./voxprint-plotweaver/plotweaver-provision.sh
-./voxprint-plotweaver/plotweaver-gui.sh
+sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc6-linux-x86_64.tar.gz
+voxprint-plotweaver-cli provision
 ```
+
+An upgrade removes the previous program folder (`%LOCALAPPDATA%\Voxprint\Plotweaver` on Windows, `/opt/voxprint-plotweaver` on Linux), updates the shortcuts and PATH, and keeps models and shared files. `plotweaver` remains on PATH for this release and prints `plotweaver is deprecated; use voxprint-plotweaver-cli`.
 
 ## Shared files
 
@@ -50,7 +51,7 @@ The installer puts shared files in one place:
 
 GGUF weights go in the suite models folder, `<home>/models/llm` (`%LOCALAPPDATA%\Voxprint\models\llm` on Windows, `~/.local/share/voxprint/models/llm` on Linux). `PLOTWEAVER_MODELS` or `VOXPRINT_MODELS_DIR` overrides that folder. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded and a copy left in `shared/models/llm` by an older Plotweaver install. A Forge file whose published name is only the quant, such as `Q5_K_M.gguf`, is stored as the registry id plus that name so two models cannot overwrite each other. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it.
 
-Every launch, and `plotweaver --selftest --json`, checks those files and repairs a missing or corrupt one. The window shows progress in plain language. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
+Every launch, and `voxprint-plotweaver-cli --selftest --json`, checks those files and repairs a missing or corrupt one. When something is still missing, the window that opens is the provisioning progress (which model, its size, the speed, and the time left). The main window opens when that step reports ready. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
 
 A card under 23.5 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A card of 23.5 GB or more installs T-pro-it-2.1 only. Setup shows that total, then checks free disk (the file size, plus 10%, plus 2 GB) before each download and stops instead of filling the drive. Each file is checked by revision, size, and SHA-256.
 
@@ -106,8 +107,8 @@ Python 3.14 is required. From a checkout:
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install --find-links packaging/wheels -e ".[dev]" -e dev/plotweaver_dev
-.venv/bin/plotweaver doctor --mock
-.venv/bin/plotweaver gui --mock --selftest
+.venv/bin/voxprint-plotweaver-cli doctor --mock
+.venv/bin/voxprint-plotweaver-cli gui --mock --selftest
 ```
 
 `docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `docs/vm-test.md` is the short RTX 4090 check: `bash scripts/vm_test.sh` on Linux, `powershell -File scripts/vm_test.ps1` on Windows. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.

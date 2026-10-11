@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,19 @@ def test_version_flag_is_the_display_label(capsys: pytest.CaptureFixture[str]) -
     assert capsys.readouterr().out.strip() == version_label()
     assert main(["version"]) == 0
     assert capsys.readouterr().out.strip() == '0.2.0 RC · build dev "Oreg"'
+
+
+def test_plotweaver_alias_warns_once(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["plotweaver", "version"])
+    assert main(["version"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.strip() == version_label()
+    assert captured.err.strip() == "plotweaver is deprecated; use voxprint-plotweaver-cli"
+    monkeypatch.setattr(sys, "argv", ["voxprint-plotweaver-cli", "version"])
+    assert main(["version"]) == 0
+    assert capsys.readouterr().err == ""
 
 
 def test_stamp_replaces_the_dev_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

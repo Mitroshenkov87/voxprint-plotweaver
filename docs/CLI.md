@@ -1,6 +1,8 @@
 # Plotweaver command line
 
-`plotweaver --version` and `plotweaver version` print the display label and nothing else:
+The installed command is `voxprint-plotweaver-cli`. `plotweaver` is a deprecated alias for this release. Starting it prints `plotweaver is deprecated; use voxprint-plotweaver-cli` on stderr, then runs the same command.
+
+`voxprint-plotweaver-cli --version` and `voxprint-plotweaver-cli version` print the display label and nothing else:
 
 ```text
 0.2.0 RC · build dev "Oreg"

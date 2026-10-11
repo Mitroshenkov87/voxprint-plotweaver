@@ -67,6 +67,37 @@ def test_ci_verifies_tool_archives_and_drops_checkout_credentials() -> None:
     assert "contents: write" in ci.split("release:", 1)[1].split("steps:", 1)[0]
 
 
+def test_suite_install_layout() -> None:
+    root = repo_root()
+    installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
+    linux = (root / "packaging" / "linux" / "build-package.sh").read_text(encoding="utf-8")
+    desktop = (root / "packaging" / "linux" / "plotweaver.desktop").read_text(encoding="utf-8")
+    assemble = (root / "packaging" / "assemble.py").read_text(encoding="utf-8")
+    project = (root / "pyproject.toml").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    head, support = readme.split("## ☕ Support the Project", 1)
+    assert r"{autopf}\VOXPrint AI Suite\Plotweaver" in installer
+    assert "DefaultGroupName=VOXPrint AI Suite" in installer
+    assert 'MyAppName "VOXPrint AI Plotweaver"' in installer
+    assert r"{app}\voxprint-plotweaver.exe" in installer
+    assert "skipifsilent" in installer
+    assert "postinstall" in installer
+    assert installer.index("plotweaver-provision.cmd") < installer.index("skipifsilent")
+    assert r"{localappdata}\Voxprint\Plotweaver" in installer
+    assert "DefaultDirName={localappdata}" not in installer
+    assert "/opt/voxprint-ai-suite/plotweaver" in linux
+    assert "/usr/bin/voxprint-plotweaver-cli" in linux
+    assert "rm -rf /opt/voxprint-plotweaver" in linux
+    assert "Name=VOXPrint AI Plotweaver" in desktop
+    assert "Exec=/opt/voxprint-ai-suite/plotweaver/voxprint-plotweaver" in desktop
+    assert "plotweaver is deprecated; use voxprint-plotweaver-cli" in assemble
+    assert 'voxprint-plotweaver-cli = "plotweaver.cli:main"' in project
+    assert "VOXPrint AI Plotweaver" in head
+    assert r"C:\Program Files\VOXPrint AI Suite\Plotweaver" in head
+    assert "/opt/voxprint-ai-suite/plotweaver" in head
+    assert "TYveZBXaSpM4FEHa6iGrc7A6zuLfS4z3x6" in support
+
+
 def test_appinfo_does_not_import_the_package() -> None:
     tree = ast.parse(
         (repo_root() / "src" / "plotweaver" / "appinfo.py").read_text(encoding="utf-8")
