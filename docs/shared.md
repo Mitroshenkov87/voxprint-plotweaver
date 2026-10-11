@@ -24,26 +24,28 @@ Inside that folder:
 
 ## Manifest
 
-`manifest.json` is version 1, the same shape Canvas writes. Each resource has `kind`, `path` (relative to the shared folder), `bytes`, `files` (name to SHA-256), `apps`, and `refcount`. `refcount` is the number of names in `apps`.
+`manifest.json` is schema 1: `schema` and `components`. A component has `kind`, `version`, `path` (relative to the shared folder), `sha256`, `installed_at`, and `refs`. Plotweaver also stores `files` (name to SHA-256), `bytes`, and `source` on the component. An older file with `version` and `resources` is rewritten to schema 1 the first time it is read. Refs that belong to other apps are kept.
 
 ```json
 {
-  "version": 1,
-  "resources": {
+  "schema": 1,
+  "components": {
     "gemma-4-12b-it-q4": {
       "kind": "model",
+      "version": "1",
       "path": "models/llm",
+      "sha256": "<sha256>",
+      "installed_at": "2026-10-11T12:00:00+00:00",
+      "refs": ["audiobook-builder", "plotweaver"],
       "bytes": 7121861440,
       "files": {"gemma-4-12b-it-Q4_K_M.gguf": "<sha256>"},
-      "apps": ["audiobook-builder", "plotweaver"],
-      "refcount": 2,
       "source": "unsloth/gemma-4-12b-it-GGUF"
     }
   }
 }
 ```
 
-Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each resource and deletes files only when the list becomes empty. A resource Audiobook Builder still lists is left in place.
+Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each component and deletes files only when `refs` is empty. A component Audiobook Builder still lists is left in place.
 
 ## Older layout
 

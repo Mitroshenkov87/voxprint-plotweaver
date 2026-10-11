@@ -17,13 +17,16 @@ def test_version_is_shared() -> None:
     root = repo_root()
     payload = json.loads((root / "BUILD.json").read_text(encoding="utf-8"))
     assert payload["version"] == "0.2.0"
-    assert payload["prerelease"] == "rc5"
-    assert payload["codename"] == "Chut"
+    assert payload["prerelease"] == "rc6"
+    assert payload["codename"] == "Oreg"
     assert payload["build"] is None
-    assert APP_VERSION == "0.2.0rc5"
-    assert version_label() == '0.2.0 RC · build dev "Chut"'
-    assert release_title(52) == '0.2.0 RC · build 52 "Chut"'
+    assert APP_VERSION == "0.2.0rc6"
+    assert version_label() == '0.2.0 RC · build dev "Oreg"'
+    assert release_title(52) == '0.2.0 RC · build 52 "Oreg"'
+    assert list((root / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
+    assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
+    assert "voxprint-common @ file:packaging/wheels/voxprint_common-0.1." in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
     linux = (root / "packaging" / "linux" / "build-package.sh").read_text(encoding="utf-8")

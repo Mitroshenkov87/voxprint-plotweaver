@@ -13,10 +13,12 @@ from typing import Any
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
+from voxprint_common.ui.splash import Splash
 
 from plotweaver.appinfo import APP_NAME, version_label
 from plotweaver.bakeoff import run_bakeoff
 from plotweaver.brief import BookBrief, BriefError, apply_brief, parse_brief, render_markdown
+from plotweaver.buildstamp import suite_build_info
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import GpuUnsupported, PlotweaverError
 from plotweaver.export import export_output_names
@@ -29,7 +31,9 @@ from plotweaver.hardware import (
 from plotweaver.install import prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer, apply_vram_budget_cap
-from plotweaver.llm import LLMBackend, MockBackend
+from plotweaver.llm import LLMBackend
+from plotweaver.optional_mock import mock_backend
+from plotweaver.paths import splash_art
 from plotweaver.registry import (
     detected_tier,
     import_forge_manifest,
@@ -46,7 +50,7 @@ from plotweaver.sound import add_sound, resolve_vxbook
 from plotweaver.store import Project
 from plotweaver.suite import provision_main, release_shared, repair_shared, selftest_report
 from plotweaver.ui.i18n import tr
-from plotweaver.ui.splash import Splash
+from plotweaver.ui.theme import SPLASH
 from plotweaver.ui.window import MainWindow
 from plotweaver.vxbook import validate_vxbook
 
@@ -453,7 +457,7 @@ def _doctor(args: argparse.Namespace) -> int:
 
 def _backend(mock: bool) -> LLMBackend:
     if mock:
-        return MockBackend()
+        return mock_backend()
     require_supported_gpu()
     return LlamaServer(ensure_llama_server())
 
@@ -835,16 +839,19 @@ def _gui(args: argparse.Namespace) -> int:
     if not args.mock and not args.selftest:
         if not _repair_before_window(app):
             return 1
-    splash = Splash()
-    splash.show()
+    splash = Splash(splash_art(), SPLASH, suite_build_info())
     app.processEvents()
     window = MainWindow(mock=bool(args.mock or args.selftest))
     window.show()
     if args.selftest:
-        splash.close()
+        splash.finish()
         window.run_selftest()
         return 0
-    QTimer.singleShot(900, splash.close)
+
+    def _retire() -> None:
+        splash.finish()
+
+    QTimer.singleShot(0, _retire)
     return int(app.exec())
 
 

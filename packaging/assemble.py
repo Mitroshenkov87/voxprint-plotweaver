@@ -69,7 +69,12 @@ def main(argv: list[str] | None = None) -> int:
     py = _base_python(prefix)
     for marker in prefix.rglob("EXTERNALLY-MANAGED"):
         marker.unlink()
+    wheel = _common_wheel()
+    _uv("pip", "install", "--python", str(py), "--link-mode", "copy", "--no-index", str(wheel))
     _uv("pip", "install", "--python", str(py), "--link-mode", "copy", str(_ROOT))
+    bundled = dest / "wheels"
+    bundled.mkdir()
+    shutil.copy2(wheel, bundled / wheel.name)
     _copy_payload(dest)
     runtime = dest / "runtime" / "llama.cpp-b11476"
     runtime.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +96,14 @@ def main(argv: list[str] | None = None) -> int:
     _stamp_packaged_build(py, dest, env)
     print(dest)
     return 0
+
+
+def _common_wheel() -> Path:
+    """Vendored voxprint-common 0.1 wheel. Installers must not fetch it."""
+    matches = sorted((_ROOT / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
+    if not matches:
+        raise SystemExit("packaging/wheels is missing voxprint-common 0.1")
+    return matches[-1]
 
 
 def _install_python(dest: Path) -> Path:

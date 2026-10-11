@@ -82,6 +82,17 @@ if (-not $Py) {
     Write-Result 2
     exit 2
 }
+if ($Mock) {
+    & $Py -c "import plotweaver_dev" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        & uv pip install --python $Py -e "$Root[dev]"
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("--mock needs the dev extra and it could not be installed")
+            Write-Result 2
+            exit 2
+        }
+    }
+}
 
 $env:PLOTWEAVER_NO_UPDATE_CHECK = "1"
 $env:QT_QPA_PLATFORM = "offscreen"

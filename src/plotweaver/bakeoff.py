@@ -20,7 +20,8 @@ from plotweaver.hardware import query_gpu, require_supported_gpu
 from plotweaver.jsontext import parse_json_object
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
-from plotweaver.llm import ChatMessage, LLMBackend, MockBackend, ModelSpec
+from plotweaver.llm import ChatMessage, LLMBackend, ModelSpec
+from plotweaver.optional_mock import mock_backend
 from plotweaver.paths import repo_root
 from plotweaver.prompts import judge_prompt, system_message
 from plotweaver.registry import (
@@ -123,7 +124,7 @@ def run_bakeoff(
         main_spec = ModelSpec("mock-main", Path("mock-main.gguf"))
         low_spec = ModelSpec("mock-low", Path("mock-low.gguf"))
         specs = [main_spec, low_spec]
-        backend: LLMBackend = MockBackend()
+        backend: LLMBackend = mock_backend()
     else:
         specs = _real_specs(allow_other_license)
         backend = LlamaServer(ensure_llama_server())

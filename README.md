@@ -1,6 +1,6 @@
 # Voxprint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Chut. `plotweaver --version` prints `0.2.0 RC · build N "Chut"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Oreg. `plotweaver --version` prints `0.2.0 RC · build N "Oreg"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -8,23 +8,23 @@ Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages.
 - An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
 - A card under 23.5 GB keeps 2 GB free and uses the 16 GB model tier. A card of 23.5 GB or more keeps 3 GB free and uses the 24 GB tier. Settings can override the choice when the card can run it.
 
-The installer includes the app, Python 3.14, the Python dependencies, and the pinned llama.cpp b11476 Vulkan runtime. During setup it checks Python, the Vulkan and CUDA llama.cpp runtimes, the NVIDIA driver, and the stock model for this card. Anything missing is installed then, with progress on screen, into the shared suite folder. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
+The installer includes the app, Python 3.14, the Python dependencies (including voxprint-common 0.1, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. During setup it checks Python, the Vulkan and CUDA llama.cpp runtimes, the NVIDIA driver, and the stock model for this card. Anything missing is installed then, with progress on screen, into the shared suite folder. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
 
 ## Download and install
 
-Release files are on the [v0.2.0-rc5 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc5). Download `SHA256SUMS` with the installer and check it before you run anything.
+Release files are on the [v0.2.0-rc6 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc6). Download `SHA256SUMS` with the installer and check it before you run anything.
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc5-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc5-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc5-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc6-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc6-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc6-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver`, adds a Voxprint entry to the Start menu, and installs missing shared files under `%LOCALAPPDATA%\Voxprint\shared`. Administrator rights are not required.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc5_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc6_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -36,7 +36,7 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf voxprint-plotweaver-0.2.0rc5-linux-x86_64.tar.gz
+tar -xzf voxprint-plotweaver-0.2.0rc6-linux-x86_64.tar.gz
 ./voxprint-plotweaver/plotweaver-provision.sh
 ./voxprint-plotweaver/plotweaver-gui.sh
 ```

@@ -60,6 +60,13 @@ if ! PY="$(pick_python)"; then
   echo "could not prepare Python" >&2
   exit 2
 fi
+if [[ "$MOCK" == "1" ]] && ! "$PY" -c "import plotweaver_dev" >/dev/null 2>&1; then
+  if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+  fi
+  uv pip install --python "$PY" -e "$ROOT[dev]" || exit 2
+fi
 if ! "$PY" -m pytest --version >/dev/null 2>&1; then
   if ! command -v uv >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh

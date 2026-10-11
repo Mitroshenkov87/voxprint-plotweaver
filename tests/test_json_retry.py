@@ -6,10 +6,11 @@ import json
 import logging
 
 import pytest
+from plotweaver_dev.mock import MockBackend
 
 from plotweaver.errors import ModelOutputError
 from plotweaver.jsontext import parse_json_object
-from plotweaver.llm import JSON_SCHEMA_FORMAT, ChatMessage, Completion, MockBackend, complete_json
+from plotweaver.llm import JSON_SCHEMA_FORMAT, ChatMessage, Completion, complete_json
 
 
 def test_trailing_comma_and_fence_parse() -> None:

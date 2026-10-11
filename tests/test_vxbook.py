@@ -8,10 +8,10 @@ import zipfile
 from pathlib import Path
 
 from PIL import features
+from plotweaver_dev.mock import MockBackend
 
 from plotweaver.appinfo import APP_VERSION
 from plotweaver.cli import main
-from plotweaver.llm import MockBackend
 from plotweaver.sound import add_sound
 from plotweaver.vxbook import (
     BlockKind,

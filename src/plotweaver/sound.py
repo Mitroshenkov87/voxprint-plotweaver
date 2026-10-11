@@ -155,79 +155,6 @@ def sound_prompt(paragraphs: Sequence[Mapping[str, object]], locked: Mapping[str
     return "TASK: sound\nDATA: " + json.dumps(data, ensure_ascii=False) + "\n\n" + rules
 
 
-def mock_sound_document(user: str) -> dict[str, object]:
-    """Deterministic markup the CI mock returns for TASK: sound."""
-    payload = _prompt_data(user)
-    rows = payload.get("paragraphs")
-    paragraphs = rows if isinstance(rows, list) else []
-    scenes: list[dict[str, object]] = []
-    current: list[dict[str, object]] = []
-    for item in paragraphs:
-        if not isinstance(item, dict):
-            continue
-        if item.get("scene_start") is True and current:
-            scenes.append(_mock_scene(len(scenes) + 1, current))
-            current = []
-        current.append(item)
-    if current:
-        scenes.append(_mock_scene(len(scenes) + 1, current))
-    cues: list[dict[str, object]] = []
-    for scene in scenes:
-        start = _as_int(scene.get("start_paragraph"))
-        end = _as_int(scene.get("end_paragraph"))
-        mood = _as_str(scene.get("mood"))
-        cues.append(
-            {
-                "id": f"bed-{start}",
-                "kind": "bed",
-                "layer": "music",
-                "prompt": f"soft {mood} ambient music bed, no percussion, no vocals",
-                "mood": mood,
-                "intensity": scene.get("intensity"),
-                "start_paragraph": start,
-                "end_paragraph": end,
-                "gain_db": DEFAULTS["bed_gain_db"],
-                "duck_db": DEFAULTS["duck_db"],
-                "loop": True,
-                "src": "auto",
-                "conf": 0.8,
-            }
-        )
-        if start != 1:
-            at = "chapter_start" if _chapter_first(paragraphs, start) else "scene_break"
-            cues.append(
-                {
-                    "id": f"tr-{start}",
-                    "kind": "transition",
-                    "at": at,
-                    "prompt": "short warm musical cadence for a scene change, no vocals",
-                    "mood": mood,
-                    "intensity": 0.3,
-                    "start_paragraph": start,
-                    "position": "before",
-                    "gain_db": DEFAULTS["transition_gain_db"],
-                    "src": "auto",
-                    "conf": 0.7,
-                }
-            )
-        if end > start:
-            cues.append(
-                {
-                    "id": f"ac-{start + 1}",
-                    "kind": "accent",
-                    "prompt": "brief low string swell, two seconds, no percussion, no vocals",
-                    "mood": "tense",
-                    "intensity": 0.4,
-                    "start_paragraph": start + 1,
-                    "position": "before",
-                    "gain_db": DEFAULTS["accent_gain_db"],
-                    "src": "auto",
-                    "conf": 0.66,
-                }
-            )
-    return {"scenes": scenes, "cues": cues}
-
-
 def resolve_vxbook(path: Path) -> Path:
     """A .vxbook file, a project folder, or a directory that already holds the book."""
     if path.is_file():
@@ -246,7 +173,7 @@ def add_sound(
     mirror: bool = False,
 ) -> list[str]:
     """Write a new .vxbook with sound extension v1. The source file is not modified."""
-    # llm imports mock_sound_document, and vxbook imports check_sound, both from here.
+    # vxbook imports check_sound from here, and this function imports the model caller.
     from plotweaver.llm import ChatMessage, complete_json
     from plotweaver.vxbook import pack_vxbook, paragraph_map, read_archive, validate_vxbook
 
@@ -741,47 +668,6 @@ def _as_int(value: object) -> int:
 
 def _as_str(value: object) -> str:
     return value if isinstance(value, str) else ""
-
-
-def _prompt_data(user: str) -> dict[str, object]:
-    for line in user.splitlines():
-        if line.startswith("DATA: "):
-            parsed = json.loads(line.removeprefix("DATA: "))
-            if isinstance(parsed, dict):
-                return parsed
-    return {}
-
-
-def _mock_scene(number: int, rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
-    moods = ("mysterious", "calm", "warm", "tense")
-    start = _as_int(rows[0].get("index"))
-    end = _as_int(rows[-1].get("index"))
-    return {
-        "id": f"s{number}",
-        "chapter": _as_str(rows[0].get("chapter")),
-        "start_paragraph": start,
-        "end_paragraph": end,
-        "mood": moods[(number - 1) % len(moods)],
-        "intensity": 0.4,
-        "src": "auto",
-        "conf": 0.8,
-    }
-
-
-def _chapter_first(paragraphs: Sequence[object], start: int) -> bool:
-    chapter = ""
-    first = 0
-    for item in paragraphs:
-        if not isinstance(item, dict):
-            continue
-        if _as_int(item.get("index")) == start:
-            chapter = _as_str(item.get("chapter"))
-            break
-    for item in paragraphs:
-        if isinstance(item, dict) and _as_str(item.get("chapter")) == chapter:
-            first = _as_int(item.get("index"))
-            break
-    return first == start
 
 
 def _optional_json(data: bytes | None) -> dict[str, object] | None:

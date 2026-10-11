@@ -7,10 +7,11 @@ import json
 import zipfile
 from pathlib import Path
 
+from plotweaver_dev.mock import MockBackend
+
 from plotweaver.appinfo import APP_VERSION
 from plotweaver.cli import main
 from plotweaver.domain import BookMode, BookRequest, Language
-from plotweaver.llm import MockBackend
 from plotweaver.runner import run_book
 from plotweaver.sound import add_sound
 from plotweaver.store import Project

@@ -9,7 +9,6 @@ record. Heretic is not a registry entry.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -19,6 +18,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, assert_never
+
+from voxprint_common.gpu_probe import TIER_24_MIN_GIB, VramTier, tier_for_gib
+from voxprint_common.hashing import sha256_file
 
 from plotweaver.atomic import write_json
 from plotweaver.errors import PlotweaverError
@@ -31,8 +33,8 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _BARE_QUANT = re.compile(r"^(?:IQ|Q)[A-Z0-9_]*\.gguf$")
 TIER_16: Literal["16gb"] = "16gb"
 TIER_24: Literal["24gb"] = "24gb"
-# A 4090 reports 24564 MiB, which is 23.99 GiB. That card is a 24 GB tier.
-TIER_24_MIN_GB = 23.5
+# A 4090 reports 24564 MiB, which is 23.99 GiB. The suite probe's 24 GB cut is 23.5 GiB.
+TIER_24_MIN_GB = float(TIER_24_MIN_GIB)
 TierName = Literal["16gb", "24gb"]
 TierOverride = Literal["auto", "16gb", "24gb"]
 
@@ -158,11 +160,7 @@ def verify_file(path: Path, *, size: int, sha256: str) -> None:
     actual = path.stat().st_size
     if actual != size:
         raise PlotweaverError(f"{path.name} is {actual} bytes, expected {size}")
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    found = digest.hexdigest()
+    found = sha256_file(path)
     if found != sha256.lower():
         raise PlotweaverError(f"{path.name} SHA-256 {found} does not match {sha256}")
 
@@ -228,10 +226,13 @@ def tier_capacity_gb(total_gb: float) -> float:
 
 
 def detected_tier(total_gb: float) -> TierName:
-    """Pick the 16 GB or 24 GB tier from the card size."""
-    if total_gb >= TIER_24_MIN_GB:
+    """24 GB at the suite probe's 23.5 GiB cut. 8 GB and 16 GB stay on the 16 GB plan."""
+    found = tier_for_gib(total_gb)
+    if found is VramTier.GB24:
         return TIER_24
-    return TIER_16
+    if found is VramTier.GB16 or found is VramTier.GB8 or found is VramTier.UNKNOWN:
+        return TIER_16
+    assert_never(found)
 
 
 def _normalise_override(value: str) -> TierOverride:
