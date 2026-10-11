@@ -5,7 +5,13 @@ from __future__ import annotations
 from voxprint_common.gpu_probe import VramTier
 from voxprint_common.mdl.catalog import load_manifest, plan_files
 
-from plotweaver.mdl_progress import download_command, mdl_gui_supported
+from plotweaver.mdl_progress import (
+    download_command,
+    installer_gui_command,
+    manage_command,
+    mdl_gui_supported,
+    verify_repair_command,
+)
 from plotweaver.paths import repo_root
 
 _T_LITE_Q4 = "68c75f5940c36baca18113058ad3d55f6d1d3e1123a8053bb4bba8481805c960"
@@ -13,8 +19,22 @@ _GEMMA_12 = "0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42"
 _T_PRO = "b19e88cc1154b4b0c99f09bc7b57b8e5f3a6af4135581a3bfd31a2518ed58714"
 
 
-def test_gui_flag_waits_for_0_2_2() -> None:
-    assert mdl_gui_supported() is False
+def test_manage_models_uses_the_mdl_window() -> None:
+    assert mdl_gui_supported() is True
+    command = manage_command()
+    assert command[-5:] == ["-m", "voxprint_common.mdl", "--gui", "--app", "plotweaver"]
+    assert "download" not in command
+    installer = installer_gui_command()
+    assert installer[-6:] == [
+        "-m",
+        "voxprint_common.mdl",
+        "download",
+        "--gui",
+        "--app",
+        "plotweaver",
+    ]
+    repair = verify_repair_command()
+    assert repair[-6:] == ["-m", "voxprint_common.mdl", "verify", "--repair", "--app", "plotweaver"]
 
 
 def test_download_command_is_json_events() -> None:

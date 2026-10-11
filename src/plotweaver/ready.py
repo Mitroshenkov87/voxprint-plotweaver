@@ -1,13 +1,9 @@
 """One readiness gate for the window.
 
-The main window opens only when :func:`voxprint_common.mdl.ready` is true.
+The main window opens only when :func:`voxprint_common.mdl.ready` is true for
+``plotweaver``. In voxprint-common 0.2.4 that call checks each required file's
+presence and size. It does not trust the status file and it does not download.
 Otherwise the window shows a short notice and Manage models.
-
-``voxprint_common.mdl.ensure_ready(app, progress_cb)`` was checked against the
-0.2.1 wheel before this shim was written. ``progress_cb`` is
-``(fraction, message)``, and the call enqueues a download. That is not the
-gate: a missing set stays closed until Manage models, or the installer, has
-run ``voxprint-mdl download``.
 """
 
 from __future__ import annotations
@@ -16,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from voxprint_common.mdl import ready as mdl_ready
+from voxprint_common.mdl.catalog import CatalogError
 from voxprint_common.mdl.status import StatusError
 
 
@@ -32,15 +29,15 @@ class Failed:
 
 
 def ensure_ready(progress_cb: Callable[[str], None]) -> Ready | Failed:
-    """Return ready only when the MDL status file says so.
+    """Return ready only when 0.2.4 ``ready('plotweaver')`` is true.
 
     ``progress_cb`` receives one plain sentence. This function does not
     download and does not draw a window.
     """
     progress_cb("Checking models.")
     try:
-        if mdl_ready():
+        if mdl_ready("plotweaver"):
             return Ready()
-    except StatusError as exc:
+    except (StatusError, CatalogError) as exc:
         return Failed(str(exc))
     return Failed("models not ready")

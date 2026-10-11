@@ -1,6 +1,6 @@
 # Shared files
 
-Plotweaver shares runtimes and model files with the other Voxprint apps. The installer checks what is already there and fills the gaps before the first book. A later launch only repairs a file that is missing or corrupt.
+Plotweaver shares runtimes and model files with the other Voxprint apps. The installer checks what is already there and fills the gaps before the first book. A later launch runs `voxprint-mdl verify --repair --app plotweaver`, then opens only when the required files are present at the expected size.
 
 ## Location
 
@@ -33,7 +33,7 @@ Inside that folder:
     "gemma-4-12b-it-q4": {
       "kind": "model",
       "version": "1",
-      "path": "models/llm",
+      "path": "models/llm/gemma-4-12b-it-Q4_K_M.gguf",
       "sha256": "<sha256>",
       "installed_at": "2026-10-11T12:00:00+00:00",
       "refs": ["audiobook-builder", "plotweaver"],
@@ -45,7 +45,7 @@ Inside that folder:
 }
 ```
 
-Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each component through voxprint-common and deletes a shared file only when that call leaves `refs` empty. A component Audiobook Builder still lists is left in place. `models/`, `runtime/`, `voices/`, `cache/`, and the suite home are never one component and are never deleted. Uninstall removes the program folder only.
+Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each component through voxprint-common and deletes a shared file only when that call leaves `refs` empty. A component Audiobook Builder still lists is left in place. `models/`, `runtime/`, `voices/`, `cache/`, and the suite home are never one component and are never deleted. Plotweaver's own refuse-list runs first, then voxprint-common's guard. Launch repair runs `voxprint-mdl verify --repair --app plotweaver`, which clears a dangerous manifest path and does not delete those bytes. Uninstall removes the program folder only.
 
 ## Model weights
 
@@ -64,4 +64,4 @@ Least-censored models are not part of this set. Settings downloads them when the
 
 ## Checks after install
 
-Every launch of the window, every real `plotweaver run`, and `plotweaver --selftest --json` repeat the check. A file whose size and recorded timestamp still match is not hashed again. A missing file, a size mismatch, or a bad checksum is downloaded again. The window shows a progress dialog. Failures are one sentence, not a traceback.
+Every launch of the window and every real `plotweaver run` call `voxprint-mdl verify --repair --app plotweaver`, then open only when `ready('plotweaver')` is true. That repair clears a dangerous manifest path and does not delete the shared bytes. `plotweaver --selftest --json` still checks the bundled runtime copy. The window shows a progress dialog. Failures are one sentence, not a traceback.

@@ -1,8 +1,8 @@
 ; VOXPrint AI Plotweaver. Full installer: the app, Python 3.14, dependencies,
 ; and the pinned llama.cpp b11476 Vulkan runtime. Files go in
-; C:\Program Files\VOXPrint AI Suite\Plotweaver. Setup then runs
-; voxprint-mdl download --app plotweaver --json. A silent install logs that
-; download and does not open a window. A failed download does not fail setup.
+; C:\Program Files\VOXPrint AI Suite\Plotweaver. An interactive setup opens
+; voxprint-mdl download --gui --app plotweaver. /VERYSILENT logs the download
+; and does not open a window. A failed download does not fail setup.
 ; Windows 11 24H2 is the minimum.
 
 #ifndef MyAppVersion
@@ -53,6 +53,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\voxprint-plotweaver.exe"; W
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath('{app}')
 
 [Run]
+; Interactive setup opens the MDL window. /VERYSILENT stays headless and logs.
 Filename: "{app}\python\python.exe"; Parameters: "-m plotweaver mdl-progress --installer"; StatusMsg: "Downloading models..."; Flags: waituntilterminated; Check: not WizardSilent
 Filename: "{app}\python\python.exe"; Parameters: "-m plotweaver mdl-progress --quiet --installer"; StatusMsg: "Downloading models..."; Flags: runhidden waituntilterminated; Check: WizardSilent
 Filename: "{app}\voxprint-plotweaver.exe"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: postinstall skipifsilent nowait

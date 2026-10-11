@@ -8,7 +8,7 @@ VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages.
 - An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
 - A card under 23.5 GB keeps 2 GB free and uses the 16 GB model tier. A card of 23.5 GB or more keeps 3 GB free and uses the 24 GB tier. Settings can override the choice when the card can run it.
 
-The installer includes the app, Python 3.14, the Python dependencies (including voxprint-common 0.2.1, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. After the files are copied, setup runs `voxprint-mdl download --app plotweaver --json` and shows that progress. A silent install writes the same events to `%LOCALAPPDATA%\Voxprint\logs\plotweaver-mdl-install.log` on Windows and `~/.local/share/voxprint/logs/plotweaver-mdl-install.log` on Linux, and it does not open a window. A failed download does not fail setup. The app then says the models are not ready and offers Manage models. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
+The installer includes the app, Python 3.14, the Python dependencies (including voxprint-common 0.2.4, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. After the files are copied, an interactive setup opens the VOXPrint MDL window (`voxprint-mdl download --gui --app plotweaver`). A silent install (`/VERYSILENT`) writes the same events to `%LOCALAPPDATA%\Voxprint\logs\plotweaver-mdl-install.log` on Windows and `~/.local/share/voxprint/logs/plotweaver-mdl-install.log` on Linux, and it does not open a window. A failed download does not fail setup. The app then says the models are not ready and offers Manage models, which opens `voxprint-mdl --gui --app plotweaver`. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
 
 ## Download and install
 
@@ -40,7 +40,7 @@ sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc7-linux-x86_64.tar.gz
 voxprint-plotweaver-cli mdl-progress --quiet --installer
 ```
 
-An upgrade removes the previous program folder (`%LOCALAPPDATA%\Voxprint\Plotweaver` on Windows, `/opt/voxprint-plotweaver` on Linux), updates the shortcuts and PATH, and keeps models and shared files. `plotweaver` remains on PATH for this release and prints `plotweaver is deprecated; use voxprint-plotweaver-cli`.
+An upgrade on Linux removes the previous program folder `/opt/voxprint-plotweaver`. It does not delete `%LOCALAPPDATA%\Voxprint` or the suite home. Shortcuts and PATH are updated, and models and shared files stay. `plotweaver` remains on PATH for this release and prints `plotweaver is deprecated; use voxprint-plotweaver-cli`.
 
 ## Shared files
 
@@ -51,7 +51,7 @@ The installer puts shared files in one place:
 
 GGUF weights go in the suite models folder, `<home>/models/llm` (`%LOCALAPPDATA%\Voxprint\models\llm` on Windows, `~/.local/share/voxprint/models/llm` on Linux). `PLOTWEAVER_MODELS` or `VOXPRINT_MODELS_DIR` overrides that folder. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded and a copy left in `shared/models/llm` by an older Plotweaver install. A Forge file whose published name is only the quant, such as `Q5_K_M.gguf`, is stored as the registry id plus that name so two models cannot overwrite each other. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it.
 
-Every launch checks whether VOXPrint MDL reports the models ready. The main window opens only then. Otherwise the app shows a short notice and Manage models, which follows `voxprint-mdl download --app plotweaver --json`. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
+Every launch checks whether VOXPrint MDL reports the models ready. The main window opens only then. Otherwise the app shows a short notice and Manage models, which opens `voxprint-mdl --gui --app plotweaver`. If that window cannot start, Plotweaver shows the download events in its own dialog. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
 
 A card under 23.5 GB installs Gemma 4 12B Q4_K_M plus T-lite-it-2.1 Q4_K_M, and keeps 2 GB of VRAM free. A card of 23.5 GB or more installs T-pro-it-2.1 Q4_K_M only. Setup shows MDL's progress. MDL checks free disk (the file size, plus 10%, plus 2 GB) before the download. Each file is checked by revision, size, and SHA-256.
 

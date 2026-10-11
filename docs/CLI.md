@@ -35,7 +35,7 @@ Argparse usage errors are not JSON.
 
 Checks the shared suite files, repairs a missing or corrupt one, and prints one JSON object. Progress stays on stderr. `ok` is false when the NVIDIA driver is below the CUDA minimum or a required file could not be repaired. The driver message includes `https://www.nvidia.com/Download/index.aspx`. This is not `plotweaver gui --selftest`, which writes a one-chapter mock book.
 
-`plotweaver mdl-progress` shows progress from `voxprint-mdl download --app plotweaver --json`. `--quiet --installer` logs to the suite log directory and exits 0 when the download fails. `plotweaver release-shared` drops Plotweaver from `manifest.json` and leaves a file another app still uses.
+`plotweaver mdl-progress` opens the MDL window for an interactive install (`voxprint-mdl download --gui --app plotweaver`). `--quiet --installer` logs to the suite log directory, does not open a window, and exits 0 when the download fails. Launch repair runs `voxprint-mdl verify --repair --app plotweaver`. `plotweaver release-shared` drops Plotweaver from `manifest.json` and leaves a file another app still uses.
 
 ## `--json` objects
 
@@ -223,7 +223,7 @@ plotweaver models list [--registry PATH] [--json] [--dry-run]
 plotweaver mdl-progress [--quiet] [--installer]
 ```
 
-Shows progress from `voxprint-mdl download --app plotweaver --json`. `--quiet` writes the log and does not open a window. `--installer` exits 0 when the download fails.
+An interactive install opens `voxprint-mdl download --gui --app plotweaver`. `--quiet` writes the log and does not open a window. `--installer` exits 0 when the download fails.
 
 ### `models import-forge-manifest`
 
