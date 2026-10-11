@@ -120,10 +120,10 @@ import sys
 from pathlib import Path
 
 out, err, *cmd = sys.argv[1:]
-if out == "-":
-    out = ""
-if err == "-":
-    err = ""
+if out == '-':
+    out = ''
+if err == '-':
+    err = ''
 proc = subprocess.run(
     [sys.executable, *cmd],
     stdout=subprocess.PIPE,
