@@ -89,9 +89,7 @@ def test_case_insensitive_walk_finds_the_cli(tmp_path: Path) -> None:
     assert handoff._case_insensitive(requested) == cli
 
 
-def test_windows_lookup_uses_the_case_walk(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_windows_lookup_uses_the_case_walk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     found = tmp_path / "folded.exe"
     monkeypatch.setattr(handoff.os, "name", "nt")
     monkeypatch.setattr(handoff, "_case_insensitive", lambda _path: found)
