@@ -46,6 +46,10 @@ jobs:
           echo "EPUBCHECK=$GITHUB_WORKSPACE/epubcheck-5.4.0/epubcheck.jar" >> "$GITHUB_ENV"
       - name: Tests
         run: pytest
+      - name: Latin and Cyrillic glyphs
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest tests/test_fonts.py
       - name: Wheel has no mock modules
         run: |
           python -m pip install -q build
@@ -65,6 +69,21 @@ jobs:
           curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
           tar -xzf gitleaks.tar.gz gitleaks
           ./gitleaks detect --source . --config .gitleaks.toml --redact --exit-code 1
+
+  windows-powershell-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          python -m pip install --find-links packaging/wheels -e ".[dev]" -e dev/plotweaver_dev
+      - name: Windows PowerShell 5.1 mock smoke
+        shell: powershell
+        run: powershell.exe -NoProfile -File scripts/vm_test.ps1 -Smoke -Mock -Json
 
   windows-installer:
     runs-on: windows-latest

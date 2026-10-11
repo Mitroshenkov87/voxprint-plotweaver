@@ -26,7 +26,12 @@ def test_version_is_shared() -> None:
     assert list((root / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert "voxprint-common==0.1.*" in project
+    assert "voxprint-common==0.1.1" in project
+    wheels = root / "packaging" / "wheels"
+    assert (wheels / "voxprint_common-0.1.1-py3-none-any.whl").is_file()
+    assert (wheels / "voxprint_common-0.1.1-py3-none-any.whl.sha256").is_file()
+    assert (wheels / "voxprint_common-0.1.1.tar.gz").is_file()
+    assert (wheels / "voxprint_common-0.1.1.tar.gz.sha256").is_file()
     assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")

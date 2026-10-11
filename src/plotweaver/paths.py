@@ -1,9 +1,9 @@
 """Checkout root, the shared suite folder, and the suite settings file.
 
-Suite home and the shared directory come from voxprint-common. Model files stay
-under ``<shared>/models`` (override ``PLOTWEAVER_MODELS``). voxprint-common's
-``models_dir()`` defaults to ``<home>/models``, which this app still reads as
-the older Audiobook Builder folder and does not use as the primary store.
+Suite home, the shared directory, and the model directory come from
+voxprint-common. ``PLOTWEAVER_MODELS`` still overrides the model directory.
+A file already stored under ``<shared>/models`` by an older Plotweaver
+install is reused when its size and SHA-256 match.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from voxprint_common.paths import home, state_dir
+from voxprint_common.paths import models_dir as suite_models_dir
 from voxprint_common.paths import shared_dir as suite_shared_dir
 
 
@@ -62,11 +63,11 @@ def shared_tools_dir() -> Path:
 
 
 def models_dir() -> Path:
-    """Shared suite model folder, ``<shared>/models``. Override with PLOTWEAVER_MODELS."""
+    """Suite model folder from voxprint-common. ``PLOTWEAVER_MODELS`` wins when set."""
     override = os.environ.get("PLOTWEAVER_MODELS")
     if override:
         return Path(override)
-    return shared_dir() / "models"
+    return suite_models_dir()
 
 
 def legacy_models_dir() -> Path:
@@ -87,10 +88,9 @@ def suite_state_dir() -> Path:
 
 
 def gguf_dir() -> Path:
-    """Shared GGUF folder, ``<shared>/models/llm``.
+    """GGUF folder, ``<models>/llm``, using the suite model root.
 
-    A file already stored by Audiobook Builder under the older ``<home>/models/llm``
-    path is reused when its size and SHA-256 match.
+    A matching file under the older ``<shared>/models/llm`` path is reused.
     """
     return models_dir() / "llm"
 

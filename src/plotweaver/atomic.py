@@ -18,6 +18,8 @@ from voxprint_common.atomic import (
     write_text,
 )
 
+from plotweaver.textio import read_text
+
 __all__ = [
     "LockTimeout",
     "exclusive_lock",
@@ -31,4 +33,4 @@ __all__ = [
 
 def read_json(path: Path) -> Any:
     """Read a JSON file written by write_json."""
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(read_text(path))

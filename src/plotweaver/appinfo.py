@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from plotweaver.textio import read_text
+
 APP_NAME = "Voxprint AI Plotweaver"
 GITHUB_REPO = "Mitroshenkov87/voxprint-plotweaver"
 LOCK_OWNER = "plotweaver"
@@ -36,7 +38,7 @@ def load_build() -> dict[str, Any]:
     """Read BUILD.json. Callers that display a label should use version_label()."""
     path = build_json_path()
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(read_text(path))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"BUILD.json is missing or invalid: {path}") from exc
     if not isinstance(data, dict):
@@ -92,7 +94,7 @@ def release_title(run_number: int) -> str:
 
 def stamp_build(path: Path, run_number: int) -> int:
     """Write build = run number + offset. Local checkouts stay null and show dev."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(read_text(path))
     if not isinstance(data, dict) or "offset" not in data:
         raise RuntimeError(f"BUILD.json must be an object with offset: {path}")
     build = int(run_number) + int(data["offset"])

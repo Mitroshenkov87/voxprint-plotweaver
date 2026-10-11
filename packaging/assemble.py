@@ -83,9 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         str(wheels),
         str(_ROOT),
     )
-    bundled = dest / "wheels"
-    bundled.mkdir()
-    shutil.copy2(wheel, bundled / wheel.name)
+    _bundle_common(wheels, wheel, dest)
     _copy_payload(dest)
     runtime = dest / "runtime" / "llama.cpp-b11476"
     runtime.parent.mkdir(parents=True, exist_ok=True)
@@ -110,11 +108,29 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _common_wheel() -> Path:
-    """Vendored voxprint-common 0.1 wheel. Installers must not fetch it."""
+    """Vendored voxprint-common 0.1.1 wheel. Installers must not fetch it."""
     matches = sorted((_ROOT / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
     if not matches:
         raise SystemExit("packaging/wheels is missing voxprint-common 0.1")
     return matches[-1]
+
+
+def _bundle_common(wheels: Path, wheel: Path, dest: Path) -> None:
+    """Copy the wheel, the sdist, and their sha256 sidecars into the stage."""
+    bundled = dest / "wheels"
+    bundled.mkdir()
+    shutil.copy2(wheel, bundled / wheel.name)
+    version = wheel.name.split("-", 2)[1]
+    names = [
+        f"{wheel.name}.sha256",
+        f"voxprint_common-{version}.tar.gz",
+        f"voxprint_common-{version}.tar.gz.sha256",
+    ]
+    for name in names:
+        extra = wheels / name
+        if not extra.is_file():
+            raise SystemExit(f"packaging/wheels is missing {name}")
+        shutil.copy2(extra, bundled / name)
 
 
 def _install_python(dest: Path) -> Path:

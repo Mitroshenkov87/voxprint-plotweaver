@@ -31,6 +31,7 @@ from plotweaver.registry import (
     load_registry,
     model_offered,
     resolve_tier,
+    stock_for_tier,
     stored_filename,
     tier_capacity_gb,
     tier_headroom_gb,
@@ -52,11 +53,12 @@ _EXCLUDED = ("thedrummer", "heretic", "yandex")
 def test_gguf_dir_is_the_shared_llm_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
     monkeypatch.delenv("PLOTWEAVER_MODELS", raising=False)
+    monkeypatch.delenv("VOXPRINT_MODELS_DIR", raising=False)
     monkeypatch.delenv("PLOTWEAVER_LLAMA_DIR", raising=False)
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     assert shared_dir() == tmp_path / "shared"
-    assert models_dir() == tmp_path / "shared" / "models"
-    assert gguf_dir() == tmp_path / "shared" / "models" / "llm"
+    assert models_dir() == tmp_path / "models"
+    assert gguf_dir() == tmp_path / "models" / "llm"
     assert llama_runtime_dir() == tmp_path / "shared" / "runtime" / f"llama.cpp-{LLAMA_BUILD}"
     assert shared_tools_dir() == tmp_path / "shared" / "tools"
     monkeypatch.setenv("PLOTWEAVER_MODELS", str(tmp_path / "override"))
@@ -377,6 +379,35 @@ def test_uncensored_download_is_separate_from_the_default_install(
     assert ensure_uncensored_models(total_vram_gb=24, free_gb=22, store=tmp_path) == 2
     assert "qwen3.6-27b-abliterated-q5" in downloaded
     assert "gemma-4-31b-abliterated-q4" in downloaded
+
+
+def test_stock_for_tier_excludes_the_other_tier() -> None:
+    entries = load_registry(repo_root() / "bakeoff" / "models.toml")
+    assert [entry.id for entry in stock_for_tier(entries, total_gb=24)] == ["t-pro-it-2.1-q4"]
+    assert [entry.id for entry in stock_for_tier(entries, total_gb=16)] == [
+        "gemma-4-12b-it-q4",
+        "t-lite-it-2.1-q4",
+        "t-lite-it-2.1-q5",
+    ]
+
+
+def test_fresh_24gb_install_downloads_only_t_pro(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    downloaded: list[str] = []
+
+    def fake_download(entry, store, *, allow_other: bool = False, on_progress=None):  # noqa: ANN001
+        del allow_other, on_progress
+        downloaded.append(entry.id)
+        target = store / stored_filename(entry)
+        target.write_bytes(b"x")
+        return target
+
+    monkeypatch.setattr("plotweaver.install.download_model", fake_download)
+    fresh = tmp_path / "fresh"
+    fresh.mkdir()
+    assert ensure_default_install(free_gb=22, total_gb=24, store=fresh) == 1
+    assert downloaded == ["t-pro-it-2.1-q4"]
 
 
 def test_uncensored_models_setting_defaults_off(

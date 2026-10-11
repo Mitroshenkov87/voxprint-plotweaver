@@ -14,6 +14,13 @@ Not covered by that licence (each has its own terms):
     The copyright notice and disclaimer stay in those files and in LICENSE.md
     beside them. The schema namespace is http://www.gribuser.ru/xml/fictionbook/2.0;
     this is the 2.1 edition (genre match, share instructions).
+  * Inter 4.1 (SIL Open Font License 1.1), Copyright 2016 The Inter Project Authors.
+    https://github.com/rsms/inter
+    Vendored at src/plotweaver/ui/fonts/Inter-Regular.ttf and Inter-SemiBold.ttf.
+    The licence is Inter-OFL.txt beside those files.
+  * Noto Sans (SIL Open Font License 1.1), Copyright 2022 The Noto Project Authors.
+    Vendored at src/plotweaver/ui/fonts/NotoSans-Regular.ttf.
+    The licence is NotoSans-OFL.txt beside that file.
   * Third-party Python packages (PySide6/Qt, python-docx, ebooklib, datasketch,
     pymorphy3, httpx, and their dependencies) keep their own licences.
 

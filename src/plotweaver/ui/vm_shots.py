@@ -10,6 +10,7 @@ from PySide6.QtGui import QImage, QPainter
 from PySide6.QtWidgets import QApplication
 
 from plotweaver.hardware import query_gpu
+from plotweaver.ui.fonts import register_ui_fonts, ui_font
 from plotweaver.ui.window import FORM, PROGRESS, RESULT, SETTINGS, MainWindow
 
 _FAKE_4090 = "NVIDIA GeForce RTX 4090,8.9,24576,22000"
@@ -28,7 +29,11 @@ def save_vm_shots(folder: Path, *, export_dir: Path | None = None) -> list[Path]
     os.environ["PLOTWEAVER_UI_PROJECT"] = str(folder / "shot-project")
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     try:
-        app = QApplication.instance() or QApplication([])
+        app = QApplication.instance()
+        if not isinstance(app, QApplication):
+            app = QApplication([])
+        register_ui_fonts()
+        app.setFont(ui_font(10))
         window = MainWindow(mock=True)
         window.resize(900, 1500)
         window.show()
@@ -102,6 +107,31 @@ def _shot_result(window: MainWindow, path: Path, export_dir: Path | None) -> Pat
     window.result_label.setText("Done\n" + "\n".join(lines))
     window.stack.setCurrentIndex(RESULT)
     return _save(window, path)
+
+
+def save_main_window(path: Path) -> Path:
+    """Grab the real main window at 1920x1080. An offscreen platform is refused."""
+    if os.environ.get("QT_QPA_PLATFORM", "").strip().lower() == "offscreen":
+        raise RuntimeError("main-window.png needs a real window")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    app = QApplication.instance()
+    if not isinstance(app, QApplication):
+        app = QApplication([])
+    register_ui_fonts()
+    app.setFont(ui_font(10))
+    window = MainWindow(mock=True)
+    window.resize(1920, 1080)
+    window.show()
+    app.processEvents()
+    screen = window.screen()
+    if screen is None:
+        raise RuntimeError("main-window.png needs a real window")
+    pixmap = screen.grabWindow(int(window.winId()))
+    if pixmap.width() < 1900 or pixmap.height() < 1000:
+        raise RuntimeError(f"main window is {pixmap.width()}x{pixmap.height()}")
+    if not pixmap.save(str(path), "PNG"):
+        raise RuntimeError(f"could not save {path}")
+    return path
 
 
 def _save(window: MainWindow, path: Path) -> Path:

@@ -36,7 +36,7 @@ Neither script asks questions. A missing GPU on a non-mock run stops before the 
 1. Pytest subset: `tests/test_models.py`, `tests/test_cli_machine.py`, `tests/test_vxbook.py`, and `tests/test_ui.py::test_vm_shots`.
 2. CLI smoke with `--json` and `--dry-run`: `run`, `vxbook validate`, and `models import-forge-manifest`.
 3. `plotweaver doctor`, which prints the GPU, the detected tier, and the usable VRAM.
-4. Stock models, then the published Forge least-censored files that fit the card, into `~/.local/share/voxprint/shared/models/llm`. llama.cpp b11476 is downloaded under `~/.local/share/voxprint/shared/runtime` if this checkout does not already have it.
+4. Stock models for the detected tier only, then the published Forge least-censored files that fit the card, into the suite models folder (`~/.local/share/voxprint/models/llm` on Linux). The download shows the total size and stops when the drive cannot hold the next file, plus 10%, plus 2 GB. llama.cpp b11476 is downloaded under `~/.local/share/voxprint/shared/runtime` if this checkout does not already have it.
 5. A 16 GB pass. Settings for this run are stored under the output directory (`PLOTWEAVER_STATE`), so the machine's saved settings stay as they were. The tier override is `16gb`. `PLOTWEAVER_VRAM_BUDGET_CAP_GB=14` makes the 24 GB card plan a 16 GB server budget (16 GB minus the 2 GB headroom). The book is `scripts/vm-brief.md`: two chapters, one scene each, dark themes on, so the stock model drafts and the Forge least-censored model fills. Exports are EPUB 3, FictionBook 2.1, `book.vxbook`, and `book.sound.vxbook`. The script validates `book.vxbook`.
 6. A 24 GB pass of the same brief, with the override set to `24gb` and the budget cap cleared.
 7. The short Mars story, `scripts/e2e_mars.sh`, as the Audiobook Builder hand-off sample (`book.vxbook` and `book.sound.vxbook`).
@@ -55,6 +55,7 @@ The script saves these offscreen Qt renders (`QT_QPA_PLATFORM=offscreen`) in `sc
 | `progress.png` | Progress screen mid-run (story bible through the dark-scene fill) |
 | `result.png` | Result screen listing `book.epub`, `book.fb2`, `book.vxbook`, and `book.sound.vxbook`. On a GPU run this is rendered again from the 24 GB export. |
 | `settings-tier.png` | Settings model tier panel |
+| `main-window.png` | The real main window at 1920×1080, grabbed from the display. A mock run with no display prints a note and continues. |
 
 When no GPU is visible, the Settings panel is rendered against a stand-in RTX 4090 (24576 MiB total, 22000 MiB free) so the 24 GB tier is on screen. A real 4090 reports 24564 MiB, which is 23.99 GiB, and is still the 24 GB tier. The tier floor is 23.5 GB.
 

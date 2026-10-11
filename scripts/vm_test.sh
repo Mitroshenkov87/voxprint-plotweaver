@@ -128,6 +128,15 @@ save_vm_shots(Path(os.environ["PLOTWEAVER_VM_SHOTS"]), export_dir=export)
 '
 }
 
+save_main_window() {
+  env -u QT_QPA_PLATFORM PLOTWEAVER_VM_OUT="$OUT" "$PY" -c '
+from pathlib import Path
+import os
+from plotweaver.ui.vm_shots import save_main_window
+save_main_window(Path(os.environ["PLOTWEAVER_VM_OUT"]) / "screenshots" / "main-window.png")
+'
+}
+
 set_tier() {
   local tier="$1"
   PLOTWEAVER_VM_TIER="$tier" "$PY" -c '
@@ -343,6 +352,14 @@ fi
 echo "screenshots"
 if ! save_shots; then
   status=1
+fi
+echo "main window"
+if ! save_main_window; then
+  if [[ "$MOCK" == "1" ]]; then
+    echo "main window skipped (no display)"
+  else
+    status=1
+  fi
 fi
 
 if [[ "$MOCK" == "1" ]]; then

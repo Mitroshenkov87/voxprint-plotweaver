@@ -25,6 +25,7 @@ from plotweaver.gguf import block_and_experts
 from plotweaver.hardware import query_gpu, vram_budget_gb, vram_short_message
 from plotweaver.llm import ChatMessage, Completion, ModelSpec
 from plotweaver.paths import suite_state_dir
+from plotweaver.textio import read_text
 from plotweaver.vram_plan import ServerPlan, plan_server
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
@@ -79,7 +80,7 @@ def stop_owned_server() -> bool:
     if not path.is_file():
         return False
     try:
-        pid = int(path.read_text(encoding="utf-8").strip())
+        pid = int(read_text(path).strip())
     except OSError, ValueError:
         path.unlink(missing_ok=True)
         return False
@@ -102,7 +103,7 @@ def _clear_pidfile(pid: int) -> None:
     if not path.is_file():
         return
     try:
-        current = int(path.read_text(encoding="utf-8").strip())
+        current = int(read_text(path).strip())
     except OSError, ValueError:
         path.unlink(missing_ok=True)
         return
@@ -134,7 +135,7 @@ def _process_name(pid: int) -> str:
         return text.strip()
     comm = Path(f"/proc/{pid}/comm")
     try:
-        return comm.read_text(encoding="utf-8").strip()
+        return read_text(comm).strip()
     except OSError:
         return ""
 

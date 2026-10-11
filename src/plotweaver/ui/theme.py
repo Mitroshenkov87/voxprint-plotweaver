@@ -89,6 +89,7 @@ def build_style(*, glass: bool) -> str:
     """Suite stylesheet, plus the menu bar and tool buttons this window uses."""
     root = ROOT_GLASS if glass else ROOT_PLAIN
     extra = f"""
+    * {{ font-family: "Inter", "Noto Sans", "Segoe UI"; }}
     QMainWindow {{ background: {root}; color: {TEXT}; }}
     QMenuBar {{ background: {root}; color: {TEXT}; }}
     QMenuBar::item:selected {{ background: {MENU_SELECTION}; }}

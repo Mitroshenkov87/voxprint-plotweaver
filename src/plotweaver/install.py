@@ -26,6 +26,7 @@ from plotweaver.registry import (
     load_registry,
     model_offered,
     registry_path,
+    stock_for_tier,
     uncensored_offer_allowed,
     weight_path,
 )
@@ -39,9 +40,7 @@ def ensure_default_install(
     total = free_gb if total_gb is None else total_gb
     folder = store or gguf_dir()
     count = 0
-    for entry in load_registry(registry_path()):
-        if not is_stock(entry) or not model_offered(entry, total_gb=total, free_gb=free_gb):
-            continue
+    for entry in stock_for_tier(load_registry(registry_path()), total_gb=total):
         if weight_path(folder, entry).is_file():
             continue
         download_model(entry, folder)

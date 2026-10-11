@@ -8,6 +8,8 @@ from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
+from plotweaver.textio import read_text
+
 ICON_NAMES = ("save", "save-as", "save-copy", "export", "download")
 _DIR = Path(__file__).resolve().parent / "icons"
 
@@ -17,7 +19,7 @@ def suite_icon(name: str, color: str, *, size: int = 22) -> QIcon:
     if name not in ICON_NAMES:
         raise KeyError(name)
     path = _DIR / f"{name}.svg"
-    svg = path.read_text(encoding="utf-8").replace("currentColor", color)
+    svg = read_text(path).replace("currentColor", color)
     renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
     if not renderer.isValid():
         raise RuntimeError(f"could not render {path.name}")

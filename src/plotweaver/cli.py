@@ -49,6 +49,8 @@ from plotweaver.scenarios import mars_request
 from plotweaver.sound import add_sound, resolve_vxbook
 from plotweaver.store import Project
 from plotweaver.suite import provision_main, release_shared, repair_shared, selftest_report
+from plotweaver.textio import read_text
+from plotweaver.ui.fonts import register_ui_fonts, ui_font
 from plotweaver.ui.i18n import tr
 from plotweaver.ui.theme import SPLASH
 from plotweaver.ui.window import MainWindow
@@ -541,7 +543,7 @@ def _read_brief_file(args: argparse.Namespace) -> BookBrief | None:
         return None
     if not args.brief.is_file():
         raise PlotweaverError(f"brief not found: {args.brief}")
-    return parse_brief(args.brief.read_text(encoding="utf-8"))
+    return parse_brief(read_text(args.brief))
 
 
 def _brief_draft(args: argparse.Namespace) -> int:
@@ -593,7 +595,7 @@ def _run(args: argparse.Namespace) -> int:
     if args.synopsis is not None:
         if not args.synopsis.is_file():
             raise PlotweaverError(f"synopsis not found: {args.synopsis}")
-        synopsis = args.synopsis.read_text(encoding="utf-8")
+        synopsis = read_text(args.synopsis)
         if not synopsis.strip():
             raise PlotweaverError("synopsis is empty")
     if exists and args.synopsis is None:
@@ -836,6 +838,8 @@ def _gui(args: argparse.Namespace) -> int:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     current = QApplication.instance()
     app = current if isinstance(current, QApplication) else QApplication([])
+    register_ui_fonts()
+    app.setFont(ui_font(10))
     if not args.mock and not args.selftest:
         if not _repair_before_window(app):
             return 1

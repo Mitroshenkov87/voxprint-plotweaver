@@ -58,6 +58,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_downloading": "Downloading…",
         "repair_title": "Checking shared files",
         "repair_checking": "Checking shared files.",
+        "repair_stock_total": "Stock models for this card: {size}.",
         "repair_reusing": "Reusing {name} already installed by another Voxprint app.",
         "repair_installing": "Installing {name} ({size}).",
         "repair_broken": "Repairing {name}.",
@@ -188,6 +189,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_downloading": "Скачивание…",
         "repair_title": "Проверка общих файлов",
         "repair_checking": "Проверяю общие файлы.",
+        "repair_stock_total": "Стандартные модели для этой карты: {size}.",
         "repair_reusing": "Беру {name}: его уже поставило другое приложение Voxprint.",
         "repair_installing": "Устанавливаю {name} ({size}).",
         "repair_broken": "Восстанавливаю {name}.",
@@ -315,6 +317,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "settings_downloading": "Wird geladen…",
         "repair_title": "Gemeinsame Dateien prüfen",
         "repair_checking": "Gemeinsame Dateien werden geprüft.",
+        "repair_stock_total": "Standardmodelle für diese Karte: {size}.",
         "repair_reusing": (
             "{name} wird wiederverwendet. Eine andere Voxprint-App hat die Datei schon."
         ),
