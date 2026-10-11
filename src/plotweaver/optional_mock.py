@@ -25,6 +25,8 @@ def mock_backend() -> LLMBackend:
     if _factory is None:
         raise PlotweaverError(
             "--mock is not included in this install. "
-            'Install the dev extra: pip install "voxprint-plotweaver[dev]".'
+            "Install the dev extra from a checkout: "
+            "pip install --find-links packaging/wheels "
+            '-e ".[dev]" -e dev/plotweaver_dev.'
         )
     return _factory()

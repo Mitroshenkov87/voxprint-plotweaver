@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 license = "Apache-2.0"
 authors = [{ name = "Aleksandr Mitroshenkov" }]
 dependencies = [
-  "voxprint-common @ file:packaging/wheels/voxprint_common-0.1.0-py3-none-any.whl",
+  "voxprint-common==0.1.*",
   "PySide6-Essentials>=6.10",
   "httpx>=0.28",
   "python-docx>=1.2",
@@ -19,8 +19,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The mock package lives in dev/plotweaver_dev and is installed beside this
+# extra (`pip install -e ".[dev]" -e dev/plotweaver_dev`). A relative path here
+# is copied into the built wheel, and uv then refuses to install the app.
 dev = [
-  "plotweaver-dev @ file:dev/plotweaver_dev",
   "pytest>=8.3",
   "ruff>=0.12",
   "mypy>=1.17",

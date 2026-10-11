@@ -52,7 +52,7 @@ pick_python() {
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
   uv venv --python 3.14 "$ROOT/.venv"
-  uv pip install --python "$ROOT/.venv/bin/python" -e "$ROOT[dev]"
+  uv pip install --python "$ROOT/.venv/bin/python" --find-links "$ROOT/packaging/wheels" -e "$ROOT[dev]" -e "$ROOT/dev/plotweaver_dev"
   echo "$ROOT/.venv/bin/python"
 }
 
@@ -65,14 +65,14 @@ if [[ "$MOCK" == "1" ]] && ! "$PY" -c "import plotweaver_dev" >/dev/null 2>&1; t
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
-  uv pip install --python "$PY" -e "$ROOT[dev]" || exit 2
+  uv pip install --python "$PY" --find-links "$ROOT/packaging/wheels" -e "$ROOT[dev]" -e "$ROOT/dev/plotweaver_dev" || exit 2
 fi
 if ! "$PY" -m pytest --version >/dev/null 2>&1; then
   if ! command -v uv >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
-  uv pip install --python "$PY" -e "$ROOT[dev]"
+  uv pip install --python "$PY" --find-links "$ROOT/packaging/wheels" -e "$ROOT[dev]" -e "$ROOT/dev/plotweaver_dev"
 fi
 
 export PLOTWEAVER_NO_UPDATE_CHECK=1

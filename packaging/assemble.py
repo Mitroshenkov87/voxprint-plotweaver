@@ -70,8 +70,19 @@ def main(argv: list[str] | None = None) -> int:
     for marker in prefix.rglob("EXTERNALLY-MANAGED"):
         marker.unlink()
     wheel = _common_wheel()
+    wheels = wheel.parent
     _uv("pip", "install", "--python", str(py), "--link-mode", "copy", "--no-index", str(wheel))
-    _uv("pip", "install", "--python", str(py), "--link-mode", "copy", str(_ROOT))
+    _uv(
+        "pip",
+        "install",
+        "--python",
+        str(py),
+        "--link-mode",
+        "copy",
+        "--find-links",
+        str(wheels),
+        str(_ROOT),
+    )
     bundled = dest / "wheels"
     bundled.mkdir()
     shutil.copy2(wheel, bundled / wheel.name)

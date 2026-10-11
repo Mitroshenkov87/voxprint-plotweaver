@@ -105,7 +105,7 @@ Python 3.14 is required. From a checkout:
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
+.venv/bin/python -m pip install --find-links packaging/wheels -e ".[dev]" -e dev/plotweaver_dev
 .venv/bin/plotweaver doctor --mock
 .venv/bin/plotweaver gui --mock --selftest
 ```

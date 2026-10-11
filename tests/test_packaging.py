@@ -26,11 +26,13 @@ def test_version_is_shared() -> None:
     assert list((root / "packaging" / "wheels").glob("voxprint_common-0.1.*.whl"))
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert "voxprint-common @ file:packaging/wheels/voxprint_common-0.1." in project
+    assert "voxprint-common==0.1.*" in project
+    assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
     linux = (root / "packaging" / "linux" / "build-package.sh").read_text(encoding="utf-8")
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "--find-links" in workflow
     assert 'version = {attr = "plotweaver.appinfo.APP_VERSION"}' in project
     assert 'MyAppVersion "0.2.0rc1"' not in installer
     assert 'MyAppVersion "0.2.0rc2"' not in installer

@@ -71,7 +71,7 @@ function Find-Python {
     & uv venv --python 3.14 (Join-Path $Root ".venv")
     if ($LASTEXITCODE -ne 0) { return $null }
     $created = Join-Path $Root ".venv\Scripts\python.exe"
-    & uv pip install --python $created -e "$Root[dev]"
+    & uv pip install --python $created --find-links (Join-Path $Root "packaging\wheels") -e "$Root[dev]" -e (Join-Path $Root "dev\plotweaver_dev")
     if ($LASTEXITCODE -ne 0) { return $null }
     return $created
 }
@@ -85,7 +85,7 @@ if (-not $Py) {
 if ($Mock) {
     & $Py -c "import plotweaver_dev" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        & uv pip install --python $Py -e "$Root[dev]"
+        & uv pip install --python $Py --find-links (Join-Path $Root "packaging\wheels") -e "$Root[dev]" -e (Join-Path $Root "dev\plotweaver_dev")
         if ($LASTEXITCODE -ne 0) {
             [Console]::Error.WriteLine("--mock needs the dev extra and it could not be installed")
             Write-Result 2
