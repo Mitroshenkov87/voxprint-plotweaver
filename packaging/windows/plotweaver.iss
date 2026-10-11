@@ -1,5 +1,6 @@
 ; Voxprint AI Plotweaver. Full installer: the app, Python 3.14, dependencies,
-; and the pinned llama.cpp b11476 Vulkan runtime. Models download on first run.
+; and the pinned llama.cpp b11476 Vulkan runtime. After the files are copied,
+; provision installs anything still missing into %LOCALAPPDATA%\Voxprint\shared.
 ; Start menu group is Voxprint. Windows 11 24H2 is the minimum.
 
 #ifndef MyAppVersion
@@ -41,3 +42,9 @@ Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m plotweaver gui"; WorkingDir: "{app}"; IconFilename: "{app}\branding\plotweaver.ico"
+
+[Run]
+Filename: "{app}\plotweaver-provision.cmd"; StatusMsg: "Installing shared Voxprint files..."; Flags: waituntilterminated
+
+[UninstallRun]
+Filename: "{app}\python\python.exe"; Parameters: "-m plotweaver release-shared"; Flags: waituntilterminated skipifdoesntexist

@@ -1,10 +1,11 @@
 """Default stock downloads, and the separate least-censored download from Settings.
 
-The first real run detects VRAM, picks the 16 GB or 24 GB tier, and downloads
-stock models that tier can run with 2 GB or 3 GB of headroom. Least-censored
-models come from Model Forge and stay out of that set. A Russian book prefers
-the forge T-lite file when it is installed. Otherwise the largest installed
-forge model for the tier is used, and the stock drafter is the fallback.
+The installer downloads the stock models for the detected tier. A later launch
+only repairs a file that is missing or corrupt. Least-censored models come
+from Model Forge and stay out of that set until Settings asks for them. A
+Russian book prefers the forge T-lite file when it is installed. Otherwise
+the largest installed forge model for the tier is used, and the stock drafter
+is the fallback.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from typing import assert_never
 
 from plotweaver.domain import BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
+from plotweaver.fetch import estimate_minutes, format_size
 from plotweaver.hardware import require_supported_gpu
 from plotweaver.paths import gguf_dir
 from plotweaver.registry import (
@@ -26,6 +28,7 @@ from plotweaver.registry import (
     registry_path,
     uncensored_offer_allowed,
 )
+from plotweaver.ui.i18n import tr
 
 
 def ensure_default_install(
@@ -45,8 +48,21 @@ def ensure_default_install(
     return count
 
 
+def optional_notice(entry: RegistryEntry) -> str:
+    """Size and a rough time estimate for one optional download."""
+    return tr("optional_notice").format(
+        name=entry.filename,
+        size=format_size(entry.size),
+        minutes=estimate_minutes(entry.size),
+    )
+
+
 def ensure_uncensored_models(
-    *, total_vram_gb: float, free_gb: float | None = None, store: Path | None = None
+    *,
+    total_vram_gb: float,
+    free_gb: float | None = None,
+    store: Path | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> int:
     """Download published least-censored models that this tier can run."""
     free = total_vram_gb if free_gb is None else free_gb
@@ -61,7 +77,8 @@ def ensure_uncensored_models(
             continue
         if (folder / entry.filename).is_file():
             continue
-        download_model(entry, folder)
+        _say(on_progress, optional_notice(entry))
+        download_model(entry, folder, on_progress=on_progress)
         count += 1
     return count
 
@@ -106,7 +123,7 @@ def prepare_real_models(
     """First-run stock download, then the dark-theme model choice."""
     gpu = require_supported_gpu()
     folder = store or gguf_dir()
-    _say(on_progress, "Downloading the stock models that fit this GPU.")
+    _say(on_progress, tr("repair_checking"))
     ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb, store=folder)
     assign_book_models(request, free_gb=gpu.free_gb, total_gb=gpu.total_gb, store=folder)
 

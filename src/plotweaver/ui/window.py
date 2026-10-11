@@ -77,6 +77,7 @@ HOME, FORM, PROGRESS, RESULT, SETTINGS = 0, 1, 2, 3, 4
 
 
 class _DownloadThread(QThread):
+    progressed = Signal(str)
     finished_ok = Signal(int)
     failed = Signal(str)
 
@@ -87,7 +88,11 @@ class _DownloadThread(QThread):
 
     def run(self) -> None:
         try:
-            count = ensure_uncensored_models(total_vram_gb=self.total_vram_gb, free_gb=self.free_gb)
+            count = ensure_uncensored_models(
+                total_vram_gb=self.total_vram_gb,
+                free_gb=self.free_gb,
+                on_progress=self.progressed.emit,
+            )
         except Exception as exc:  # noqa: BLE001 - show the message, keep the window
             self.failed.emit(str(exc))
             return
@@ -465,6 +470,7 @@ class MainWindow(QMainWindow):
         assert total is not None
         free = self._gpu_free()
         self._download = _DownloadThread(total, total if free is None else free)
+        self._download.progressed.connect(self.settings_status.setText)
         self._download.finished_ok.connect(self._download_done)
         self._download.failed.connect(self._download_failed)
         self._download.start()

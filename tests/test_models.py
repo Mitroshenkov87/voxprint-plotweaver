@@ -12,7 +12,14 @@ from plotweaver.domain import BookRequest, Language, ModelTier, request_from_dic
 from plotweaver.errors import PlotweaverError
 from plotweaver.install import assign_book_models, ensure_default_install, ensure_uncensored_models
 from plotweaver.llama_release import LLAMA_BUILD
-from plotweaver.paths import gguf_dir, llama_runtime_dir, models_dir, repo_root
+from plotweaver.paths import (
+    gguf_dir,
+    llama_runtime_dir,
+    models_dir,
+    repo_root,
+    shared_dir,
+    shared_tools_dir,
+)
 from plotweaver.registry import (
     bakeoff_skip_reason,
     claim_user,
@@ -38,11 +45,18 @@ _EXCLUDED = ("thedrummer", "heretic", "yandex")
 
 
 def test_gguf_dir_is_the_shared_llm_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("PLOTWEAVER_MODELS", str(tmp_path))
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    monkeypatch.delenv("PLOTWEAVER_MODELS", raising=False)
     monkeypatch.delenv("PLOTWEAVER_LLAMA_DIR", raising=False)
-    assert models_dir() == tmp_path
-    assert gguf_dir() == tmp_path / "llm"
-    assert llama_runtime_dir() == tmp_path / "llm" / f"llama.cpp-{LLAMA_BUILD}"
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    assert shared_dir() == tmp_path / "shared"
+    assert models_dir() == tmp_path / "shared" / "models"
+    assert gguf_dir() == tmp_path / "shared" / "models" / "llm"
+    assert llama_runtime_dir() == tmp_path / "shared" / "runtime" / f"llama.cpp-{LLAMA_BUILD}"
+    assert shared_tools_dir() == tmp_path / "shared" / "tools"
+    monkeypatch.setenv("PLOTWEAVER_MODELS", str(tmp_path / "override"))
+    assert models_dir() == tmp_path / "override"
+    assert gguf_dir() == tmp_path / "override" / "llm"
 
 
 def test_registry_lists_confirmed_apache_models() -> None:
@@ -323,8 +337,8 @@ def test_uncensored_download_is_separate_from_the_default_install(
 ) -> None:
     downloaded: list[str] = []
 
-    def fake_download(entry, store, *, allow_other: bool = False):  # noqa: ANN001
-        del allow_other
+    def fake_download(entry, store, *, allow_other: bool = False, on_progress=None):  # noqa: ANN001
+        del allow_other, on_progress
         downloaded.append(entry.id)
         target = store / entry.filename
         target.write_bytes(b"x")

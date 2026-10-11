@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
 from plotweaver.appinfo import APP_NAME, version_label
 from plotweaver.bakeoff import run_bakeoff
@@ -20,7 +20,12 @@ from plotweaver.brief import BookBrief, BriefError, apply_brief, parse_brief, re
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import GpuUnsupported, PlotweaverError
 from plotweaver.export import export_output_names
-from plotweaver.hardware import require_supported_gpu, vram_budget_gb, vram_headroom_gb
+from plotweaver.hardware import (
+    driver_status,
+    require_supported_gpu,
+    vram_budget_gb,
+    vram_headroom_gb,
+)
 from plotweaver.install import prepare_real_models
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer, apply_vram_budget_cap
@@ -39,6 +44,8 @@ from plotweaver.runner import draft_book_brief, export_book, run_book
 from plotweaver.scenarios import mars_request
 from plotweaver.sound import add_sound, resolve_vxbook
 from plotweaver.store import Project
+from plotweaver.suite import provision_main, release_shared, repair_shared, selftest_report
+from plotweaver.ui.i18n import tr
 from plotweaver.ui.splash import Splash
 from plotweaver.ui.window import MainWindow
 from plotweaver.vxbook import validate_vxbook
@@ -156,11 +163,26 @@ def build_parser() -> argparse.ArgumentParser:
     draft.add_argument("--mock", action="store_true")
     _add_machine_args(draft)
     draft.set_defaults(func=_brief_draft)
+
+    provision = sub.add_parser(
+        "provision",
+        help="Install missing shared files. The installer runs this.",
+    )
+    provision.set_defaults(func=_provision)
+
+    release = sub.add_parser(
+        "release-shared",
+        help="Drop Plotweaver from the shared manifest. Keep files other apps use.",
+    )
+    release.set_defaults(func=_release)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run one plotweaver command and return its exit code."""
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if raw and raw[0] == "--selftest" and set(raw) <= {"--selftest", "--json"}:
+        return _selftest_command("--json" in raw)
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
@@ -425,6 +447,7 @@ def _doctor(args: argparse.Namespace) -> int:
         f"with {tier_headroom_gb(info.total_gb):.0f} GB held back."
         f"{cap_note}"
     )
+    print(driver_status().message)
     return 0
 
 
@@ -620,6 +643,7 @@ def _run(args: argparse.Namespace) -> int:
             request.least_censored_model_id = stored.least_censored_model_id
     progress = _progress(args)
     if not args.mock:
+        _repair_or_raise(progress)
         prepare_real_models(request, on_progress=progress)
     project.save_request(request)
     result = run_book(
@@ -806,7 +830,11 @@ def _gui(args: argparse.Namespace) -> int:
     if args.selftest:
         os.environ["PLOTWEAVER_UI_PROJECT"] = tempfile.mkdtemp(prefix="plotweaver-selftest-")
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    app = QApplication.instance() or QApplication([])
+    current = QApplication.instance()
+    app = current if isinstance(current, QApplication) else QApplication([])
+    if not args.mock and not args.selftest:
+        if not _repair_before_window(app):
+            return 1
     splash = Splash()
     splash.show()
     app.processEvents()
@@ -818,3 +846,73 @@ def _gui(args: argparse.Namespace) -> int:
         return 0
     QTimer.singleShot(900, splash.close)
     return int(app.exec())
+
+
+def _repair_before_window(app: QApplication) -> bool:
+    dialog = QProgressDialog(tr("repair_checking"), "", 0, 0)
+    dialog.setCancelButton(None)
+    dialog.setWindowTitle(tr("repair_title"))
+    dialog.setMinimumDuration(0)
+    dialog.show()
+    app.processEvents()
+
+    def progress(message: str) -> None:
+        dialog.setLabelText(message)
+        app.processEvents()
+
+    try:
+        repair_shared(progress)
+    except Exception as exc:  # noqa: BLE001 - one sentence, never a traceback
+        dialog.close()
+        QMessageBox.critical(None, tr("repair_title"), _plain_message(exc))
+        return False
+    status = driver_status()
+    dialog.close()
+    if not status.ok:
+        QMessageBox.warning(None, tr("repair_title"), status.message)
+    return True
+
+
+def _repair_or_raise(progress: Callable[[str], None]) -> None:
+    try:
+        repair_shared(progress)
+    except OSError as exc:
+        raise PlotweaverError(str(exc)) from None
+
+
+def _plain_message(exc: BaseException) -> str:
+    text = str(exc).strip()
+    return text or "A shared file could not be repaired."
+
+
+def _selftest_command(as_json: bool) -> int:
+    try:
+        report = selftest_report()
+    except Exception as exc:  # noqa: BLE001 - one sentence, never a traceback
+        message = _plain_message(exc)
+        if as_json:
+            _print_json({"ok": False, "error": message, "code": 1})
+        else:
+            print(message, file=sys.stderr)
+        return 1
+    if as_json:
+        _print_json(report)
+    else:
+        driver = report.get("driver")
+        if isinstance(driver, dict):
+            print(str(driver.get("message") or ""))
+        messages = report.get("messages")
+        if isinstance(messages, list):
+            for line in messages:
+                print(line)
+    return 0 if report.get("ok") else 1
+
+
+def _provision(_args: argparse.Namespace) -> int:
+    return provision_main()
+
+
+def _release(_args: argparse.Namespace) -> int:
+    removed = release_shared()
+    print("\n".join(removed) if removed else "shared files kept")
+    return 0

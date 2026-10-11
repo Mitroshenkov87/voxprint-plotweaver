@@ -130,7 +130,7 @@ jobs:
           sha256sum -- * | LC_ALL=C sort -k2 > SHA256SUMS
           sha256sum -c SHA256SUMS
           if ! gh release view "$tag" >/dev/null 2>&1; then
-            args=(release create "$tag" --title "$title" --notes "The Windows setup and the Linux package include the app, Python 3.14, dependencies, and llama.cpp b11476. Model weights download on first run.")
+            args=(release create "$tag" --title "$title" --notes "The Windows setup and the Linux package include the app, Python 3.14, dependencies, and llama.cpp b11476. The installer fills the shared suite folder with anything still missing.")
             if [[ "$pre" == "1" ]]; then
               args+=(--prerelease)
             fi

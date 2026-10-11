@@ -1,4 +1,4 @@
-"""NVIDIA detection, the suite VRAM budget, and the 83 C thermal rule.
+"""NVIDIA detection, the driver minimum, the suite VRAM budget, and the 83 C thermal rule.
 
 The product refuses to start a real job without an NVIDIA RTX 40-series GPU or newer
 (compute capability 8.9 or higher, and "RTX" in the device name). Tests set
@@ -10,12 +10,19 @@ from __future__ import annotations
 import os
 import statistics
 import subprocess
+import sys
 import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from plotweaver.errors import GpuUnsupported
+from plotweaver.ui.i18n import tr
+
+NVIDIA_DRIVER_PAGE = "https://www.nvidia.com/Download/index.aspx"
+# CUDA 12.8 GA on Linux and CUDA 12.4 GA on Windows, from the CUDA toolkit release notes.
+MIN_DRIVER_LINUX = (570, 117)
+MIN_DRIVER_WINDOWS = (551, 61)
 
 # Ada (RTX 40) is compute capability 8.9. Anything older, including RTX 30 (8.6), is refused.
 MIN_COMPUTE_CAP = 8.9
@@ -110,6 +117,108 @@ def query_gpu() -> GpuInfo | None:
 def is_supported(info: GpuInfo) -> bool:
     """RTX 40-series (Ada, sm_89) or a newer RTX card."""
     return info.compute_cap >= MIN_COMPUTE_CAP and "RTX" in info.name.upper()
+
+
+@dataclass(frozen=True)
+class DriverStatus:
+    """Whether the installed NVIDIA driver can run the pinned CUDA runtime."""
+
+    ok: bool
+    version: str | None
+    minimum: str
+    message: str
+
+
+def minimum_driver() -> tuple[int, ...]:
+    """Driver tuple required by the CUDA build for this operating system."""
+    if sys.platform == "win32":
+        return MIN_DRIVER_WINDOWS
+    return MIN_DRIVER_LINUX
+
+
+def format_driver(parts: tuple[int, ...]) -> str:
+    """Join a driver tuple the way nvidia-smi prints it."""
+    return ".".join(str(part) for part in parts)
+
+
+def parse_driver(text: str) -> tuple[int, ...]:
+    """Leading integers from a driver version such as ``570.117``."""
+    numbers: list[int] = []
+    for piece in text.strip().split("."):
+        digits: list[str] = []
+        for char in piece:
+            if char.isdigit():
+                digits.append(char)
+            else:
+                break
+        if digits:
+            numbers.append(int("".join(digits)))
+    return tuple(numbers)
+
+
+def driver_meets(found: str, minimum: tuple[int, ...] | None = None) -> bool:
+    """True when ``found`` is at least ``minimum`` (the platform CUDA floor by default)."""
+    required = minimum_driver() if minimum is None else minimum
+    got = parse_driver(found)
+    if not got:
+        return False
+    width = max(len(got), len(required))
+    left = got + (0,) * (width - len(got))
+    right = required + (0,) * (width - len(required))
+    return left >= right
+
+
+def query_driver_version() -> str | None:
+    """Installed NVIDIA driver, or None when nvidia-smi has nothing to report.
+
+    ``PLOTWEAVER_FAKE_DRIVER`` is a version string, or ``none``.
+    """
+    fake = os.environ.get("PLOTWEAVER_FAKE_DRIVER")
+    if fake is not None:
+        if fake.strip().lower() in {"", "none", "missing"}:
+            return None
+        return fake.strip()
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+            creationflags=_NO_WINDOW,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    return proc.stdout.strip().splitlines()[0].strip() or None
+
+
+def driver_status() -> DriverStatus:
+    """Plain-language driver check, including NVIDIA's download page when it is too old."""
+    required = minimum_driver()
+    label = format_driver(required)
+    found = query_driver_version()
+    if found is None:
+        return DriverStatus(
+            False,
+            None,
+            label,
+            tr("driver_missing").format(url=NVIDIA_DRIVER_PAGE),
+        )
+    if not driver_meets(found, required):
+        return DriverStatus(
+            False,
+            found,
+            label,
+            tr("driver_old").format(version=found, minimum=label, url=NVIDIA_DRIVER_PAGE),
+        )
+    return DriverStatus(True, found, label, tr("driver_ok").format(version=found))
+
+
+def driver_allows_cuda() -> bool:
+    """True when the installed driver can run the pinned CUDA llama.cpp build."""
+    return driver_status().ok
 
 
 def require_supported_gpu() -> GpuInfo:

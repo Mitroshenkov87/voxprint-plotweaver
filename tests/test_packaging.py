@@ -69,6 +69,8 @@ def test_bundled_runtime_is_used_before_a_download(
     binary.parent.mkdir(parents=True)
     binary.write_bytes(b"")
     (binary.parent / ".complete").write_text(LLAMA_BUILD, encoding="utf-8")
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    monkeypatch.setenv("PLOTWEAVER_FAKE_DRIVER", "none")
     monkeypatch.delenv("PLOTWEAVER_LLAMA_SERVER", raising=False)
     monkeypatch.setattr("plotweaver.llama_release.repo_root", lambda: root)
     monkeypatch.setattr(
