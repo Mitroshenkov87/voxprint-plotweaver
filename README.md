@@ -1,30 +1,30 @@
 # Voxprint AI Plotweaver
 
-Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Tzaruf. `plotweaver --version` prints `0.2.0 RC · build N "Tzaruf"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+Voxprint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Chut. `plotweaver --version` prints `0.2.0 RC · build N "Chut"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
 - Windows 11 24H2 or newer, or a Linux distribution from 2025 onward (x86_64).
 - An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
-- A 16 GB card keeps 2 GB free and uses the 16 GB model tier. A 24 GB card keeps 3 GB free and uses the 24 GB tier. Cards between those sizes use the 16 GB tier. Settings can override the choice when the card can run it.
+- A card under 23.5 GB keeps 2 GB free and uses the 16 GB model tier. A card of 23.5 GB or more keeps 3 GB free and uses the 24 GB tier. Settings can override the choice when the card can run it.
 
-The installer includes the app, Python 3.14, the Python dependencies, and the pinned llama.cpp b11476 Vulkan runtime. During setup it checks Python, the Vulkan and CUDA llama.cpp runtimes, the NVIDIA driver, and the stock model for this card. Anything missing is installed then, with progress on screen, into the shared suite folder. Least-censored models stay optional. The 0.2.0 RC4 downloads below do not include that step yet. It ships with the next release.
+The installer includes the app, Python 3.14, the Python dependencies, and the pinned llama.cpp b11476 Vulkan runtime. During setup it checks Python, the Vulkan and CUDA llama.cpp runtimes, the NVIDIA driver, and the stock model for this card. Anything missing is installed then, with progress on screen, into the shared suite folder. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
 
 ## Download and install
 
-Release files are on the [v0.2.0-rc4 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc4). Download `SHA256SUMS` with the installer and check it before you run anything.
+Release files are on the [v0.2.0-rc5 release](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc5). Download `SHA256SUMS` with the installer and check it before you run anything.
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc4-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc4-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc4-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc5-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc5-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc5-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs for the current user under `%LOCALAPPDATA%\Voxprint\Plotweaver`, adds a Voxprint entry to the Start menu, and installs missing shared files under `%LOCALAPPDATA%\Voxprint\shared`. Administrator rights are not required.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc4_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc5_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -36,7 +36,7 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf voxprint-plotweaver-0.2.0rc4-linux-x86_64.tar.gz
+tar -xzf voxprint-plotweaver-0.2.0rc5-linux-x86_64.tar.gz
 ./voxprint-plotweaver/plotweaver-provision.sh
 ./voxprint-plotweaver/plotweaver-gui.sh
 ```
@@ -48,11 +48,11 @@ The installer puts shared files in one place:
 - Windows: `%LOCALAPPDATA%\Voxprint\shared\` (`runtime\`, `models\`, `tools\`)
 - Linux: `~/.local/share/voxprint/shared/`
 
-GGUF weights go in `shared/models/llm`. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it. Older copies under `<home>/models/llm` stay where Audiobook Builder expects them.
+GGUF weights go in `shared/models/llm`. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded. A Forge file whose published name is only the quant, such as `Q5_K_M.gguf`, is stored as the registry id plus that name so two models cannot overwrite each other. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it. Older copies under `<home>/models/llm` stay where Audiobook Builder expects them.
 
 Every launch, and `plotweaver --selftest --json`, checks those files and repairs a missing or corrupt one. The window shows progress in plain language. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
 
-A card under 24 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A 24 GB card also installs T-pro-it-2.1. Each file is checked by revision, size, and SHA-256.
+A card under 23.5 GB installs Gemma 4 12B plus T-lite-it-2.1 Q4_K_M and Q5_K_M. A card of 23.5 GB or more also installs T-pro-it-2.1. Each file is checked by revision, size, and SHA-256.
 
 Least-censored models are a separate download from Settings, and only when a published file fits the card. On 16 GB those are the Forge Qwen 27B Q3_K_M and the Forge abliterated T-lite IQ4_XS and Q5_K_M. On 24 GB the card also offers the Forge Qwen 27B Q5 and the Forge Gemma 31B Q4_K_M. The Gemma 31B IQ3_XXS row stays disabled until `plotweaver models import-forge-manifest` fills it. A Russian book prefers the larger installed Forge T-lite. Plotweaver does not abliterate or quantize weights.
 
@@ -93,7 +93,7 @@ Import `book.vxbook` into Audiobook Builder. Import `book.sound.vxbook` when you
 - The setup refuses Windows older than 11 24H2 (build 26100).
 - A GPU whose name does not contain RTX, or whose compute capability is below 8.9, is refused. Install the current NVIDIA driver. On Linux the package also needs the Vulkan loader (`libvulkan1`), which the `.deb` depends on.
 - The first real run needs a network connection and enough free disk for the GGUF files (several gigabytes for the 16 GB tier, more when T-pro is included). A failed download can be started again from the app. Finished files are checked before use.
-- Settings says no published least-censored model fits this card when every forge row for the tier is still disabled or too large for the free memory.
+- Settings says no published least-censored model fits this card when every forge row for the tier is still disabled or too large for the card.
 - `sha256sum -c SHA256SUMS` must succeed before you install. A mismatch means the download is incomplete or not the file this release published.
 - The **Mock model (no GPU)** checkbox writes a deterministic sample without a GPU. It is for a trial of the window, not for a novel you will keep.
 - Set `PLOTWEAVER_NO_UPDATE_CHECK=1` to skip the GitHub release check. That check sends no client id. Telemetry is off.
@@ -110,7 +110,7 @@ python -m venv .venv
 .venv/bin/plotweaver gui --mock --selftest
 ```
 
-`docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `docs/vm-test.md` is the short RTX 4090 check, `bash scripts/vm_test.sh`. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
+`docs/architecture.md` describes the pipeline. `docs/bakeoff.md` describes the RTX 4090 bake-off and the Mars end-to-end story. `docs/vm-test.md` is the short RTX 4090 check: `bash scripts/vm_test.sh` on Linux, `powershell -File scripts/vm_test.ps1` on Windows. `LICENSE` is Apache-2.0. `NOTICE` names llama.cpp (MIT, not vendored in git) and the model-weight licences, which stay with the downloaded files.
 
 ## Documentation
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -45,23 +46,38 @@ def stream_download(
     on_progress: Callable[[str], None] | None,
     label: str,
 ) -> None:
-    """Download ``url`` to ``dest``. The destination appears only after the stream finishes."""
+    """Download ``url`` to ``dest``. Resume a non-empty ``.partial`` and drop an empty one."""
     dest.parent.mkdir(parents=True, exist_ok=True)
+    if total is not None and total > 0:
+        require_disk_space(dest, total)
     partial = dest.with_suffix(dest.suffix + ".partial")
+    resume = _resume_from(partial, total)
+    if resume and total is not None and resume >= total:
+        partial.replace(dest)
+        return
+    headers = {"User-Agent": "plotweaver"}
+    if resume:
+        headers["Range"] = f"bytes={resume}-"
     started = time.monotonic()
-    got = 0
+    got = resume
     last_note = 0.0
     try:
         with httpx.stream(
             "GET",
             url,
-            headers={"User-Agent": "plotweaver"},
+            headers=headers,
             follow_redirects=True,
             timeout=httpx.Timeout(3600.0, connect=30.0),
         ) as response:
+            if resume and response.status_code != 206:
+                resume = 0
+                got = 0
+                partial.unlink(missing_ok=True)
             response.raise_for_status()
             announced = total if total is not None else _content_length(response)
-            with partial.open("wb") as handle:
+            if announced and resume == 0:
+                require_disk_space(dest, announced)
+            with partial.open("ab" if resume else "wb") as handle:
                 for chunk in response.iter_bytes(1024 * 1024):
                     handle.write(chunk)
                     got += len(chunk)
@@ -74,14 +90,57 @@ def stream_download(
                         last_note,
                     )
     except httpx.HTTPError:
-        partial.unlink(missing_ok=True)
+        _drop_empty_partial(partial)
         raise PlotweaverError(
             f"Could not download {label}. Check the network connection and try again."
         ) from None
     except OSError as exc:
-        partial.unlink(missing_ok=True)
+        _drop_empty_partial(partial)
         raise PlotweaverError(f"Could not save {label}. {exc.strerror or exc}.") from None
+    if partial.is_file() and partial.stat().st_size == 0:
+        partial.unlink()
+        raise PlotweaverError(f"Could not download {label}. The file was empty.")
     partial.replace(dest)
+
+
+def require_disk_space(dest: Path, nbytes: int) -> None:
+    """Refuse a download when the drive cannot hold the file plus a 10% margin."""
+    need = int(nbytes * 1.10)
+    if need < nbytes:
+        need = nbytes
+    probe = dest.parent
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
+    usage = shutil.disk_usage(probe)
+    if usage.free >= need:
+        return
+    drive = dest.anchor or str(probe)
+    needed = need / _GIB
+    free = usage.free / _GIB
+    raise PlotweaverError(
+        f"Not enough disk space on {drive}. Need {needed:.1f} GB, {free:.1f} GB free."
+    )
+
+
+def _resume_from(partial: Path, total: int | None) -> int:
+    if not partial.is_file():
+        return 0
+    size = partial.stat().st_size
+    if size <= 0:
+        partial.unlink()
+        return 0
+    if total is not None and size > total:
+        partial.unlink()
+        return 0
+    return size
+
+
+def _drop_empty_partial(partial: Path) -> None:
+    try:
+        if partial.is_file() and partial.stat().st_size == 0:
+            partial.unlink()
+    except OSError:
+        return
 
 
 def _content_length(response: httpx.Response) -> int | None:

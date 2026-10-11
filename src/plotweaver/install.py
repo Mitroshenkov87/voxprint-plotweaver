@@ -17,7 +17,7 @@ from typing import assert_never
 from plotweaver.domain import BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
 from plotweaver.fetch import estimate_minutes, format_size
-from plotweaver.hardware import require_supported_gpu
+from plotweaver.hardware import require_supported_gpu, vram_short_message
 from plotweaver.paths import gguf_dir
 from plotweaver.registry import (
     RegistryEntry,
@@ -27,6 +27,7 @@ from plotweaver.registry import (
     model_offered,
     registry_path,
     uncensored_offer_allowed,
+    weight_path,
 )
 from plotweaver.ui.i18n import tr
 
@@ -41,7 +42,7 @@ def ensure_default_install(
     for entry in load_registry(registry_path()):
         if not is_stock(entry) or not model_offered(entry, total_gb=total, free_gb=free_gb):
             continue
-        if (folder / entry.filename).is_file():
+        if weight_path(folder, entry).is_file():
             continue
         download_model(entry, folder)
         count += 1
@@ -75,7 +76,7 @@ def ensure_uncensored_models(
             continue
         if not model_offered(entry, total_gb=total_vram_gb, free_gb=free):
             continue
-        if (folder / entry.filename).is_file():
+        if weight_path(folder, entry).is_file():
             continue
         _say(on_progress, optional_notice(entry))
         download_model(entry, folder, on_progress=on_progress)
@@ -136,6 +137,8 @@ def _stock_main(entries: list[RegistryEntry], total_gb: float, free_gb: float) -
     for entry in entries:
         if entry.role == "main" and is_stock(entry) and _offered(entry, total_gb, free_gb):
             return entry
+    if free_gb + 0.5 < total_gb:
+        raise PlotweaverError(vram_short_message())
     raise PlotweaverError("No stock model fits this VRAM tier.")
 
 
@@ -154,7 +157,7 @@ def _least_censored(
         and entry.uncensored
         and entry.role == "least-censored"
         and _offered(entry, total_gb, free_gb)
-        and (store / entry.filename).is_file()
+        and weight_path(store, entry).is_file()
     ]
     specific = [entry for entry in installed if language.value in entry.languages]
     if specific:
@@ -172,7 +175,7 @@ def _preferred(entries: list[RegistryEntry]) -> RegistryEntry:
 
 
 def _installed(entry: RegistryEntry, store: Path) -> Path:
-    path = store / entry.filename
+    path = weight_path(store, entry)
     if not path.is_file():
         raise PlotweaverError(f"{entry.id} is not installed ({path.name}).")
     return path

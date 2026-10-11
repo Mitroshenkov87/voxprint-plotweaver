@@ -56,7 +56,9 @@ from plotweaver.registry import (
     load_registry,
     model_offered,
     registry_path,
+    stored_filename,
     verify_file,
+    weight_path,
 )
 from plotweaver.ui.i18n import tr
 
@@ -180,23 +182,26 @@ def _install_stock(say: Progress) -> list[str]:
 
 def _place_model(entry: RegistryEntry, say: Progress) -> bool:
     """Return True when this call installed or repaired the file."""
-    dest = gguf_dir() / entry.filename
+    dest = weight_path(gguf_dir(), entry)
+    local_name = stored_filename(entry)
+    if dest.name != local_name:
+        dest = gguf_dir() / local_name
     if _trusted(dest, size=entry.size, sha256=entry.sha256):
         _register_model(entry, _legacy_apps())
         return False
     if dest.is_file():
-        say(tr("repair_broken").format(name=entry.filename))
+        say(tr("repair_broken").format(name=local_name))
         dest.unlink()
         _forget_stamp(dest)
     source = _matching_legacy(entry)
     if source is not None:
-        say(tr("repair_reusing").format(name=entry.filename))
+        say(tr("repair_reusing").format(name=local_name))
         _link_file(source, dest)
         verify_file(dest, size=entry.size, sha256=entry.sha256)
         _remember(dest, size=entry.size, sha256=entry.sha256)
         _register_model(entry, _legacy_apps())
         return True
-    say(tr("repair_installing").format(name=entry.filename, size=format_size(entry.size)))
+    say(tr("repair_installing").format(name=local_name, size=format_size(entry.size)))
     download_model(entry, dest.parent, on_progress=say)
     _remember(dest, size=entry.size, sha256=entry.sha256)
     _register_model(entry, _legacy_apps())
@@ -204,24 +209,29 @@ def _place_model(entry: RegistryEntry, say: Progress) -> bool:
 
 
 def _matching_legacy(entry: RegistryEntry) -> Path | None:
-    source = legacy_models_dir() / "llm" / entry.filename
-    dest = gguf_dir() / entry.filename
-    if not source.is_file():
-        return None
-    try:
-        if source.resolve() == dest.resolve():
-            return None
-    except OSError:
-        return None
-    try:
-        verify_file(source, size=entry.size, sha256=entry.sha256)
-    except PlotweaverError, OSError:
-        return None
-    return source
+    dest = gguf_dir() / stored_filename(entry)
+    names = [stored_filename(entry)]
+    if entry.filename not in names:
+        names.append(entry.filename)
+    for name in names:
+        source = legacy_models_dir() / "llm" / name
+        if not source.is_file():
+            continue
+        try:
+            if source.resolve() == dest.resolve():
+                continue
+        except OSError:
+            continue
+        try:
+            verify_file(source, size=entry.size, sha256=entry.sha256)
+        except PlotweaverError, OSError:
+            continue
+        return source
+    return None
 
 
 def _register_model(entry: RegistryEntry, extra_apps: tuple[str, ...]) -> None:
-    dest = gguf_dir() / entry.filename
+    dest = gguf_dir() / stored_filename(entry)
     root = shared_dir().resolve()
     try:
         relative = dest.parent.resolve().relative_to(root).as_posix()
@@ -235,7 +245,7 @@ def _register_model(entry: RegistryEntry, extra_apps: tuple[str, ...]) -> None:
             kind="model",
             path=relative,
             nbytes=entry.size,
-            files={entry.filename: entry.sha256.lower()},
+            files={stored_filename(entry): entry.sha256.lower()},
             app=app,
             source=entry.repo,
         )

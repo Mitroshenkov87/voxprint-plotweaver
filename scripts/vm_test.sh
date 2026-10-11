@@ -9,9 +9,13 @@ cd "$ROOT"
 
 OUT="./out/vm-test"
 MOCK=0
+SMOKE=0
+JSON=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mock) MOCK=1; shift ;;
+    --smoke) SMOKE=1; shift ;;
+    --json) JSON=1; shift ;;
     --out)
       OUT="${2:-}"
       if [[ -z "$OUT" ]]; then
@@ -52,7 +56,10 @@ pick_python() {
   echo "$ROOT/.venv/bin/python"
 }
 
-PY="$(pick_python)"
+if ! PY="$(pick_python)"; then
+  echo "could not prepare Python" >&2
+  exit 2
+fi
 if ! "$PY" -m pytest --version >/dev/null 2>&1; then
   if ! command -v uv >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -124,8 +131,67 @@ save_model_tier_override(os.environ["PLOTWEAVER_VM_TIER"])
 '
 }
 
+json_line() {
+  local code="$1"
+  if [[ "$JSON" != "1" ]]; then
+    return 0
+  fi
+  local ok="false"
+  local mode="full"
+  local mock="false"
+  if [[ "$code" == "0" ]]; then
+    ok="true"
+  fi
+  if [[ "$SMOKE" == "1" ]]; then
+    mode="smoke"
+  fi
+  if [[ "$MOCK" == "1" ]]; then
+    mock="true"
+  fi
+  printf '{"ok":%s,"exit":%s,"mode":"%s","mock":%s}\n' "$ok" "$code" "$mode" "$mock"
+}
+
+require_gpu() {
+  if [[ "$MOCK" == "1" ]]; then
+    return 0
+  fi
+  if "$PY" -c 'from plotweaver.hardware import is_supported, query_gpu
+info = query_gpu()
+raise SystemExit(0 if info is not None and is_supported(info) else 1)'; then
+    return 0
+  fi
+  echo "no supported NVIDIA GPU" >&2
+  json_line 3
+  exit 3
+}
+
+detected_tier_name() {
+  if [[ "$MOCK" == "1" ]]; then
+    PLOTWEAVER_FAKE_GPU="NVIDIA GeForce RTX 4090,8.9,24564,20000" "$PY" -c '
+from plotweaver.hardware import query_gpu
+from plotweaver.registry import detected_tier
+info = query_gpu()
+if info is None:
+    raise SystemExit(1)
+print(detected_tier(info.total_gb))
+'
+  else
+  "$PY" -c '
+from plotweaver.hardware import query_gpu
+from plotweaver.registry import detected_tier
+info = query_gpu()
+if info is None:
+    raise SystemExit(1)
+print(detected_tier(info.total_gb))
+'
+  fi
+}
+
 run_book() {
   local tier="$1"
+  local chapters="${2:-2}"
+  local scenes="${3:-1}"
+  local dark="${4:-1}"
   local dir="$OUT/$tier"
   mkdir -p "$dir"
   local -a mock_args=()
@@ -151,16 +217,20 @@ run_book() {
   local start end code
   start="$(date +%s.%N)"
   set +e
+  local -a dark_args=()
+  if [[ "$dark" == "1" ]]; then
+    dark_args=(--dark-themes)
+  fi
   "$PY" -m plotweaver run \
     --project "$dir/project" \
     --brief "$ROOT/scripts/vm-brief.md" \
-    --chapters 2 \
-    --scenes-per-chapter 1 \
-    --dark-themes \
+    --chapters "$chapters" \
+    --scenes-per-chapter "$scenes" \
     --yes \
     --fb2 \
     --sound \
     --json \
+    "${dark_args[@]+"${dark_args[@]}"}" \
     "${mock_args[@]+"${mock_args[@]}"}" \
     >"$dir/run.json" \
     2> >(stamp_copy "$dir/stderr.log")
@@ -181,6 +251,46 @@ run_book() {
   "$PY" -m plotweaver vxbook validate "$dir/project/export/book.vxbook" --json \
     > "$dir/vxbook-validate.json"
 }
+
+require_gpu
+
+if [[ "$SMOKE" == "1" ]]; then
+  echo "smoke install check"
+  if ! "$PY" -c "import plotweaver"; then
+    json_line 2
+    exit 2
+  fi
+  echo "smoke doctor"
+  if [[ "$MOCK" == "1" ]]; then
+    "$PY" -m plotweaver doctor --mock >"$OUT/doctor.txt" || status=1
+  else
+    "$PY" -m plotweaver doctor >"$OUT/doctor.txt" || status=1
+  fi
+  echo "smoke models list"
+  if ! "$PY" -m plotweaver models list --json >"$OUT/checks/models.json"; then
+    status=1
+  fi
+  tier="$(detected_tier_name)" || status=1
+  if [[ -n "${tier:-}" && "$status" -eq 0 ]]; then
+    echo "smoke book $tier"
+    run_book "$tier" 1 1 0 || status=1
+    if [[ -f "$OUT/$tier/project/export/book.vxbook" ]]; then
+      "$PY" -m plotweaver vxbook validate "$OUT/$tier/project/export/book.vxbook" --json \
+        >"$OUT/$tier/vxbook-validate.json" || status=1
+    else
+      status=1
+    fi
+  fi
+  echo "summary"
+  PLOTWEAVER_VM_OUT="$OUT" "$PY" -c '
+import os
+from pathlib import Path
+from plotweaver.vm_report import write_summary
+write_summary(Path(os.environ["PLOTWEAVER_VM_OUT"]))
+' || status=1
+  json_line "$status"
+  exit "$status"
+fi
 
 echo "pytest subset"
 if ! "$PY" -m pytest \
@@ -292,4 +402,5 @@ tar -C "$OUT" -czf "$OUT/vm-test-results.tar.gz" \
     summary.md screenshots 16gb 24gb mars checks mode.txt
 
 echo "wrote $OUT/summary.md and $OUT/vm-test-results.tar.gz"
+json_line "$status"
 exit "$status"

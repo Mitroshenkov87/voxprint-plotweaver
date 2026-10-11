@@ -98,6 +98,13 @@ def test_vm_brief_is_short_and_dark() -> None:
 
 def test_vm_test_script_parses() -> None:
     script = repo_root() / "scripts" / "vm_test.sh"
+    powershell = repo_root() / "scripts" / "vm_test.ps1"
+    text = script.read_text(encoding="utf-8")
+    ps = powershell.read_text(encoding="utf-8")
+    for flag in ("--smoke", "--json", "--mock"):
+        assert flag in text
+        assert flag in ps
+    assert "-Smoke" in ps
     bash = shutil.which("bash")
     if bash is None:
         pytest.skip("bash is not installed")

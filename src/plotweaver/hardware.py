@@ -114,6 +114,77 @@ def query_gpu() -> GpuInfo | None:
         return None
 
 
+@dataclass(frozen=True)
+class VramHolder:
+    """One process currently using GPU memory."""
+
+    pid: int
+    name: str
+    used_mib: int
+
+
+def query_vram_holders() -> list[VramHolder]:
+    """Processes holding GPU memory.
+
+    ``PLOTWEAVER_FAKE_VRAM_HOLDERS`` is ``pid,name,mib`` rows separated by
+    semicolons. An empty value or ``none`` means nothing is holding the card.
+    """
+    fake = os.environ.get("PLOTWEAVER_FAKE_VRAM_HOLDERS")
+    if fake is not None:
+        return _parse_fake_holders(fake)
+    try:
+        proc = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-compute-apps=pid,process_name,used_gpu_memory",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+            creationflags=_NO_WINDOW,
+        )
+    except OSError, subprocess.SubprocessError:
+        return []
+    if proc.returncode != 0:
+        return []
+    holders: list[VramHolder] = []
+    for line in (proc.stdout or "").splitlines():
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) < 3:
+            continue
+        try:
+            holders.append(VramHolder(int(parts[0]), parts[1], int(float(parts[2]))))
+        except ValueError:
+            continue
+    return holders
+
+
+def vram_short_message() -> str:
+    """Name the processes holding GPU memory when a model cannot be loaded."""
+    holders = query_vram_holders()
+    if not holders:
+        return "VRAM is short. nvidia-smi did not name a process holding it."
+    listed = ", ".join(f"{item.name} (pid {item.pid}, {item.used_mib} MiB)" for item in holders)
+    return f"VRAM is short. In use: {listed}."
+
+
+def _parse_fake_holders(raw: str) -> list[VramHolder]:
+    if raw.strip().lower() in {"", "none"}:
+        return []
+    holders: list[VramHolder] = []
+    for row in raw.split(";"):
+        parts = [part.strip() for part in row.split(",")]
+        if len(parts) < 3:
+            continue
+        try:
+            holders.append(VramHolder(int(parts[0]), parts[1], int(float(parts[2]))))
+        except ValueError:
+            continue
+    return holders
+
+
 def is_supported(info: GpuInfo) -> bool:
     """RTX 40-series (Ada, sm_89) or a newer RTX card."""
     return info.compute_cap >= MIN_COMPUTE_CAP and "RTX" in info.name.upper()

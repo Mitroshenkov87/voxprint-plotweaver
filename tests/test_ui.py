@@ -81,7 +81,7 @@ def test_settings_hides_abliterated_downloads_when_nothing_fits(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("PLOTWEAVER_STATE", str(tmp_path))
-    monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4060,8.9,8192,3072")
+    monkeypatch.setenv("PLOTWEAVER_FAKE_GPU", "NVIDIA GeForce RTX 4060,8.9,6144,1024")
     app = QApplication.instance() or QApplication([])
     window = MainWindow(mock=True)
     window.show()
@@ -195,7 +195,7 @@ def test_suite_icons_and_splash() -> None:
     assert splash.version_text == version_label()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Tzaruf"'
+    assert window.about_text() == '0.2.0 RC · build dev "Chut"'
     save = next(
         button
         for button in window.findChildren(type(window.download_uncensored))

@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -27,8 +28,11 @@ from plotweaver.settings import model_tier_override
 
 APPROVED_LICENSES = {"apache-2.0", "mit"}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_BARE_QUANT = re.compile(r"^(?:IQ|Q)[A-Z0-9_]*\.gguf$")
 TIER_16: Literal["16gb"] = "16gb"
 TIER_24: Literal["24gb"] = "24gb"
+# A 4090 reports 24564 MiB, which is 23.99 GiB. That card is a 24 GB tier.
+TIER_24_MIN_GB = 23.5
 TierName = Literal["16gb", "24gb"]
 TierOverride = Literal["auto", "16gb", "24gb"]
 
@@ -208,8 +212,8 @@ def entry_tier(entry: RegistryEntry) -> str:
 
 
 def tier_headroom_gb(total_gb: float) -> float:
-    """Leave 2 GB free below 24 GB, and 3 GB free on a 24 GB card or larger."""
-    if total_gb >= 24:
+    """Leave 2 GB free below 23.5 GB, and 3 GB free on a 24 GB card or larger."""
+    if total_gb >= TIER_24_MIN_GB:
         return 3.0
     return 2.0
 
@@ -218,9 +222,14 @@ def usable_vram_gb(total_gb: float, free_gb: float) -> float:
     return max(0.0, min(free_gb, total_gb - tier_headroom_gb(total_gb)))
 
 
+def tier_capacity_gb(total_gb: float) -> float:
+    """VRAM available for choosing models, from the card total, ignoring other processes."""
+    return max(0.0, total_gb - tier_headroom_gb(total_gb))
+
+
 def detected_tier(total_gb: float) -> TierName:
     """Pick the 16 GB or 24 GB tier from the card size."""
-    if total_gb >= 24:
+    if total_gb >= TIER_24_MIN_GB:
         return TIER_24
     return TIER_16
 
@@ -238,7 +247,7 @@ def _normalise_override(value: str) -> TierOverride:
 
 
 def resolve_tier(total_gb: float, override: str | None = None) -> TierName:
-    """Auto picks 16 GB under 24 GB of VRAM, and 24 GB at that size or above.
+    """Auto picks 16 GB under 23.5 GB of VRAM, and 24 GB at that size or above.
 
     A saved 24 GB override on a smaller card falls back to the detected tier.
     """
@@ -250,7 +259,7 @@ def resolve_tier(total_gb: float, override: str | None = None) -> TierName:
         case "16gb":
             return TIER_16
         case "24gb":
-            if total_gb >= 24:
+            if total_gb >= TIER_24_MIN_GB:
                 return TIER_24
             return detected_tier(total_gb)
         case _ as unreachable:
@@ -283,22 +292,28 @@ def model_offered(
     free_gb: float,
     override: str | None = None,
 ) -> bool:
-    """True when this card's tier and headroom can run the file."""
+    """True when this card's total VRAM tier can run the file.
+
+    ``free_gb`` is accepted so callers can pass the live reading. The install
+    set follows the card total, not memory another process is holding.
+    """
+    del free_gb
     if not tier_allows(entry, resolve_tier(total_gb, override)):
         return False
-    return entry.min_vram_gb <= usable_vram_gb(total_gb, free_gb)
+    return entry.min_vram_gb <= tier_capacity_gb(total_gb)
 
 
 def tier_option_enabled(tier: str, *, total_gb: float, free_gb: float) -> bool:
-    """Settings can force 24 GB only when some published 24 GB model fits."""
+    """Settings can force 24 GB only when some published 24 GB model fits the card total."""
+    del free_gb
     choice = _normalise_override(tier)
     match choice:
         case "auto" | "16gb":
             return True
         case "24gb":
-            if total_gb < 24:
+            if total_gb < TIER_24_MIN_GB:
                 return False
-            usable = usable_vram_gb(total_gb, free_gb)
+            usable = tier_capacity_gb(total_gb)
             try:
                 entries = load_registry(registry_path())
             except PlotweaverError:
@@ -333,6 +348,55 @@ def bakeoff_skip_reason(entry: RegistryEntry, *, free_gb: float) -> str | None:
     return None
 
 
+def stored_filename(entry: RegistryEntry) -> str:
+    """On-disk GGUF name. A bare quant such as ``Q5_K_M.gguf`` is prefixed with the model id."""
+    if _BARE_QUANT.fullmatch(entry.filename):
+        return f"{entry.id}-{entry.filename}"
+    return entry.filename
+
+
+def migrate_generic_weight(folder: Path, entry: RegistryEntry) -> Path | None:
+    """Hardlink a verified generic quant onto the model-id name, then remove the generic name.
+
+    A file whose SHA-256 does not match is left in place. A legacy copy outside
+    ``folder`` is not touched.
+    """
+    stored_name = stored_filename(entry)
+    stored = folder / stored_name
+    if stored.is_file():
+        return stored
+    if stored_name == entry.filename:
+        return None
+    generic = folder / entry.filename
+    if not generic.is_file():
+        return None
+    try:
+        verify_file(generic, size=entry.size, sha256=entry.sha256)
+    except PlotweaverError, OSError:
+        return None
+    stored.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(generic, stored)
+    except OSError:
+        shutil.copy2(generic, stored)
+    try:
+        verify_file(stored, size=entry.size, sha256=entry.sha256)
+    except PlotweaverError, OSError:
+        stored.unlink(missing_ok=True)
+        return None
+    if generic.resolve() != stored.resolve():
+        generic.unlink()
+    return stored
+
+
+def weight_path(folder: Path, entry: RegistryEntry) -> Path:
+    """Installed weight, after a verified generic quant has been renamed by hardlink."""
+    migrated = migrate_generic_weight(folder, entry)
+    if migrated is not None and migrated.is_file():
+        return migrated
+    return folder / stored_filename(entry)
+
+
 def download_model(
     entry: RegistryEntry,
     store: Path | None = None,
@@ -360,7 +424,9 @@ def download_model(
     legacy = legacy_models_dir()
     if legacy.resolve() != folder.parent.resolve():
         claim_user(legacy)
-    target = folder / entry.filename
+    local_name = stored_filename(entry)
+    target = folder / local_name
+    migrate_generic_weight(folder, entry)
     url = (
         f"https://huggingface.co/{entry.repo}/resolve/{entry.revision}/"
         f"{entry.filename}?download=true"
@@ -376,14 +442,14 @@ def download_model(
             target,
             total=entry.size,
             on_progress=on_progress,
-            label=entry.filename,
+            label=local_name,
         )
     verify_file(target, size=entry.size, sha256=entry.sha256)
     manifest = {
         "id": entry.id,
         "repo": entry.repo,
         "revision": entry.revision,
-        "files": [{"path": entry.filename, "sha256": entry.sha256, "size": entry.size}],
+        "files": [{"path": local_name, "sha256": entry.sha256, "size": entry.size}],
         "license": canonical_licence(entry.license),
         "base_repo": entry.base_repo,
         "base_revision": entry.base_revision,
