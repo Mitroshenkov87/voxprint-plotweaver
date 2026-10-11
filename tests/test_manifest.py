@@ -60,7 +60,9 @@ def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("plotweaver.suite._install_cuda", lambda _say: None)
 
 
-def test_refcount_deletes_a_file_only_at_zero(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_refcount_deletes_a_file_only_at_zero(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
     shared = shared_dir()
     target = shared / "models" / "llm" / "weights.gguf"
