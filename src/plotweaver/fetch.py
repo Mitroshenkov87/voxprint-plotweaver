@@ -7,6 +7,7 @@ Ten attempts back off, then the bytes are hashed and renamed into place.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import time
 from collections.abc import Callable
@@ -22,6 +23,17 @@ _MIB = 1024 * 1024
 _GIB = 1024 * 1024 * 1024
 _ATTEMPTS = 10
 _RESERVE = 2 * _GIB
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def require_sha256(sha256: str, label: str) -> str:
+    """Refuse a model whose registry entry has no 64-hex SHA-256."""
+    digest = (sha256 or "").strip().lower()
+    if _SHA256.fullmatch(digest) is None:
+        raise PlotweaverError(
+            f"Refusing to download or load {label}. The registry entry has no SHA-256."
+        )
+    return digest
 
 
 def format_size(nbytes: int) -> str:
@@ -53,9 +65,10 @@ def stream_download(
     total: int | None,
     on_progress: Callable[[str], None] | None,
     label: str,
-    sha256: str | None = None,
+    sha256: str,
 ) -> None:
     """Download ``url`` to ``dest``. Resume, retry, check the hash, then rename."""
+    digest = require_sha256(sha256, label)
     dest.parent.mkdir(parents=True, exist_ok=True)
     if total is not None and total > 0:
         require_disk_space(dest, total)
@@ -74,7 +87,7 @@ def stream_download(
         except OSError as exc:
             _drop_empty_partial(partial)
             raise PlotweaverError(f"Could not save {label}. {exc.strerror or exc}.") from None
-    _finalize(partial, dest, total, sha256, label)
+    _finalize(partial, dest, total, digest, label)
 
 
 def require_disk_space(dest: Path, nbytes: int) -> None:
@@ -139,7 +152,7 @@ def _finalize(
     partial: Path,
     dest: Path,
     total: int | None,
-    sha256: str | None,
+    sha256: str,
     label: str,
 ) -> None:
     if not partial.is_file() or partial.stat().st_size == 0:
@@ -151,11 +164,10 @@ def _finalize(
         raise PlotweaverError(
             f"Could not download {label}. The download stopped at {size} of {total} bytes."
         )
-    if sha256:
-        found = sha256_file(partial)
-        if found != sha256.lower():
-            partial.unlink()
-            raise PlotweaverError(f"{label} SHA-256 {found} does not match {sha256}")
+    found = sha256_file(partial)
+    if found != sha256:
+        partial.unlink()
+        raise PlotweaverError(f"{label} SHA-256 {found} does not match {sha256}")
     os.replace(partial, dest)
 
 
