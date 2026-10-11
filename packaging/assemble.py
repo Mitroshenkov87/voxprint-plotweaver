@@ -25,7 +25,7 @@ _COPY_FILES = (
     "NOTICE",
     "BUILD.json",
 )
-_COMMON_SHA256 = "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
+_COMMON_SHA256 = "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
 _FETCH = """
 from pathlib import Path
 import sys
@@ -189,10 +189,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _common_wheel() -> Path:
-    """Vendored voxprint-common 0.2.1 wheel. Installers must not fetch it."""
-    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.2.1-py3-none-any.whl"
+    """Vendored voxprint-common 0.2.4 wheel. Installers must not fetch it."""
+    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.2.4-py3-none-any.whl"
     if not wheel.is_file():
-        raise SystemExit("packaging/wheels is missing voxprint-common 0.2.1")
+        raise SystemExit("packaging/wheels is missing voxprint-common 0.2.4")
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
     if digest != _COMMON_SHA256:
         raise SystemExit(f"voxprint-common wheel sha256 is {digest}")

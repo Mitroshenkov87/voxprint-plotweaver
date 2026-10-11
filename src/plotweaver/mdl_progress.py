@@ -1,7 +1,9 @@
-"""Run VOXPrint MDL and render its JSON events.
+"""Run VOXPrint MDL.
 
-Plotweaver does not download model bytes. ``voxprint-mdl download`` does.
-0.2.1 has no progress window, so a caller draws these events itself.
+Plotweaver does not download or repair model bytes. Manage models opens
+``voxprint-mdl --gui --app plotweaver``. An interactive installer opens
+``voxprint-mdl download --gui``. ``/VERYSILENT`` stays on the JSON log.
+Launch repair is ``voxprint-mdl verify --repair --app plotweaver``.
 """
 
 from __future__ import annotations
@@ -20,11 +22,58 @@ APP_ID = "plotweaver"
 EventFn = Callable[[dict[str, object]], None]
 
 
+def manage_command() -> list[str]:
+    """``voxprint-mdl --gui --app plotweaver``. No download subcommand."""
+    return [sys.executable, "-m", "voxprint_common.mdl", "--gui", "--app", APP_ID]
+
+
+def installer_gui_command() -> list[str]:
+    """Interactive installer progress: the MDL download window."""
+    return [
+        sys.executable,
+        "-m",
+        "voxprint_common.mdl",
+        "download",
+        "--gui",
+        "--app",
+        APP_ID,
+    ]
+
+
+def verify_repair_command() -> list[str]:
+    """Launch repair. MDL neutralises a dangerous manifest path and re-checks files."""
+    return [
+        sys.executable,
+        "-m",
+        "voxprint_common.mdl",
+        "verify",
+        "--repair",
+        "--app",
+        APP_ID,
+    ]
+
+
+def run_mdl(command: Sequence[str]) -> int | None:
+    """Run one MDL command. ``None`` means the process could not be started."""
+    try:
+        completed = subprocess.run(command, check=False)
+    except OSError:
+        return None
+    return int(completed.returncode)
+
+
+def launch_repair() -> int:
+    """Run ``voxprint-mdl verify --repair --app plotweaver`` and return its code."""
+    code = run_mdl(verify_repair_command())
+    if code is None:
+        raise OSError("voxprint-mdl verify --repair could not be started")
+    return code
+
+
 def mdl_gui_supported() -> bool:
     """True when this voxprint-common build ships the MDL window.
 
-    The window arrives in 0.2.2. 0.2.1 accepts ``--gui`` and then fails
-    closed or opens an unfinished window, so Manage models does not use it.
+    The localized window is in 0.2.4. Older builds are not used.
     """
     text = version("voxprint-common")
     parts: list[int] = []

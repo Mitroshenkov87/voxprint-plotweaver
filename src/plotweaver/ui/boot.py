@@ -32,9 +32,14 @@ class _ProvisionThread(QThread):
     finished_with = Signal(object)
 
     def run(self) -> None:
-        # Suite repair imports llama and the registry. Keep that off this module's import.
+        # MDL verify and the readiness gate stay off this module's import.
+        from plotweaver.mdl_progress import launch_repair
         from plotweaver.ready import ensure_ready
 
+        try:
+            launch_repair()
+        except OSError as exc:
+            self.progressed.emit(str(exc))
         self.finished_with.emit(ensure_ready(self.progressed.emit))
 
 

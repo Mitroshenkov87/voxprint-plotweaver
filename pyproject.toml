@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 license = "Apache-2.0"
 authors = [{ name = "Aleksandr Mitroshenkov" }]
 dependencies = [
-  "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.1/voxprint_common-0.2.1-py3-none-any.whl",
+  "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl",
   "PySide6-Essentials>=6.10",
   "httpx>=0.28",
   "python-docx>=1.2",

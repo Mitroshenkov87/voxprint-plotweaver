@@ -18,10 +18,9 @@ from pathlib import Path
 
 from voxprint_common.atomic import exclusive_lock, write_json
 from voxprint_common.hashing import sha256_bytes, sha256_file
+from voxprint_common.runtime_manifest import ManifestError as CommonManifestError
 from voxprint_common.runtime_manifest import (
-    ManifestError as CommonManifestError,
-)
-from voxprint_common.runtime_manifest import (
+    _refuse_protected,
     add_ref,
     load,
     lock_path,
@@ -108,13 +107,21 @@ def load_manifest(shared: Path) -> dict[str, Resource]:
 
 
 def refuse_shared_delete(path: Path) -> None:
-    """Raise when ``path`` is a shared root or an ancestor of one."""
+    """Raise when ``path`` is a shared root or an ancestor of one.
+
+    Plotweaver's own list runs first. voxprint-common's guard then refuses a
+    path ours missed. A file inside a root is still allowed.
+    """
     target = path.resolve()
     for root in _shared_delete_roots():
         if target == root or target in root.parents:
             raise ManifestError(
                 f"refusing to delete {path}: it is a shared root or an ancestor of one"
             )
+    try:
+        _refuse_protected(target, str(path))
+    except CommonManifestError as exc:
+        raise ManifestError(str(exc)) from exc
 
 
 def register_resource(
@@ -230,11 +237,14 @@ def _remember(
 def _resource_dir(shared: Path, resource: Resource) -> Path:
     raw = Path(resource.path)
     if raw.is_absolute():
-        return raw
-    base = (shared / resource.path).resolve()
-    root = shared.resolve()
-    if base != root and root not in base.parents:
-        raise ManifestError("a resource path must stay inside the shared folder")
+        base = raw
+    else:
+        base = (shared / resource.path).resolve()
+        root = shared.resolve()
+        if base != root and root not in base.parents:
+            raise ManifestError("a resource path must stay inside the shared folder")
+    if raw.name in resource.files:
+        return base.parent
     return base
 
 
@@ -276,7 +286,9 @@ def _delete_files(shared: Path, resource: Resource) -> None:
     base = _resource_dir(shared, resource)
     refuse_shared_delete(base)
     root = shared.resolve()
-    allowed = (root, models_dir().resolve(), base)
+    # ``base`` is not an allowed root. A manifest path outside the shared
+    # folder and the models folder must not become a delete root.
+    allowed = (root, models_dir().resolve())
     for name in resource.files:
         target = (base / name).resolve()
         refuse_shared_delete(target)

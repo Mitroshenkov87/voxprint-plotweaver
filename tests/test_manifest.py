@@ -169,10 +169,10 @@ def test_uninstall_leaves_a_file_another_app_refs(
 ) -> None:
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
     shared = shared_dir()
-    folder = shared / "models" / "llm"
-    folder.mkdir(parents=True)
-    shared_file = folder / "weights.gguf"
-    own_file = folder / "only.gguf"
+    shared_file = shared / "models" / "llm" / "shared-weights" / "weights.gguf"
+    own_file = shared / "models" / "llm" / "plotweaver-only" / "only.gguf"
+    shared_file.parent.mkdir(parents=True)
+    own_file.parent.mkdir(parents=True)
     shared_file.write_bytes(b"abc")
     own_file.write_bytes(b"abc")
     files = {"weights.gguf": _DIGEST}
@@ -181,7 +181,7 @@ def test_uninstall_leaves_a_file_another_app_refs(
         shared,
         "example-model",
         kind="model",
-        path="models/llm",
+        path="models/llm/shared-weights",
         nbytes=3,
         files=files,
         app="plotweaver",
@@ -190,7 +190,7 @@ def test_uninstall_leaves_a_file_another_app_refs(
         shared,
         "example-model",
         kind="model",
-        path="models/llm",
+        path="models/llm/shared-weights",
         nbytes=3,
         files=files,
         app="audiobook-builder",
@@ -199,7 +199,7 @@ def test_uninstall_leaves_a_file_another_app_refs(
         shared,
         "plotweaver-only",
         kind="model",
-        path="models/llm",
+        path="models/llm/plotweaver-only",
         nbytes=3,
         files=own,
         app="plotweaver",
@@ -241,6 +241,25 @@ def test_shared_root_delete_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     inside.parent.mkdir(parents=True, exist_ok=True)
     inside.write_bytes(b"abc")
     refuse_shared_delete(inside)
+
+
+def test_refuse_also_calls_the_common_guard(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    seen: list[Path] = []
+
+    def veto(resolved: Path, shown: str) -> None:
+        seen.append(resolved)
+        raise ManifestError(f"common refused {shown}")
+
+    monkeypatch.setattr("plotweaver.manifest._refuse_protected", veto)
+    inside = shared_dir() / "models" / "llm" / "weights.gguf"
+    inside.parent.mkdir(parents=True)
+    inside.write_bytes(b"abc")
+    with pytest.raises(ManifestError, match="common refused"):
+        refuse_shared_delete(inside)
+    assert seen == [inside.resolve()]
 
 
 def test_shared_root_cannot_be_a_component(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -305,6 +324,35 @@ def test_uninstall_refuses_to_delete_a_shared_root(
     assert keep.is_file()
     assert models.is_dir()
     assert (shared / "runtime").is_dir()
+
+
+def test_uninstall_leaves_a_file_outside_the_suite(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
+    shared = shared_dir()
+    shared.mkdir(parents=True)
+    outside = tmp_path / "outside" / "weights.gguf"
+    outside.parent.mkdir()
+    outside.write_bytes(b"abc")
+    document = {
+        "schema": 1,
+        "components": {
+            "planted": {
+                "kind": "model",
+                "version": "1",
+                "path": str(outside),
+                "sha256": _DIGEST,
+                "installed_at": "2020-01-01T00:00:00",
+                "refs": ["plotweaver"],
+                "files": {outside.name: _DIGEST},
+            }
+        },
+    }
+    (shared / "manifest.json").write_text(json.dumps(document), encoding="utf-8")
+    removed = unregister_app(shared, "plotweaver")
+    assert removed == ["planted"]
+    assert outside.is_file()
 
 
 def test_replace_tree_refuses_a_shared_root(

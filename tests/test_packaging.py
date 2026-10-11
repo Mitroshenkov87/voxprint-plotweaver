@@ -30,19 +30,20 @@ def test_version_is_shared() -> None:
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     pin = (
         "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/"
-        "releases/download/v0.2.1/voxprint_common-0.2.1-py3-none-any.whl"
+        "releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl"
     )
     assert pin in project
     wheels = root / "packaging" / "wheels"
-    wheel = wheels / "voxprint_common-0.2.1-py3-none-any.whl"
+    wheel = wheels / "voxprint_common-0.2.4-py3-none-any.whl"
     assert wheel.is_file()
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    assert digest == "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
+    assert digest == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
     requirements = (root / "packaging" / "requirements-common.txt").read_text(encoding="utf-8")
     assert f"--hash=sha256:{digest}" in requirements
-    assert (wheels / "voxprint_common-0.2.1-py3-none-any.whl.sha256").is_file()
-    assert (wheels / "voxprint_common-0.2.1.tar.gz").is_file()
-    assert (wheels / "voxprint_common-0.2.1.tar.gz.sha256").is_file()
+    assert (wheels / "voxprint_common-0.2.4-py3-none-any.whl.sha256").is_file()
+    assert (wheels / "voxprint_common-0.2.4.tar.gz").is_file()
+    assert (wheels / "voxprint_common-0.2.4.tar.gz.sha256").is_file()
+    assert not list(wheels.glob("voxprint_common-0.2.1*"))
     assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
@@ -94,7 +95,22 @@ def test_suite_install_layout() -> None:
     assert "postinstall" in installer
     assert installer.index("mdl-progress") < installer.index("skipifsilent")
     assert "WizardSilent" in installer
-    assert "--gui" not in installer
+    interactive = [
+        line
+        for line in installer.splitlines()
+        if "mdl-progress" in line and "not WizardSilent" in line
+    ]
+    silent = [
+        line
+        for line in installer.splitlines()
+        if "mdl-progress" in line and "Check: WizardSilent" in line
+    ]
+    assert interactive and "--quiet" not in interactive[0]
+    assert silent and "--quiet" in silent[0]
+    progress = (root / "src" / "plotweaver" / "mdl_progress.py").read_text(encoding="utf-8")
+    assert '"--gui"' in progress
+    assert '"verify"' in progress
+    assert '"--repair"' in progress
     assert "DelTree" not in installer
     assert "UninstallDelete" not in installer
     assert r"{localappdata}" not in installer

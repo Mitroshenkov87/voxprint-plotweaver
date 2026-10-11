@@ -27,9 +27,26 @@ def test_missing_status_is_not_ready(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert notes == ["Checking models."]
 
 
-def test_ready_status_opens_the_gate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_status_file_does_not_open_the_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
     save_status(Status(JobState.READY))
     notes: list[str] = []
-    assert isinstance(ensure_ready(notes.append), Ready)
+    result = ensure_ready(notes.append)
+    assert isinstance(result, Failed)
     assert notes == ["Checking models."]
+
+
+def test_gate_asks_ready_for_plotweaver(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    seen: list[object] = []
+
+    def present(target: object = None) -> bool:
+        seen.append(target)
+        return True
+
+    monkeypatch.setattr("plotweaver.ready.mdl_ready", present)
+    notes: list[str] = []
+    assert isinstance(ensure_ready(notes.append), Ready)
+    assert seen == ["plotweaver"]

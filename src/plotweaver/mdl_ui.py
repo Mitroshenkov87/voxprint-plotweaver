@@ -1,19 +1,18 @@
 """Manage models: the MDL window, or a dialog that only draws MDL events.
 
-0.2.2 will open ``voxprint-mdl download --gui``. Until then this dialog runs
-``voxprint-mdl download --app plotweaver --json`` and paints those lines.
+``voxprint-mdl --gui --app plotweaver`` opens the localized window. This dialog
+runs only when that command fails, and it only paints JSON events.
 """
 
 from __future__ import annotations
 
 import subprocess
-import sys
 from collections.abc import Sequence
 
 from PySide6.QtCore import QEventLoop, QObject, QThread, Signal
 from PySide6.QtWidgets import QApplication, QProgressDialog, QWidget
 
-from plotweaver.mdl_progress import download_command, mdl_gui_supported, run_download
+from plotweaver.mdl_progress import download_command, manage_command, run_download, run_mdl
 from plotweaver.ui.i18n import tr
 
 
@@ -39,11 +38,10 @@ class _DownloadThread(QThread):
 
 
 def manage_models(parent: QWidget | None = None, models: Sequence[str] = ()) -> int:
-    """Open Manage models. Fall back to the JSON dialog when ``--gui`` is absent."""
-    if mdl_gui_supported():
-        code = _try_gui(models)
-        if code is not None:
-            return code
+    """Open ``voxprint-mdl --gui --app plotweaver``. Fall back if that fails."""
+    code = run_mdl(manage_command())
+    if code in (0, 3):
+        return code
     return show_progress_dialog(parent, models)
 
 
@@ -102,22 +100,3 @@ class _Holder(QObject):
         fraction = payload.get("fraction")
         if isinstance(fraction, int | float):
             self.dialog.setValue(max(0, min(1000, int(float(fraction) * 1000))))
-
-
-def _try_gui(models: Sequence[str]) -> int | None:
-    """Return the ``--gui`` exit code, or None when this build rejects ``--gui``."""
-    command = [
-        sys.executable,
-        "-m",
-        "voxprint_common.mdl",
-        "download",
-        "--gui",
-        "--app",
-        "plotweaver",
-    ]
-    for model_id in models:
-        command.extend(["--model", model_id])
-    completed = subprocess.run(command, check=False)
-    if completed.returncode == 1:
-        return None
-    return int(completed.returncode)

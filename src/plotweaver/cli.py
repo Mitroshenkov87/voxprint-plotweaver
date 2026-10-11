@@ -127,7 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     provision.set_defaults(func=_provision)
     progress = sub.add_parser(
         "mdl-progress",
-        help="Show progress from voxprint-mdl download --json. Plotweaver does not download.",
+        help="Interactive install opens the MDL window. --quiet logs and stays headless.",
     )
     progress.add_argument(
         "--quiet",
@@ -385,7 +385,12 @@ def _models_list(args: argparse.Namespace) -> int:
 
 
 def _mdl_progress(args: argparse.Namespace) -> int:
-    from plotweaver.mdl_progress import install_log_path, run_download
+    from plotweaver.mdl_progress import (
+        install_log_path,
+        installer_gui_command,
+        run_download,
+        run_mdl,
+    )
 
     log = install_log_path() if args.installer or args.quiet else None
     if args.quiet:
@@ -395,14 +400,17 @@ def _mdl_progress(args: argparse.Namespace) -> int:
             print(str(exc), file=sys.stderr)
             code = 1
         return 0 if args.installer else code
-    # The dialog imports Qt. A silent install stays on the quiet path above.
-    from plotweaver.mdl_ui import show_progress_dialog
+    # /VERYSILENT took the quiet path. An interactive install uses the MDL window.
+    window = run_mdl(installer_gui_command())
+    code = 1 if window is None else window
+    if window is None or window == 1:
+        from plotweaver.mdl_ui import show_progress_dialog
 
-    try:
-        code = show_progress_dialog()
-    except OSError as exc:
-        print(str(exc), file=sys.stderr)
-        code = 1
+        try:
+            code = show_progress_dialog()
+        except OSError as exc:
+            print(str(exc), file=sys.stderr)
+            code = 1
     return 0 if args.installer else code
 
 
@@ -849,12 +857,16 @@ def _gui(args: argparse.Namespace) -> int:
 
 
 def _repair_or_raise(progress: Callable[[str], None]) -> None:
-    from plotweaver.suite import repair_shared
+    """Launch repair is MDL verify --repair. Plotweaver does not repair the bytes."""
+    from plotweaver.mdl_progress import launch_repair
 
+    progress("Checking models.")
     try:
-        repair_shared(progress)
+        code = launch_repair()
     except OSError as exc:
         raise PlotweaverError(str(exc)) from None
+    if code != 0:
+        raise PlotweaverError("models not ready")
 
 
 def _plain_message(exc: BaseException) -> str:

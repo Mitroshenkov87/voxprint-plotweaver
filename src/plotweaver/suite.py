@@ -261,12 +261,11 @@ def _accepted_legacy(source: Path, dest: Path, entry: RegistryEntry) -> Path | N
 
 def _register_model(entry: RegistryEntry, extra_apps: tuple[str, ...]) -> None:
     dest = gguf_dir() / stored_filename(entry)
-    parent = dest.parent.resolve()
     root = shared_dir().resolve()
     try:
-        recorded = parent.relative_to(root).as_posix()
+        recorded = dest.resolve().relative_to(root).as_posix()
     except ValueError:
-        recorded = parent.as_posix()
+        recorded = dest.resolve().as_posix()
     apps = tuple(dict.fromkeys((APP_ID, *extra_apps)))
     for app in apps:
         register_resource(

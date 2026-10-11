@@ -29,7 +29,7 @@ Off: the main model does every step. A refusal is kept as a narrator paragraph a
 
 On: pass 1 drafts the book with the stock model. A scene beat marked dark, or a refusal on a dark scene, becomes a placeholder (beats, point of view, emotional goal, links to the neighbouring scenes). Pass 2 loads one least-censored model, fills every placeholder from the neighbouring text, and proofreads the book before unloading. There is no second verification model and no rollback loop. Least-censored models come from Model Forge. A Russian book uses the forge abliterated T-lite when that file is installed and the tier allows it. Otherwise pass 2 uses the largest installed forge model for the tier. When none is installed, pass 2 uses the stock drafter (T-pro on 24 GB, Gemma 4 12B on 16 GB). The book form's Standard / Least censored choice is separate from the VRAM tier. Settings offers the forge download when a published file fits the card. Plotweaver downloads finished GGUF files pinned by revision and SHA-256. It does not abliterate, quantize, or fit weights.
 
-VOXPrint MDL downloads the stock set from `voxprint-app-models.json` and `mdl.json`. The window opens only when MDL reports ready. Manage models runs `voxprint-mdl download --app plotweaver --json` and draws those events.
+VOXPrint MDL downloads the stock set from `voxprint-app-models.json` and `mdl.json`. The window opens only when `ready('plotweaver')` reports each required file present at its expected size. Manage models runs `voxprint-mdl --gui --app plotweaver`. If that command fails, Plotweaver draws the JSON events from `voxprint-mdl download --app plotweaver --json`. Launch repair is `voxprint-mdl verify --repair --app plotweaver`.
 
 ## VRAM-aware model tiers
 
