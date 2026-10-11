@@ -260,11 +260,9 @@ def _accepted_legacy(source: Path, dest: Path, entry: RegistryEntry) -> Path | N
             return None
     except OSError:
         return None
-    try:
-        verify_file(source, size=entry.size, sha256=entry.sha256)
-    except PlotweaverError, OSError:
-        return None
-    return source
+    if _trusted(source, size=entry.size, sha256=entry.sha256):
+        return source
+    return None
 
 
 def _register_model(entry: RegistryEntry, extra_apps: tuple[str, ...]) -> None:
@@ -392,7 +390,7 @@ def _register_runtime(resource_id: str, folder: Path, source: str) -> None:
         kind="runtime",
         path=relative,
         nbytes=marker.stat().st_size,
-        files={".complete": file_sha256(marker)},
+        files={".complete": _cached_sha256(marker)},
         app=APP_ID,
         source=source,
     )
@@ -434,7 +432,7 @@ def _register_python(folder: Path) -> None:
         kind="runtime",
         path=relative,
         nbytes=tracked.stat().st_size,
-        files={tracked.name: file_sha256(tracked)},
+        files={tracked.name: _cached_sha256(tracked)},
         app=APP_ID,
         source="python",
     )
@@ -524,6 +522,26 @@ def _spawn_version_ok(binary: Path) -> bool:
     except OSError, subprocess.SubprocessError:
         return False
     return proc.returncode == 0 and _marker_version(proc.stdout.replace(" ", "."))
+
+
+def _cached_sha256(path: Path) -> str:
+    """Return the file hash, reusing a size and mtime stamp when it still matches."""
+    stat = path.stat()
+    key = str(path.resolve())
+    stamps = _load_stamps()
+    row = stamps.get(key)
+    if (
+        isinstance(row, dict)
+        and int(row.get("size") or -1) == stat.st_size
+        and int(row.get("mtime_ns") or -1) == stat.st_mtime_ns
+    ):
+        digest = row.get("sha256")
+        if isinstance(digest, str) and len(digest) == 64:
+            return digest
+    digest = file_sha256(path)
+    stamps[key] = {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns, "sha256": digest}
+    write_json(_stamp_path(), {"files": stamps})
+    return digest
 
 
 def _trusted(path: Path, *, size: int, sha256: str) -> bool:

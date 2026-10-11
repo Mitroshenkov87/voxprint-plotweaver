@@ -42,8 +42,17 @@ _GUI_SH = """#!/bin/sh
 ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 exec "$ROOT/python/bin/python3" -m plotweaver gui "$@"
 """
+_CLI_SH = """#!/bin/sh
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+exec "$ROOT/python/bin/python3" -m plotweaver "$@"
+"""
+_ALIAS_SH = """#!/bin/sh
+echo "plotweaver is deprecated; use voxprint-plotweaver-cli" >&2
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+exec "$ROOT/python/bin/python3" -m plotweaver "$@"
+"""
 _GUI_CMD = """@echo off\r
-"%~dp0python\\pythonw.exe" -m plotweaver gui %*\r
+"%~dp0voxprint-plotweaver.exe" %*\r
 """
 _PROVISION_SH = """#!/bin/sh
 ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
@@ -52,6 +61,35 @@ exec "$ROOT/python/bin/python3" -m plotweaver provision
 _PROVISION_CMD = """@echo off\r
 "%~dp0python\\python.exe" -m plotweaver provision\r
 if errorlevel 1 pause\r
+"""
+_LAUNCHER_CS = r"""
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+class Program {
+  static int Main(string[] args) {
+    __DEPRECATE__
+    string root = AppDomain.CurrentDomain.BaseDirectory;
+    string py = Path.Combine(root, "python", "__PYTHON__");
+    var psi = new ProcessStartInfo();
+    psi.FileName = py;
+    psi.UseShellExecute = false;
+    psi.WorkingDirectory = root;
+    var all = new List<string>();
+    __PREFIX__
+    foreach (string arg in args) all.Add(Quote(arg));
+    psi.Arguments = string.Join(" ", all.ToArray());
+    var proc = Process.Start(psi);
+    if (proc == null) return 1;
+    proc.WaitForExit();
+    return proc.ExitCode;
+  }
+  static string Quote(string value) {
+    if (value.IndexOfAny(new char[] { ' ', '\t', '"' }) < 0) return value;
+    return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+  }
+}
 """
 
 
@@ -207,16 +245,86 @@ def _copy_payload(dest: Path) -> None:
         shutil.copytree(_ROOT / name, dest / name, symlinks=True, ignore=ignore)
     for name in _COPY_FILES:
         shutil.copy2(_ROOT / name, dest / name)
-    gui = dest / "plotweaver-gui.sh"
-    gui.write_text(_GUI_SH, encoding="utf-8", newline="\n")
-    gui.chmod(0o755)
+    _write_script(dest / "voxprint-plotweaver", _GUI_SH)
+    _write_script(dest / "voxprint-plotweaver-cli", _CLI_SH)
+    _write_script(dest / "plotweaver", _ALIAS_SH)
+    _write_script(dest / "plotweaver-gui.sh", _GUI_SH)
     (dest / "plotweaver-gui.cmd").write_text(_GUI_CMD, encoding="utf-8", newline="\n")
-    provision = dest / "plotweaver-provision.sh"
-    provision.write_text(_PROVISION_SH, encoding="utf-8", newline="\n")
-    provision.chmod(0o755)
+    _write_script(dest / "plotweaver-provision.sh", _PROVISION_SH)
     (dest / "plotweaver-provision.cmd").write_text(_PROVISION_CMD, encoding="utf-8", newline="\n")
+    if sys.platform == "win32":
+        _compile_windows_launcher(
+            dest,
+            "voxprint-plotweaver.exe",
+            python_name="pythonw.exe",
+            prefix='all.Add("-m"); all.Add("plotweaver"); all.Add("gui");',
+            winexe=True,
+            deprecate=False,
+        )
+        _compile_windows_launcher(
+            dest,
+            "voxprint-plotweaver-cli.exe",
+            python_name="python.exe",
+            prefix='all.Add("-m"); all.Add("plotweaver");',
+            winexe=False,
+            deprecate=False,
+        )
+        _compile_windows_launcher(
+            dest,
+            "plotweaver.exe",
+            python_name="python.exe",
+            prefix='all.Add("-m"); all.Add("plotweaver");',
+            winexe=False,
+            deprecate=True,
+        )
     for script in (dest / "scripts").glob("*.sh"):
         script.chmod(script.stat().st_mode | 0o755)
+
+
+def _write_script(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8", newline="\n")
+    path.chmod(path.stat().st_mode | 0o755)
+
+
+def _compile_windows_launcher(
+    dest: Path,
+    name: str,
+    *,
+    python_name: str,
+    prefix: str,
+    winexe: bool,
+    deprecate: bool,
+) -> None:
+    """Compile one small exe that starts the staged interpreter."""
+    deprecate_line = ""
+    if deprecate:
+        deprecate_line = (
+            'Console.Error.WriteLine("plotweaver is deprecated; use voxprint-plotweaver-cli");'
+        )
+    source_text = (
+        _LAUNCHER_CS.replace("__DEPRECATE__", deprecate_line)
+        .replace("__PYTHON__", python_name)
+        .replace("__PREFIX__", prefix)
+    )
+    source = dest / f"{name}.cs"
+    source.write_text(source_text, encoding="utf-8", newline="\n")
+    target = "/target:winexe" if winexe else "/target:exe"
+    subprocess.run(
+        [_csc(), "/nologo", target, f"/out:{dest / name}", str(source)],
+        check=True,
+    )
+    source.unlink()
+
+
+def _csc() -> str:
+    roots = (
+        Path(r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"),
+        Path(r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"),
+    )
+    for candidate in roots:
+        if candidate.is_file():
+            return str(candidate)
+    raise SystemExit("csc.exe was not found")
 
 
 if __name__ == "__main__":

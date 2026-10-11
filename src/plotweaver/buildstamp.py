@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from voxprint_common.buildinfo import BuildInfo, load
 
-from plotweaver.appinfo import build_json_path
+from plotweaver.appinfo import APP_NAME, build_json_path
 
 
 def suite_build_info() -> BuildInfo:
     """Read BUILD.json the way the rest of the suite does, including older shapes."""
-    return load(build_json_path(), app="plotweaver")
+    return load(build_json_path(), app=APP_NAME)

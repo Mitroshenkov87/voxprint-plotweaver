@@ -1,5 +1,8 @@
 """New book, progress, and result. The pipeline runs on the UI thread in the self-test
 and on a worker thread for a normal click, so the window can repaint.
+
+The llama client, the model registry, and export helpers are imported inside
+the methods that use them. Constructing the window does not load them.
 """
 
 from __future__ import annotations
@@ -8,9 +11,8 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import assert_never
 
-from PySide6.QtCore import QSize, QThread, QUrl, Signal
+from PySide6.QtCore import QSize, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
@@ -46,27 +48,13 @@ from plotweaver.brief import (
 )
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
-from plotweaver.hardware import query_gpu, require_supported_gpu
-from plotweaver.install import ensure_uncensored_models, prepare_real_models
-from plotweaver.llama_release import ensure_llama_server
-from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import LLMBackend
-from plotweaver.optional_mock import mock_backend
-from plotweaver.registry import (
-    TierName,
-    detected_tier,
-    resolve_tier,
-    tier_option_enabled,
-    uncensored_offer_allowed,
-)
-from plotweaver.runner import RunResult, draft_book_brief, run_book
 from plotweaver.settings import (
     model_tier_override,
     save_model_tier_override,
     save_uncensored_models,
     uncensored_models_preference,
 )
-from plotweaver.sound import add_sound
 from plotweaver.store import Project
 from plotweaver.textio import read_text
 from plotweaver.ui.brief_form import BriefForm
@@ -74,7 +62,6 @@ from plotweaver.ui.fonts import register_ui_fonts, ui_font
 from plotweaver.ui.i18n import tr
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.theme import TEXT, TEXT_ON_PRIMARY, build_style, enable_acrylic
-from plotweaver.update_check import check_for_update
 
 HOME, FORM, PROGRESS, RESULT, SETTINGS = 0, 1, 2, 3, 4
 
@@ -90,6 +77,8 @@ class _DownloadThread(QThread):
         self.free_gb = free_gb
 
     def run(self) -> None:
+        from plotweaver.install import ensure_uncensored_models
+
         try:
             count = ensure_uncensored_models(
                 total_vram_gb=self.total_vram_gb,
@@ -115,6 +104,9 @@ class _RunThread(QThread):
         self.approve = approve
 
     def run(self) -> None:
+        from plotweaver.install import prepare_real_models
+        from plotweaver.runner import run_book
+
         try:
             if not self.request_mock:
                 request = self.project.request()
@@ -136,6 +128,11 @@ class _RunThread(QThread):
 
 
 def _backend(mock: bool) -> LLMBackend:
+    from plotweaver.hardware import require_supported_gpu
+    from plotweaver.llama_release import ensure_llama_server
+    from plotweaver.llama_server import LlamaServer
+    from plotweaver.optional_mock import mock_backend
+
     if mock:
         return mock_backend()
     require_supported_gpu()
@@ -203,10 +200,16 @@ class MainWindow(QMainWindow):
         note = QLabel(tr("gpu_note"))
         note.setObjectName("faint")
         note.setWordWrap(True)
-        newer = check_for_update()
-        if newer:
-            note.setText(f"{tr('gpu_note')}\n{newer}")
         layout.addWidget(note)
+
+        def _show_update() -> None:
+            from plotweaver.update_check import check_for_update
+
+            newer = check_for_update()
+            if newer:
+                note.setText(f"{tr('gpu_note')}\n{newer}")
+
+        QTimer.singleShot(0, _show_update)
         button = QPushButton(tr("new"))
         button.setObjectName("primary")
         button.clicked.connect(lambda: self.stack.setCurrentIndex(FORM))
@@ -361,27 +364,31 @@ class MainWindow(QMainWindow):
         return page
 
     def _gpu_total(self) -> float | None:
+        from plotweaver.hardware import query_gpu
+
         gpu = query_gpu()
         if gpu is None:
             return None
         return gpu.total_gb
 
     def _gpu_free(self) -> float | None:
+        from plotweaver.hardware import query_gpu
+
         gpu = query_gpu()
         if gpu is None:
             return None
         return gpu.free_gb
 
-    def _tier_label(self, tier: TierName) -> str:
-        match tier:
-            case "16gb":
-                return tr("settings_vram_16")
-            case "24gb":
-                return tr("settings_vram_24")
-            case _ as unreachable:
-                assert_never(unreachable)
+    def _tier_label(self, tier: str) -> str:
+        if tier == "16gb":
+            return tr("settings_vram_16")
+        if tier == "24gb":
+            return tr("settings_vram_24")
+        return tier
 
     def _can_use_24(self) -> bool:
+        from plotweaver.registry import tier_option_enabled
+
         total = self._gpu_total()
         free = self._gpu_free()
         if total is None or free is None:
@@ -397,6 +404,8 @@ class MainWindow(QMainWindow):
             item.setEnabled(enabled)
 
     def _refresh_vram_tier(self) -> None:
+        from plotweaver.registry import detected_tier, resolve_tier
+
         total = self._gpu_total()
         free = self._gpu_free()
         can_24 = self._can_use_24()
@@ -436,6 +445,8 @@ class MainWindow(QMainWindow):
         return "auto"
 
     def _open_settings(self) -> None:
+        from plotweaver.registry import uncensored_offer_allowed
+
         self._refresh_vram_tier()
         allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
         self.uncensored_models.setEnabled(allowed)
@@ -448,10 +459,14 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(SETTINGS)
 
     def _uncensored_toggled(self, checked: bool) -> None:
+        from plotweaver.registry import uncensored_offer_allowed
+
         allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
         self.download_uncensored.setEnabled(allowed and checked)
 
     def _save_settings(self) -> None:
+        from plotweaver.registry import uncensored_offer_allowed
+
         choice = self._selected_override()
         if choice == "24gb" and not self._can_use_24():
             choice = "auto"
@@ -467,6 +482,8 @@ class MainWindow(QMainWindow):
         self.settings_status.setText(tr("settings_saved"))
 
     def _download_uncensored(self) -> None:
+        from plotweaver.registry import uncensored_offer_allowed
+
         total = self._gpu_total()
         if not uncensored_offer_allowed(total, self._gpu_free()):
             self.settings_status.setText(tr("settings_uncensored_blocked"))
@@ -487,6 +504,8 @@ class MainWindow(QMainWindow):
         self.download_uncensored.setEnabled(True)
 
     def _download_failed(self, message: str) -> None:
+        from plotweaver.registry import uncensored_offer_allowed
+
         self.settings_status.setText(message)
         self.download_uncensored.setEnabled(
             uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
@@ -591,6 +610,8 @@ class MainWindow(QMainWindow):
         self.result_label.setText(f"{tr('done')}\n{target}")
 
     def _draft_brief(self) -> None:
+        from plotweaver.runner import draft_book_brief
+
         notes = self.brief_form.notes.toPlainText().strip()
         if not notes:
             QMessageBox.warning(self, tr("app"), tr("brief_need_notes"))
@@ -718,6 +739,9 @@ class MainWindow(QMainWindow):
         self._thread.start()
 
     def _run_sync(self, mock: bool, yes: bool, approve: bool) -> None:
+        from plotweaver.install import prepare_real_models
+        from plotweaver.runner import run_book
+
         assert self._project is not None
         try:
             if not mock:
@@ -741,6 +765,8 @@ class MainWindow(QMainWindow):
         self.log.appendPlainText(message)
 
     def _on_done(self, result: object) -> None:
+        from plotweaver.runner import RunResult
+
         if not isinstance(result, RunResult):
             return
         if result.status == "waiting":
@@ -756,6 +782,8 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(RESULT)
 
     def _add_sound(self) -> None:
+        from plotweaver.sound import add_sound
+
         if self._project is None:
             return
         source = self._project.export_dir / "book.vxbook"

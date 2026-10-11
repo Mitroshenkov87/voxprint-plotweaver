@@ -1,6 +1,6 @@
 # Roadmap
 
-This is the public plan for Voxprint AI Plotweaver. It has no dates. The release you can install now is 0.2.0 RC.
+This is the public plan for VOXPrint AI Plotweaver. It has no dates. The release you can install now is 0.2.0 RC.
 
 ## Next version (near-term)
 

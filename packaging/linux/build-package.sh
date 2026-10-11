@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full Linux package: relocatable CPython, dependencies, and llama.cpp b11476.
-# Shared files are installed by plotweaver provision, not while this package is built.
+# Shared files are installed by voxprint-plotweaver-cli provision, not while this package is built.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,10 +8,10 @@ cd "$ROOT"
 DIST="$ROOT/dist"
 PKG="$ROOT/packaging/linux/pkg"
 STAGE="$ROOT/build/stage"
-APP="$PKG/opt/voxprint-plotweaver"
+APP="$PKG/opt/voxprint-ai-suite/plotweaver"
 
 rm -rf "$PKG" "$DIST" "$STAGE"
-mkdir -p "$DIST" "$PKG/usr/share/applications" "$PKG/usr/share/icons/hicolor/256x256/apps" "$PKG/DEBIAN"
+mkdir -p "$DIST" "$PKG/usr/bin" "$PKG/usr/share/applications" "$PKG/usr/share/icons/hicolor/256x256/apps" "$PKG/DEBIAN"
 
 if command -v python >/dev/null 2>&1; then
   PY=python
@@ -41,27 +41,40 @@ Priority: optional
 Architecture: amd64
 Maintainer: Aleksandr Mitroshenkov <https://github.com/Mitroshenkov87/voxprint-plotweaver>
 Depends: libglib2.0-0t64 | libglib2.0-0, libegl1, libgl1, libxkbcommon0, libfontconfig1, libdbus-1-3, libx11-6, libxcb1, libvulkan1
-Description: Voxprint AI Plotweaver
+Description: VOXPrint AI Plotweaver
  Local synopsis-to-novel app. Python, dependencies, and llama.cpp b11476
- are included. The package installer runs plotweaver provision, which fills
- ~/.local/share/voxprint/shared when something is missing.
+ are included. The package installer runs voxprint-plotweaver-cli provision,
+ which fills ~/.local/share/voxprint/shared when something is missing. It does not
+ open the window.
 EOF
+
+cat > "$PKG/usr/bin/voxprint-plotweaver-cli" << 'EOF'
+#!/bin/sh
+exec /opt/voxprint-ai-suite/plotweaver/voxprint-plotweaver-cli "$@"
+EOF
+cat > "$PKG/usr/bin/plotweaver" << 'EOF'
+#!/bin/sh
+exec /opt/voxprint-ai-suite/plotweaver/plotweaver "$@"
+EOF
+chmod 755 "$PKG/usr/bin/voxprint-plotweaver-cli" "$PKG/usr/bin/plotweaver"
 
 cat > "$PKG/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
 set -eu
-APP=/opt/voxprint-plotweaver
+APP=/opt/voxprint-ai-suite/plotweaver
+# Previous releases unpacked here. Shared files and models stay under the home directory.
+rm -rf /opt/voxprint-plotweaver
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
   su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver provision"
 else
-  echo "Run $APP/plotweaver-provision.sh as your user to install shared files."
+  echo "Run voxprint-plotweaver-cli provision as your user to install shared files."
 fi
 EOF
 
 cat > "$PKG/DEBIAN/prerm" << 'EOF'
 #!/bin/sh
 set -eu
-APP=/opt/voxprint-plotweaver
+APP=/opt/voxprint-ai-suite/plotweaver
 if [ "$1" = remove ] || [ "$1" = purge ]; then
   if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
     su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver release-shared" || true
@@ -72,7 +85,7 @@ chmod 755 "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/prerm"
 
 TAR="voxprint-plotweaver-${VERSION}-linux-x86_64.tar.gz"
 DEB="voxprint-plotweaver_${VERSION}_amd64.deb"
-tar -C "$PKG/opt" -czf "$DIST/$TAR" voxprint-plotweaver
+tar -C "$PKG" -czf "$DIST/$TAR" opt/voxprint-ai-suite usr/bin
 dpkg-deb --root-owner-group --build "$PKG" "$DIST/$DEB"
 
 (

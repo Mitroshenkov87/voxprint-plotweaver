@@ -1,4 +1,4 @@
-"""Voxprint AI Plotweaver: local synopsis-to-novel engine."""
+"""VOXPrint AI Plotweaver: local synopsis-to-novel engine."""
 
 from plotweaver.appinfo import APP_VERSION
 

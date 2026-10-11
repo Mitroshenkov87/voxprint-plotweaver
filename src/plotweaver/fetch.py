@@ -221,6 +221,7 @@ def _note(
         tr("optional_eta").format(
             name=label,
             size=format_size(announced),
+            speed=f"{format_size(int(rate))}/s",
             eta=format_eta(remaining),
         )
     )

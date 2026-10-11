@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Voxprint AI Plotweaver
+Name=VOXPrint AI Plotweaver
 Comment=Write a novel from a synopsis with local models
-Exec=/opt/voxprint-plotweaver/plotweaver-gui.sh
+Exec=/opt/voxprint-ai-suite/plotweaver/voxprint-plotweaver
 Icon=plotweaver
 Terminal=false
 Categories=Office;

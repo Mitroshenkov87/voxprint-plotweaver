@@ -1,4 +1,4 @@
-# Voxprint AI Plotweaver
+# VOXPrint AI Plotweaver
 
 Plotweaver writes a novel from a synopsis on your machine, with local models only.
 
