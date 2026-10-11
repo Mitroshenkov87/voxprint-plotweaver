@@ -141,7 +141,18 @@ def main(argv: list[str] | None = None) -> int:
         marker.unlink()
     wheel = _common_wheel()
     wheels = wheel.parent
-    _uv("pip", "install", "--python", str(py), "--link-mode", "copy", "--no-index", str(wheel))
+    # jeepney is not vendored. The project install below resolves other deps.
+    _uv(
+        "pip",
+        "install",
+        "--python",
+        str(py),
+        "--link-mode",
+        "copy",
+        "--no-index",
+        "--no-deps",
+        str(wheel),
+    )
     _uv(
         "pip",
         "install",

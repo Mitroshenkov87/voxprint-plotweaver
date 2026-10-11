@@ -105,6 +105,8 @@ def test_suite_install_layout() -> None:
     assert "Name=VOXPrint AI Plotweaver" in desktop
     assert "Exec=/opt/voxprint-ai-suite/plotweaver/voxprint-plotweaver" in desktop
     assert "plotweaver is deprecated; use voxprint-plotweaver-cli" in assemble
+    assert '"--no-index"' in assemble
+    assert '"--no-deps"' in assemble
     assert 'voxprint-plotweaver-cli = "plotweaver.cli:main"' in project
     assert "VOXPrint AI Plotweaver" in head
     assert r"C:\Program Files\VOXPrint AI Suite\Plotweaver" in head
