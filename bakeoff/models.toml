@@ -13,8 +13,9 @@
 # Settings offers an enabled least-censored file when the selected tier can run it.
 # A 16 GB card shows that download when a forge quant for 16 GB fits. A 24 GB-only
 # file still needs a 24 GB card.
-# Least-censored rows come from Model Forge. Stock rows stay T-pro, Gemma 4 12B,
-# and the official T-lite Q4/Q5. min_vram_gb is the file size plus the model card's
+# Least-censored rows come from Model Forge. Stock rows are T-pro on 24 GB, and
+# Gemma 4 12B plus the official T-lite Q4_K_M on 16 GB. The official T-lite Q5
+# is not part of the stock set. min_vram_gb is the file size plus the model card's
 # 8192-context KV, rounded up to the next 0.5 GB. A row fits 16 GB when that number
 # is at most 14 (16 minus 2 GB headroom) and 24 GB when it is at most 21 (24 minus 3).
 # Read from the Forge cards on 2026-10-10.
@@ -99,9 +100,9 @@ base_license = "apache-2.0"
 min_vram_gb = 7
 context = 8192
 moe = false
-optional = false
+optional = true
 uncensored = false
-notes = "16 GB stock Russian candidate. Official T-lite-it-2.1 and this Q5_K_M quant are Apache-2.0. 5.85 GB."
+notes = "Official T-lite Q5_K_M. Not part of the stock install. The 16 GB stock set is Q4_K_M plus Gemma 4 12B Q4."
 
 [[model]]
 id = "qwen3.6-27b-abliterated-iq4-xs"
@@ -242,12 +243,12 @@ card = "16gb"
 tier = "16gb"
 optional = true
 uncensored = true
-enabled = false
+enabled = true
 repo = "Mitroshenkov87/voxprint-gemma4-31b"
-revision = ""
-filename = "gemma-4-31b-abliterated-IQ3_XXS.gguf"
-sha256 = ""
-size = 0
+revision = "26495e1a45d8bde085a0681c3c43044eff5c8ac5"
+filename = "IQ3_XXS.gguf"
+sha256 = "c7bb8f9f4bdb396fb40a5beb617de27132cda6727b885e82f635340f353c5340"
+size = 12077502368
 license = "apache-2.0"
 base_repo = "paperscarecrow/Gemma-4-31B-it-abliterated"
 base_revision = "2491ee58472b82a2372d288f982943b9d5e6a82c"
@@ -255,7 +256,7 @@ base_license = "apache-2.0"
 min_vram_gb = 12
 context = 8192
 moe = false
-notes = "Disabled 16 GB placeholder. The Forge card names an IQ3_XXS quant, and that file is not in revision 458a5cea1077218d72daf2e49334abe6eb1da930. plotweaver models import-forge-manifest enables this row when the file is published."
+notes = "16 GB on-demand Gemma 4 31B IQ3_XXS from Mitroshenkov87/voxprint-gemma4-31b. Not part of the stock install."
 
 [[model]]
 id = "t-lite-it-2.1-abliterated-iq4-xs"

@@ -45,7 +45,7 @@ Inside that folder:
 }
 ```
 
-Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each component and deletes files only when `refs` is empty. A component Audiobook Builder still lists is left in place.
+Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` from each component through voxprint-common and deletes a shared file only when that call leaves `refs` empty. A component Audiobook Builder still lists is left in place. `models/`, `runtime/`, `voices/`, `cache/`, and the suite home are never one component and are never deleted. Uninstall removes the program folder only.
 
 ## Model weights
 

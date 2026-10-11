@@ -16,12 +16,13 @@ from plotweaver.manifest import (
     ManifestError,
     file_sha256,
     load_manifest,
+    refuse_shared_delete,
     register_resource,
     unregister_app,
 )
-from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root, shared_dir
+from plotweaver.paths import gguf_dir, legacy_models_dir, repo_root, shared_dir, voxprint_home
 from plotweaver.registry import RegistryEntry, load_registry
-from plotweaver.suite import release_shared, repair_shared
+from plotweaver.suite import _replace_tree, release_shared, repair_shared
 
 _DIGEST = hashlib.sha256(b"abc").hexdigest()
 
@@ -116,7 +117,9 @@ def test_runtime_tree_is_removed_only_at_zero(
         app="plotweaver",
     )
     assert unregister_app(shared, "plotweaver") == ["python-3.14"]
-    assert not marker.parent.exists()
+    assert not marker.exists()
+    assert marker.parent.is_dir()
+    assert (shared / "runtime").is_dir()
 
 
 def test_old_manifest_keeps_other_apps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -161,6 +164,183 @@ def test_mock_flag_names_the_dev_extra(monkeypatch: pytest.MonkeyPatch) -> None:
         optional_mock.mock_backend()
 
 
+def test_uninstall_leaves_a_file_another_app_refs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    shared = shared_dir()
+    folder = shared / "models" / "llm"
+    folder.mkdir(parents=True)
+    shared_file = folder / "weights.gguf"
+    own_file = folder / "only.gguf"
+    shared_file.write_bytes(b"abc")
+    own_file.write_bytes(b"abc")
+    files = {"weights.gguf": _DIGEST}
+    own = {"only.gguf": _DIGEST}
+    register_resource(
+        shared,
+        "example-model",
+        kind="model",
+        path="models/llm",
+        nbytes=3,
+        files=files,
+        app="plotweaver",
+    )
+    register_resource(
+        shared,
+        "example-model",
+        kind="model",
+        path="models/llm",
+        nbytes=3,
+        files=files,
+        app="audiobook-builder",
+    )
+    register_resource(
+        shared,
+        "plotweaver-only",
+        kind="model",
+        path="models/llm",
+        nbytes=3,
+        files=own,
+        app="plotweaver",
+    )
+    assert release_shared() == ["plotweaver-only"]
+    assert shared_file.is_file()
+    assert not own_file.exists()
+    assert (shared / "models").is_dir()
+    assert voxprint_home().is_dir()
+    assert load_manifest(shared)["example-model"].apps == ("audiobook-builder",)
+
+
+def test_shared_root_delete_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    home = voxprint_home()
+    shared = shared_dir()
+    roots = [
+        home,
+        shared,
+        home / "models",
+        home / "runtime",
+        home / "voices",
+        home / "cache",
+        shared / "models",
+        shared / "runtime",
+        shared / "voices",
+        shared / "cache",
+    ]
+    for root in roots:
+        root.mkdir(parents=True, exist_ok=True)
+        marker = root / "keep.txt"
+        marker.write_text("stay", encoding="utf-8")
+        with pytest.raises(ManifestError, match="shared root"):
+            refuse_shared_delete(root)
+        assert marker.is_file()
+    with pytest.raises(ManifestError, match="shared root"):
+        refuse_shared_delete(home.parent)
+    inside = shared / "models" / "llm" / "weights.gguf"
+    inside.parent.mkdir(parents=True, exist_ok=True)
+    inside.write_bytes(b"abc")
+    refuse_shared_delete(inside)
+
+
+def test_shared_root_cannot_be_a_component(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    shared = shared_dir()
+    shared.mkdir(parents=True)
+    blocked = [
+        "models",
+        "runtime",
+        "voices",
+        "cache",
+        ".",
+        "models/",
+        "RUNTIME",
+        "models/llm/..",
+        str(voxprint_home()),
+        str(shared),
+        str(shared / "runtime"),
+        str(shared / "models"),
+    ]
+    for path in blocked:
+        with pytest.raises(ManifestError):
+            register_resource(
+                shared,
+                "everything",
+                kind="model",
+                path=path,
+                nbytes=0,
+                files={},
+                app="plotweaver",
+            )
+    assert not (shared / "manifest.json").is_file()
+
+
+def test_uninstall_refuses_to_delete_a_shared_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    shared = shared_dir()
+    models = shared / "models"
+    keep = models / "llm" / "weights.gguf"
+    keep.parent.mkdir(parents=True)
+    keep.write_bytes(b"abc")
+    (shared / "runtime").mkdir()
+    document = {
+        "schema": 1,
+        "components": {
+            "everything": {
+                "kind": "runtime",
+                "version": "1",
+                "path": "models",
+                "sha256": _DIGEST,
+                "installed_at": "2020-01-01T00:00:00",
+                "refs": ["plotweaver"],
+                "files": {"llm/weights.gguf": _DIGEST},
+            }
+        },
+    }
+    (shared / "manifest.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ManifestError, match="shared root"):
+        unregister_app(shared, "plotweaver")
+    assert keep.is_file()
+    assert models.is_dir()
+    assert (shared / "runtime").is_dir()
+
+
+def test_replace_tree_refuses_a_shared_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    root = shared_dir() / "runtime"
+    root.mkdir(parents=True)
+    marker = root / "keep.txt"
+    marker.write_text("stay", encoding="utf-8")
+    source = tmp_path / "incoming"
+    source.mkdir()
+    (source / "file.txt").write_text("new", encoding="utf-8")
+    with pytest.raises(ManifestError, match="shared root"):
+        _replace_tree(source, root)
+    assert marker.is_file()
+    with pytest.raises(ManifestError, match="shared root"):
+        _replace_tree(source, voxprint_home().parent)
+
+
+def test_replace_tree_keeps_the_runtime_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
+    dest = shared_dir() / "runtime" / "python"
+    dest.mkdir(parents=True)
+    (dest / "old.txt").write_text("old", encoding="utf-8")
+    source = tmp_path / "incoming"
+    source.mkdir()
+    (source / "new.txt").write_text("new", encoding="utf-8")
+    _replace_tree(source, dest)
+    assert (dest / "new.txt").is_file()
+    assert not (dest / "old.txt").exists()
+    assert (shared_dir() / "runtime").is_dir()
+
+
 def test_resource_path_cannot_escape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path))
     with pytest.raises(ManifestError):
@@ -188,10 +368,6 @@ def test_reuse_links_a_verified_legacy_file(
     users.write_text('{"audiobook-builder": true}\n', encoding="utf-8")
     monkeypatch.setattr("plotweaver.suite.load_registry", lambda _path: [entry])
 
-    def fail_download(*_args: object, **_kwargs: object) -> Path:
-        raise AssertionError("download attempted")
-
-    monkeypatch.setattr("plotweaver.suite.download_model", fail_download)
     notes: list[str] = []
     repaired = repair_shared(notes.append)
     dest = gguf_dir() / entry.filename
@@ -212,27 +388,20 @@ def test_reuse_links_a_verified_legacy_file(
     assert "plotweaver" not in text
 
 
-def test_repair_refetches_a_corrupt_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_repair_drops_a_corrupt_model_without_downloading(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _isolate(monkeypatch, tmp_path)
     entry = _entry()
     dest = gguf_dir() / entry.filename
     dest.parent.mkdir(parents=True)
     dest.write_bytes(b"zzz")
     monkeypatch.setattr("plotweaver.suite.load_registry", lambda _path: [entry])
-    calls: list[str] = []
-
-    def fake_download(item: RegistryEntry, store: Path, **_kwargs: object) -> Path:
-        calls.append(item.id)
-        target = store / item.filename
-        target.write_bytes(b"abc")
-        return target
-
-    monkeypatch.setattr("plotweaver.suite.download_model", fake_download)
     notes: list[str] = []
-    assert repair_shared(notes.append) == [entry.id]
-    assert calls == [entry.id]
-    assert dest.read_bytes() == b"abc"
+    assert repair_shared(notes.append) == []
+    assert not dest.is_file()
     assert any("Repairing" in note for note in notes)
+    assert any("not ready" in note.lower() for note in notes)
 
 
 def test_old_driver_message_links_to_nvidia(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -272,8 +441,12 @@ def test_selftest_json_reports_the_driver(
 def test_installers_provision_the_shared_folder() -> None:
     windows = Path("packaging/windows/plotweaver.iss").read_text(encoding="utf-8")
     linux = Path("packaging/linux/build-package.sh").read_text(encoding="utf-8")
-    assert "plotweaver-provision.cmd" in windows
+    assert "mdl-progress" in windows
+    assert "--quiet" in windows
     assert "release-shared" in windows
-    assert "plotweaver provision" in linux
+    assert "mdl-progress --quiet --installer" in linux
+    assert "plotweaver-mdl-install.log" in linux
     assert "voxprint/shared" in linux
-    assert "plotweaver-provision.sh" in Path("packaging/assemble.py").read_text(encoding="utf-8")
+    assert "mdl-progress --quiet --installer" in Path("packaging/assemble.py").read_text(
+        encoding="utf-8"
+    )

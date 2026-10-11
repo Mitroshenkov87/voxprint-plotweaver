@@ -19,7 +19,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from voxprint_common.gpu_probe import MIN_COMPUTE, gib_from_mib, query_gpus
+from voxprint_common.gpu_probe import MIN_COMPUTE, GpuDevice, gib_from_mib, query_gpus
 
 from plotweaver.errors import GpuUnsupported
 from plotweaver.ui.i18n import tr
@@ -84,19 +84,38 @@ def _parse_fake(raw: str) -> GpuInfo | None:
     return GpuInfo(name, float(cap), float(total), float(free))
 
 
+def _discrete_gpu(devices: list[GpuDevice]) -> GpuDevice | None:
+    """The NVIDIA GPU, not an integrated GPU nvidia-smi might also list.
+
+    Hybrid graphics (Optimus) keep the RTX card on the discrete device.
+    The largest RTX or GeForce device wins when more than one is reported.
+    """
+    ranked: list[tuple[int, GpuDevice]] = []
+    for gpu in devices:
+        if gpu.memory_mib is None or gpu.compute is None:
+            continue
+        name = gpu.name.upper()
+        if any(word in name for word in ("INTEL", "ARC ", "AMD", "RADEON")):
+            continue
+        bonus = 1_000_000_000 if any(word in name for word in ("RTX", "NVIDIA", "GEFORCE")) else 0
+        ranked.append((bonus + int(gpu.memory_mib), gpu))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: item[0])
+    return ranked[-1][1]
+
+
 def query_gpu() -> GpuInfo | None:
-    """First NVIDIA GPU, or None when nvidia-smi is absent.
+    """NVIDIA GPU from nvidia-smi, or None when that probe is absent.
 
     PLOTWEAVER_FAKE_GPU is ``name,compute_cap,total_mib,free_mib`` or ``none``.
+    On a hybrid laptop the discrete NVIDIA device is used, not the iGPU.
     """
     fake = os.environ.get("PLOTWEAVER_FAKE_GPU")
     if fake is not None:
         return _parse_fake(fake)
-    devices = query_gpus()
-    if not devices:
-        return None
-    gpu = devices[0]
-    if gpu.memory_mib is None or gpu.compute is None:
+    gpu = _discrete_gpu(query_gpus())
+    if gpu is None or gpu.memory_mib is None or gpu.compute is None:
         return None
     free = _query_free_mib()
     if free is None:

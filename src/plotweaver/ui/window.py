@@ -66,31 +66,6 @@ from plotweaver.ui.theme import TEXT, TEXT_ON_PRIMARY, build_style, enable_acryl
 HOME, FORM, PROGRESS, RESULT, SETTINGS = 0, 1, 2, 3, 4
 
 
-class _DownloadThread(QThread):
-    progressed = Signal(str)
-    finished_ok = Signal(int)
-    failed = Signal(str)
-
-    def __init__(self, total_vram_gb: float, free_gb: float) -> None:
-        super().__init__()
-        self.total_vram_gb = total_vram_gb
-        self.free_gb = free_gb
-
-    def run(self) -> None:
-        from plotweaver.install import ensure_uncensored_models
-
-        try:
-            count = ensure_uncensored_models(
-                total_vram_gb=self.total_vram_gb,
-                free_gb=self.free_gb,
-                on_progress=self.progressed.emit,
-            )
-        except Exception as exc:  # noqa: BLE001 - show the message, keep the window
-            self.failed.emit(str(exc))
-            return
-        self.finished_ok.emit(count)
-
-
 class _RunThread(QThread):
     progressed = Signal(str)
     finished_ok = Signal(object)
@@ -154,7 +129,6 @@ class MainWindow(QMainWindow):
         self._clicks: list[float] = []
         self._egg_shown = False
         self._thread: _RunThread | None = None
-        self._download: _DownloadThread | None = None
         self._project: Project | None = None
         self._refs: list[str] = []
         root = QWidget()
@@ -354,9 +328,9 @@ class MainWindow(QMainWindow):
         save = self._icon_button(tr("settings_save"), "save", primary=True)
         save.clicked.connect(self._save_settings)
         layout.addWidget(save)
-        self.download_uncensored = self._icon_button(tr("settings_download"), "download")
-        self.download_uncensored.clicked.connect(self._download_uncensored)
-        layout.addWidget(self.download_uncensored)
+        self.manage_models = self._icon_button(tr("manage_models"), "download")
+        self.manage_models.clicked.connect(self._manage_models)
+        layout.addWidget(self.manage_models)
         back = QPushButton(tr("back"))
         back.clicked.connect(lambda: self.stack.setCurrentIndex(HOME))
         layout.addWidget(back)
@@ -451,18 +425,15 @@ class MainWindow(QMainWindow):
         allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
         self.uncensored_models.setEnabled(allowed)
         self.uncensored_models.setChecked(uncensored_models_preference() if allowed else False)
-        self.download_uncensored.setEnabled(allowed and self.uncensored_models.isChecked())
+        self.manage_models.setEnabled(True)
         self.settings_note.setText(
             tr("settings_uncensored_note") if allowed else tr("settings_uncensored_blocked")
         )
         self.settings_status.setText("")
         self.stack.setCurrentIndex(SETTINGS)
 
-    def _uncensored_toggled(self, checked: bool) -> None:
-        from plotweaver.registry import uncensored_offer_allowed
-
-        allowed = uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
-        self.download_uncensored.setEnabled(allowed and checked)
+    def _uncensored_toggled(self, _checked: bool) -> None:
+        self.manage_models.setEnabled(True)
 
     def _save_settings(self) -> None:
         from plotweaver.registry import uncensored_offer_allowed
@@ -481,35 +452,11 @@ class MainWindow(QMainWindow):
             return
         self.settings_status.setText(tr("settings_saved"))
 
-    def _download_uncensored(self) -> None:
-        from plotweaver.registry import uncensored_offer_allowed
+    def _manage_models(self) -> None:
+        # The dialog imports the MDL runner. The window stays light until the click.
+        from plotweaver.mdl_ui import manage_models
 
-        total = self._gpu_total()
-        if not uncensored_offer_allowed(total, self._gpu_free()):
-            self.settings_status.setText(tr("settings_uncensored_blocked"))
-            return
-        save_uncensored_models(True)
-        self.settings_status.setText(tr("settings_downloading"))
-        self.download_uncensored.setEnabled(False)
-        assert total is not None
-        free = self._gpu_free()
-        self._download = _DownloadThread(total, total if free is None else free)
-        self._download.progressed.connect(self.settings_status.setText)
-        self._download.finished_ok.connect(self._download_done)
-        self._download.failed.connect(self._download_failed)
-        self._download.start()
-
-    def _download_done(self, count: int) -> None:
-        self.settings_status.setText(f"{tr('settings_saved')} {count}")
-        self.download_uncensored.setEnabled(True)
-
-    def _download_failed(self, message: str) -> None:
-        from plotweaver.registry import uncensored_offer_allowed
-
-        self.settings_status.setText(message)
-        self.download_uncensored.setEnabled(
-            uncensored_offer_allowed(self._gpu_total(), self._gpu_free())
-        )
+        manage_models(self)
 
     def _add_ref(self) -> None:
         path, _selected = QFileDialog.getOpenFileName(

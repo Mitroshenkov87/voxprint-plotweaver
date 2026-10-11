@@ -40,7 +40,25 @@ if ($env:PLOTWEAVER_MOCK -eq "1") {
     $Mock = $true
 }
 
+function Stop-PlotweaverLlama {
+    $roots = @(
+        (Join-Path $env:LOCALAPPDATA "Voxprint"),
+        (Join-Path $env:ProgramFiles "VOXPrint AI Suite\Plotweaver")
+    )
+    $procs = Get-CimInstance Win32_Process -Filter "Name = 'llama-server.exe'" -ErrorAction SilentlyContinue
+    foreach ($proc in $procs) {
+        $path = $proc.ExecutablePath
+        if (-not $path) { continue }
+        foreach ($root in $roots) {
+            if ($path.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+                Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
 function Write-Result([int]$Code) {
+    Stop-PlotweaverLlama
     if (-not $Json) {
         return
     }
@@ -73,6 +91,8 @@ function Find-Python {
     & uv venv --python 3.14 (Join-Path $Root ".venv")
     if ($LASTEXITCODE -ne 0) { return $null }
     $created = Join-Path $Root ".venv\Scripts\python.exe"
+    & uv pip install --python $created --require-hashes --no-deps -r (Join-Path $Root "packaging\requirements-common.txt")
+    if ($LASTEXITCODE -ne 0) { return $null }
     & uv pip install --python $created --find-links (Join-Path $Root "packaging\wheels") -e "$Root[dev]" -e (Join-Path $Root "dev\plotweaver_dev")
     if ($LASTEXITCODE -ne 0) { return $null }
     return $created
@@ -159,6 +179,25 @@ if (-not (Test-Gpu)) {
     [Console]::Error.WriteLine("no supported NVIDIA GPU")
     Write-Result 3
     exit 3
+}
+
+function Test-MdlReady {
+    $dest = Join-Path $Out "checks\mdl-status.json"
+    if ($Mock) {
+        "skipped" | Out-File -FilePath $dest -Encoding utf8
+        return $true
+    }
+    $code = Invoke-Captured $dest "-" @("-m", "voxprint_common.mdl", "status", "--app", "plotweaver", "--json")
+    if ($code -ne 0) { return $false }
+    $env:PLOTWEAVER_VM_MDL = $dest
+    & $Py -c @'
+import json, os, sys
+from pathlib import Path
+text = Path(os.environ["PLOTWEAVER_VM_MDL"]).read_text(encoding="utf-8").strip().splitlines()
+payload = json.loads(text[-1]) if text else {}
+raise SystemExit(0 if payload.get("ready") is True else 1)
+'@
+    return $LASTEXITCODE -eq 0
 }
 
 function Get-DetectedTier {
@@ -268,6 +307,11 @@ if ($Smoke) {
     Write-Output "smoke models list"
     $code = Invoke-Captured (Join-Path $Out "checks\models.json") "-" @("-m", "plotweaver", "models", "list", "--json")
     if ($code -ne 0) { $status = 1 }
+    Write-Output "smoke mdl status"
+    if (-not (Test-MdlReady)) {
+        [Console]::Error.WriteLine("models not ready")
+        $status = 1
+    }
     $tier = Get-DetectedTier
     if (-not $tier) { $status = 1 }
     elseif ($status -eq 0) {
@@ -310,16 +354,6 @@ $code = Invoke-Captured (Join-Path $Out "checks\vxbook-dry.json") "-" @(
     "--dry-run", "--json"
 )
 if ($code -ne 0) { $status = 1 }
-$env:VM_ROOT = $Root
-$env:VM_OUT = Join-Path $Out "checks"
-& $Py -c "import json, os; from pathlib import Path; root = Path(os.environ['VM_ROOT']); out = Path(os.environ['VM_OUT']); (out / 'models.toml').write_text((root / 'bakeoff' / 'models.toml').read_text(encoding='utf-8'), encoding='utf-8'); (out / 'forge.json').write_text(json.dumps({'models': [{'id': 'gemma-4-31b-abliterated-iq3-xxs', 'revision': 'ab' * 20, 'sha256': 'ab' * 32, 'size': 1}]}), encoding='utf-8')"
-$code = Invoke-Captured (Join-Path $Out "checks\import-dry.json") "-" @(
-    "-m", "plotweaver", "models", "import-forge-manifest",
-    (Join-Path $Out "checks\forge.json"),
-    "--registry", (Join-Path $Out "checks\models.toml"),
-    "--dry-run", "--json"
-)
-if ($code -ne 0) { $status = 1 }
 
 Write-Output "screenshots"
 if ((Save-Shots) -ne 0) { $status = 1 }
@@ -331,6 +365,7 @@ if ($shotCode -ne 0) {
 }
 
 if ($Mock) {
+    Test-MdlReady | Out-Null
     Write-Output "mock 16 GB pass"
     if ((Invoke-Book "16gb") -ne 0) { $status = 1 }
     Write-Output "mock 24 GB pass"
@@ -349,19 +384,25 @@ else {
     $code = Invoke-Captured (Join-Path $Out "doctor.txt") "-" @("-m", "plotweaver", "doctor")
     if ($code -ne 0) { $status = 1 }
     if ($status -eq 0) {
-        Write-Output "model download"
-        $code = Invoke-Captured (Join-Path $Out "checks\download.txt") "-" @(
-            "-c",
-            "from plotweaver.hardware import require_supported_gpu; from plotweaver.install import ensure_default_install, ensure_uncensored_models; gpu = require_supported_gpu(); print(f'{gpu.name}: {gpu.free_gb:.1f} of {gpu.total_gb:.1f} GB free'); print('stock', ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb)); print('forge', ensure_uncensored_models(total_vram_gb=gpu.total_gb, free_gb=gpu.free_gb))"
-        )
-        if ($code -ne 0) { $status = 1 }
+        Write-Output "mdl status"
+        if (-not (Test-MdlReady)) {
+            [Console]::Error.WriteLine("models not ready")
+            $status = 1
+        }
     }
     if ($status -eq 0) {
         Write-Output "16 GB pass"
         if ((Invoke-Book "16gb") -ne 0) { $status = 1 }
-        Write-Output "24 GB pass"
-        if ((Invoke-Book "24gb") -ne 0) { $status = 1 }
-        $export = Join-Path $Out "24gb\project\export"
+        $detected = Get-DetectedTier
+        if ($detected -eq "24gb") {
+            Write-Output "24 GB pass"
+            if ((Invoke-Book "24gb") -ne 0) { $status = 1 }
+            $export = Join-Path $Out "24gb\project\export"
+        }
+        else {
+            Write-Output "24 GB pass skipped (card is $detected)"
+            $export = Join-Path $Out "16gb\project\export"
+        }
         if (Test-Path (Join-Path $export "book.vxbook")) {
             if ((Save-Shots $export) -ne 0) { $status = 1 }
         }

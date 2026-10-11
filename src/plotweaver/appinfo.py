@@ -58,7 +58,7 @@ def load_build() -> dict[str, Any]:
 
 
 def package_version(info: dict[str, Any] | None = None) -> str:
-    """PEP 440 version. A prerelease of rc6 on 0.2.0 is 0.2.0rc6."""
+    """PEP 440 version. A prerelease of rc7 on 0.2.0 is 0.2.0rc7."""
     payload = load_build() if info is None else info
     version = str(payload["version"])
     pre = payload.get("prerelease")

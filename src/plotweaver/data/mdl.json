@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "app": "plotweaver",
+  "models": [
+    {
+      "id": "t-lite-it-2.1-q4",
+      "version": "1",
+      "vram_tier": "16gb",
+      "display_name": "T-lite-it-2.1 Q4_K_M",
+      "files": [
+        {
+          "path": "T-lite-it-2.1-Q4_K_M.gguf",
+          "size": 5027750240,
+          "sha256": "68c75f5940c36baca18113058ad3d55f6d1d3e1123a8053bb4bba8481805c960",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "t-tech/T-lite-it-2.1-GGUF",
+              "filename": "T-lite-it-2.1-Q4_K_M.gguf",
+              "revision": "fc10186e59064c2e74f59c3d5dbce233931b3b81"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t-lite-it-2.1-q4",
+      "version": "1",
+      "vram_tier": "24gb",
+      "display_name": "T-lite-it-2.1 Q4_K_M",
+      "status": "unavailable",
+      "reason": "The 24 GB stock model is T-pro-it-2.1 Q4_K_M."
+    },
+    {
+      "id": "gemma-4-12b-it-q4",
+      "version": "1",
+      "vram_tier": "16gb",
+      "display_name": "Gemma 4 12B Q4_K_M",
+      "files": [
+        {
+          "path": "gemma-4-12b-it-Q4_K_M.gguf",
+          "size": 7121861440,
+          "sha256": "0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "unsloth/gemma-4-12b-it-GGUF",
+              "filename": "gemma-4-12b-it-Q4_K_M.gguf",
+              "revision": "fc034cfff751157913579611efad8462ac1be606"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gemma-4-12b-it-q4",
+      "version": "1",
+      "vram_tier": "24gb",
+      "display_name": "Gemma 4 12B Q4_K_M",
+      "status": "unavailable",
+      "reason": "The 24 GB stock model is T-pro-it-2.1 Q4_K_M."
+    },
+    {
+      "id": "t-pro-it-2.1-q4",
+      "version": "1",
+      "vram_tier": "24gb",
+      "display_name": "T-pro-it-2.1 Q4_K_M",
+      "files": [
+        {
+          "path": "T-pro-it-2.1-Q4_K_M.gguf",
+          "size": 19761766048,
+          "sha256": "b19e88cc1154b4b0c99f09bc7b57b8e5f3a6af4135581a3bfd31a2518ed58714",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "t-tech/T-pro-it-2.1-GGUF",
+              "filename": "T-pro-it-2.1-Q4_K_M.gguf",
+              "revision": "cf18787d8901c26ca9334812e7ff8070f2ddab4a"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "qwen3.6-27b-abliterated-q3-k-m",
+      "version": "1",
+      "vram_tier": "16gb",
+      "on_demand": true,
+      "display_name": "Huihui Qwen3.6 27B abliterated Q3_K_M",
+      "files": [
+        {
+          "path": "Q3_K_M.gguf",
+          "size": 13500736128,
+          "sha256": "a52055204d9bd9208f4312951a2a68b32c4c68d54d6905c5386dbb552df58edf",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "Mitroshenkov87/voxprint-huihui-qwen36-27b",
+              "filename": "Q3_K_M.gguf",
+              "revision": "cc596c1a74791b7fca57d037ef168dd57c76ed34"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gemma-4-31b-abliterated-iq3-xxs",
+      "version": "1",
+      "vram_tier": "16gb",
+      "on_demand": true,
+      "display_name": "Gemma 4 31B abliterated IQ3_XXS",
+      "files": [
+        {
+          "path": "IQ3_XXS.gguf",
+          "size": 12077502368,
+          "sha256": "c7bb8f9f4bdb396fb40a5beb617de27132cda6727b885e82f635340f353c5340",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "Mitroshenkov87/voxprint-gemma4-31b",
+              "filename": "IQ3_XXS.gguf",
+              "revision": "26495e1a45d8bde085a0681c3c43044eff5c8ac5"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t-lite-it-2.1-abliterated-iq4-xs",
+      "version": "1",
+      "vram_tier": "16gb",
+      "on_demand": true,
+      "display_name": "T-lite-it-2.1 abliterated IQ4_XS",
+      "files": [
+        {
+          "path": "IQ4_XS.gguf",
+          "size": 4561837632,
+          "sha256": "0f0d10020cd7186c5fa46eed0feb5007f5af7fdef01dcd90883e8fe5ee758df0",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "Mitroshenkov87/voxprint-t-lite-it-2.1",
+              "filename": "IQ4_XS.gguf",
+              "revision": "d06307f15311bc5d385c213ef82f52d6dc20ced3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t-lite-it-2.1-abliterated-q5",
+      "version": "1",
+      "vram_tier": "16gb",
+      "on_demand": true,
+      "display_name": "T-lite-it-2.1 abliterated Q5_K_M",
+      "files": [
+        {
+          "path": "Q5_K_M.gguf",
+          "size": 5850952896,
+          "sha256": "3a418e95f953f8d52c8f4047f8731bde37bc1874013bf22e2ea49216fa586b5d",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "Mitroshenkov87/voxprint-t-lite-it-2.1",
+              "filename": "Q5_K_M.gguf",
+              "revision": "d06307f15311bc5d385c213ef82f52d6dc20ced3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "qwen3.6-27b-abliterated-q5",
+      "version": "1",
+      "vram_tier": "24gb",
+      "on_demand": true,
+      "display_name": "Huihui Qwen3.6 27B abliterated Q5_K_M",
+      "files": [
+        {
+          "path": "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf",
+          "size": 19535700288,
+          "sha256": "a4fd0da6216fb8b9a74e25a688a118b001888b704e17f5c851c2bd80f4f5e284",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "Mitroshenkov87/voxprint-huihui-qwen36-27b",
+              "filename": "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf",
+              "revision": "cc596c1a74791b7fca57d037ef168dd57c76ed34"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gemma-4-31b-abliterated-q4",
+      "version": "1",
+      "vram_tier": "24gb",
+      "on_demand": true,
+      "display_name": "Gemma 4 31B abliterated Q4_K_M",
+      "files": [
+        {
+          "path": "gemma-4-31b-abliterated-Q4_K_M.gguf",
+          "size": 18687057536,
+          "sha256": "380f2f50f441225e669ab1541220985387bf3933573cd2f4f7e667f3790e73a3",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "Mitroshenkov87/voxprint-gemma4-31b",
+              "filename": "gemma-4-31b-abliterated-Q4_K_M.gguf",
+              "revision": "458a5cea1077218d72daf2e49334abe6eb1da930"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

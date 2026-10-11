@@ -21,6 +21,7 @@ from plotweaver.jsontext import parse_json_object
 from plotweaver.llama_release import ensure_llama_server
 from plotweaver.llama_server import LlamaServer
 from plotweaver.llm import ChatMessage, LLMBackend, ModelSpec
+from plotweaver.manifest import refuse_shared_delete
 from plotweaver.optional_mock import mock_backend
 from plotweaver.paths import repo_root
 from plotweaver.prompts import judge_prompt, system_message
@@ -225,6 +226,7 @@ def _one_book(
             return
     project_dir = folder / "project"
     if project_dir.exists():
+        refuse_shared_delete(project_dir)
         shutil.rmtree(project_dir)
     request = BookRequest(
         title=story.title,
@@ -346,6 +348,7 @@ def _blind(results: Path) -> None:
     """A reading folder with the model names removed, and a key kept beside it."""
     reader = results / "blind-packet" / "reader"
     if reader.exists():
+        refuse_shared_delete(reader)
         shutil.rmtree(reader)
     reader.mkdir(parents=True)
     key: dict[str, str] = {}

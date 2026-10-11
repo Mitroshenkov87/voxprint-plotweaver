@@ -10,6 +10,19 @@ PKG="$ROOT/packaging/linux/pkg"
 STAGE="$ROOT/build/stage"
 APP="$PKG/opt/voxprint-ai-suite/plotweaver"
 
+# Build directories inside this repo only. Not the suite home.
+case "$PKG" in
+  "$ROOT"/packaging/linux/pkg) ;;
+  *) echo "refusing to remove $PKG" >&2; exit 1 ;;
+esac
+case "$DIST" in
+  "$ROOT"/dist) ;;
+  *) echo "refusing to remove $DIST" >&2; exit 1 ;;
+esac
+case "$STAGE" in
+  "$ROOT"/build/stage) ;;
+  *) echo "refusing to remove $STAGE" >&2; exit 1 ;;
+esac
 rm -rf "$PKG" "$DIST" "$STAGE"
 mkdir -p "$DIST" "$PKG/usr/bin" "$PKG/usr/share/applications" "$PKG/usr/share/icons/hicolor/256x256/apps" "$PKG/DEBIAN"
 
@@ -43,9 +56,10 @@ Maintainer: Aleksandr Mitroshenkov <https://github.com/Mitroshenkov87/voxprint-p
 Depends: libglib2.0-0t64 | libglib2.0-0, libegl1, libgl1, libxkbcommon0, libfontconfig1, libdbus-1-3, libx11-6, libxcb1, libvulkan1
 Description: VOXPrint AI Plotweaver
  Local synopsis-to-novel app. Python, dependencies, and llama.cpp b11476
- are included. The package installer runs voxprint-plotweaver-cli provision,
- which fills ~/.local/share/voxprint/shared when something is missing. It does not
- open the window.
+ are included. The package installer runs voxprint-mdl download for
+ plotweaver and logs to ~/.local/share/voxprint/logs/plotweaver-mdl-install.log.
+ A failed download does not fail the package. It does not open the window.
+ Shared files stay under ~/.local/share/voxprint/shared.
 EOF
 
 cat > "$PKG/usr/bin/voxprint-plotweaver-cli" << 'EOF'
@@ -62,12 +76,12 @@ cat > "$PKG/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
 set -eu
 APP=/opt/voxprint-ai-suite/plotweaver
-# Previous releases unpacked here. Shared files and models stay under the home directory.
+# Previous program prefix only. This is not the suite home and not a shared root.
 rm -rf /opt/voxprint-plotweaver
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
-  su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver provision"
+  su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver mdl-progress --quiet --installer" || true
 else
-  echo "Run voxprint-plotweaver-cli provision as your user to install shared files."
+  echo "Run voxprint-plotweaver-cli mdl-progress --quiet --installer as your user."
 fi
 EOF
 
@@ -75,6 +89,7 @@ cat > "$PKG/DEBIAN/prerm" << 'EOF'
 #!/bin/sh
 set -eu
 APP=/opt/voxprint-ai-suite/plotweaver
+# Drop Plotweaver's manifest refs only. Do not delete the suite home.
 if [ "$1" = remove ] || [ "$1" = purge ]; then
   if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
     su -s /bin/sh "$SUDO_USER" -c "$APP/python/bin/python3 -m plotweaver release-shared" || true
@@ -83,6 +98,7 @@ fi
 EOF
 chmod 755 "$PKG/DEBIAN/postinst" "$PKG/DEBIAN/prerm"
 
+# The tarball is the program tree only. It has no uninstall script.
 TAR="voxprint-plotweaver-${VERSION}-linux-x86_64.tar.gz"
 DEB="voxprint-plotweaver_${VERSION}_amd64.deb"
 tar -C "$PKG" -czf "$DIST/$TAR" opt/voxprint-ai-suite usr/bin

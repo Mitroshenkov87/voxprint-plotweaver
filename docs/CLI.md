@@ -5,7 +5,7 @@ The installed command is `voxprint-plotweaver-cli`. `plotweaver` is a deprecated
 `voxprint-plotweaver-cli --version` and `voxprint-plotweaver-cli version` print the display label and nothing else:
 
 ```text
-0.2.0 RC · build dev "Oreg"
+0.2.0 RC · build dev "Shti"
 ```
 
 `BUILD.json` at the repository root is the source for the version, the prerelease, the codename, and the build offset. A packaged CI build replaces `dev` with `GITHUB_RUN_NUMBER + offset`. A final release (`prerelease` null or empty) drops ` RC`.
@@ -35,7 +35,7 @@ Argparse usage errors are not JSON.
 
 Checks the shared suite files, repairs a missing or corrupt one, and prints one JSON object. Progress stays on stderr. `ok` is false when the NVIDIA driver is below the CUDA minimum or a required file could not be repaired. The driver message includes `https://www.nvidia.com/Download/index.aspx`. This is not `plotweaver gui --selftest`, which writes a one-chapter mock book.
 
-`plotweaver provision` is what the Windows setup and the Linux package run. `plotweaver release-shared` drops Plotweaver from `manifest.json` and leaves a file another app still uses.
+`plotweaver mdl-progress` shows progress from `voxprint-mdl download --app plotweaver --json`. `--quiet --installer` logs to the suite log directory and exits 0 when the download fails. `plotweaver release-shared` drops Plotweaver from `manifest.json` and leaves a file another app still uses.
 
 ## `--json` objects
 
@@ -217,26 +217,14 @@ plotweaver models list [--registry PATH] [--json] [--dry-run]
 }
 ```
 
-### `models import-forge-manifest`
+### `mdl-progress`
 
 ```text
-plotweaver models import-forge-manifest FILE [--registry PATH] [--json] [--dry-run]
+plotweaver mdl-progress [--quiet] [--installer]
 ```
 
-`FILE` is JSON `{"models": [{"id", "revision", "sha256", "size", ...}]}`. Without `--dry-run` the matching placeholder rows are enabled. `--dry-run` validates the file and leaves the registry byte for byte.
+Shows progress from `voxprint-mdl download --app plotweaver --json`. `--quiet` writes the log and does not open a window. `--installer` exits 0 when the download fails.
 
-```json
-{
-  "ok": true,
-  "command": "models.import-forge-manifest",
-  "dry_run": true,
-  "code": 0,
-  "registry": "/absolute/bakeoff/models.toml",
-  "manifest": "/absolute/forge.json",
-  "models": ["gemma-4-31b-abliterated-iq3-xxs"],
-  "writes": false,
-  "actions": ["validate the Model Forge manifest", "leave the registry unchanged"]
-}
-```
+### `models import-forge-manifest`
 
-`writes` is true when the registry was updated. `models` is the list of ids that were enabled, or that would be enabled.
+This command is no longer in the CLI. Model downloads go through VOXPrint MDL.

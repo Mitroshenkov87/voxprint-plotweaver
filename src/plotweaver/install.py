@@ -14,14 +14,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import assert_never
 
+from plotweaver.bytesize import estimate_minutes, format_size
 from plotweaver.domain import BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
-from plotweaver.fetch import estimate_minutes, format_size
 from plotweaver.hardware import require_supported_gpu, vram_short_message
 from plotweaver.paths import gguf_dir
 from plotweaver.registry import (
     RegistryEntry,
-    download_model,
     is_stock,
     load_registry,
     model_offered,
@@ -36,15 +35,16 @@ from plotweaver.ui.i18n import tr
 def ensure_default_install(
     *, free_gb: float, total_gb: float | None = None, store: Path | None = None
 ) -> int:
-    """Download stock models for the detected tier. Skip files already present."""
+    """Count stock models for this tier that are already on disk.
+
+    VOXPrint MDL downloads the files. This function does not.
+    """
     total = free_gb if total_gb is None else total_gb
     folder = store or gguf_dir()
     count = 0
     for entry in stock_for_tier(load_registry(registry_path()), total_gb=total):
         if weight_path(folder, entry).is_file():
-            continue
-        download_model(entry, folder)
-        count += 1
+            count += 1
     return count
 
 
@@ -64,7 +64,8 @@ def ensure_uncensored_models(
     store: Path | None = None,
     on_progress: Callable[[str], None] | None = None,
 ) -> int:
-    """Download published least-censored models that this tier can run."""
+    """Count published least-censored models for this tier that are already on disk."""
+    del on_progress
     free = total_vram_gb if free_gb is None else free_gb
     if not uncensored_offer_allowed(total_vram_gb, free):
         raise PlotweaverError("No published least-censored model fits this card.")
@@ -76,10 +77,7 @@ def ensure_uncensored_models(
         if not model_offered(entry, total_gb=total_vram_gb, free_gb=free):
             continue
         if weight_path(folder, entry).is_file():
-            continue
-        _say(on_progress, optional_notice(entry))
-        download_model(entry, folder, on_progress=on_progress)
-        count += 1
+            count += 1
     return count
 
 
@@ -120,11 +118,14 @@ def prepare_real_models(
     store: Path | None = None,
     on_progress: Callable[[str], None] | None = None,
 ) -> None:
-    """First-run stock download, then the dark-theme model choice."""
+    """Bind installed stock models. A missing file stays a models-not-ready error."""
     gpu = require_supported_gpu()
     folder = store or gguf_dir()
     _say(on_progress, tr("repair_checking"))
-    ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb, store=folder)
+    entries = stock_for_tier(load_registry(registry_path()), total_gb=gpu.total_gb)
+    present = ensure_default_install(free_gb=gpu.free_gb, total_gb=gpu.total_gb, store=folder)
+    if present < len(entries):
+        raise PlotweaverError("models not ready")
     assign_book_models(request, free_gb=gpu.free_gb, total_gb=gpu.total_gb, store=folder)
 
 

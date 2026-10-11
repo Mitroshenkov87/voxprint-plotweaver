@@ -11,6 +11,7 @@ import atexit
 import ctypes
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -30,6 +31,38 @@ from plotweaver.vram_plan import ServerPlan, plan_server
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 _JOB_KILL_ON_CLOSE = 0x2000
+
+
+def nvidia_device_arg(listing: str) -> str | None:
+    """Index of the first RTX or NVIDIA device in ``--list-devices`` output."""
+    for line in listing.splitlines():
+        folded = line.casefold()
+        if "nvidia" not in folded and "rtx" not in folded:
+            continue
+        numbered = re.search(r"(?:^|[^\w])(\d+)\s*[=:]", line)
+        if numbered:
+            return numbered.group(1)
+        vulkan = re.search(r"\bvulkan(\d+)\b", folded)
+        if vulkan:
+            return vulkan.group(1)
+    return None
+
+
+def _nvidia_device(binary: Path) -> str | None:
+    try:
+        proc = subprocess.run(
+            [str(binary), "--list-devices"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+            creationflags=_NO_WINDOW,
+        )
+    except OSError, subprocess.TimeoutExpired:
+        return None
+    return nvidia_device_arg(proc.stdout + "\n" + proc.stderr)
+
+
 _JOB_EXTENDED_LIMIT = 9
 
 
@@ -443,6 +476,9 @@ class LlamaServer:
         ]
         if plan.n_cpu_moe:
             command.extend(["--n-cpu-moe", str(plan.n_cpu_moe)])
+        device = _nvidia_device(self.binary)
+        if device is not None:
+            command.extend(["--device", device])
         if os.name == "nt":
             proc = subprocess.Popen(
                 command,
