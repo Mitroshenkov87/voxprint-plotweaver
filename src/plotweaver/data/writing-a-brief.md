@@ -116,20 +116,21 @@ A weak brief is only a mood ("something sad in space") or a synopsis that implie
 
 ## Length
 
-Words are pages times words per page. On the window the length chips are a story (25 pages), a novella (80), and a novel (250, the default and the ceiling). The long-novel chip (~500–600 pages) stays on the row and is switched off: very long books arrive in the next update. The free field and Expert pages accept 1 to 250. At 250 they say this is as long as this update can write. The line under the chips shows pages, words, and a reading time at 250 words per minute. These are planning labels, not measured run times.
+Words are pages times words per page. On the window the length chips are a story (25 pages), a novella (80), a novel (250, the default), and a long novel (550). The free field and Expert pages accept any count from 1 to 2,000 and write the same page count. Above 600 pages the window shows a plain note: very long books are written as short scenes, and quality is still being checked. The line under the chips shows pages, words, and a reading time at 250 words per minute. These are planning labels, not measured run times.
 
-A longer book is more chapters only until the ceiling. Empty `chapters` uses `min(40, max(8, round(words / 2500)))`. Scenes per chapter default to 2. Words per scene are `max(400, words // (chapters × scenes))`.
+Empty `chapters` follows the planner: at least 8 chapters, about 3,200 words a chapter, kept between 2,500 and 4,000. Scene count starts at 2 and rises so each scene fits one draft. English scenes stay near 750 words. Russian scenes stay near 377 words. An explicit chapter count is kept. An explicit scene count is a minimum; the planner still adds scenes when one would be too long.
 
-| Pages | Words at 250 per page | Chapters if left empty | Words asked per scene (2 scenes) |
-| --- | --- | --- | --- |
-| 25 | 6,250 | 8, the floor | 400, the floor (16 × 400 is 6,400 words) |
-| 80 | 20,000 | 8 | 1,250 |
-| 250 | 62,500 | 25 | 1,250 |
-| 550 | 137,500 | 40, the ceiling (an uncapped split would be 55) | 1,718 |
+| Pages | Words at 250 per page | Chapters if left empty | English scenes × words | Russian scenes × words |
+| --- | --- | --- | --- | --- |
+| 25 | 6,250 | 8 | 2 × 390 | 3 × 260 |
+| 80 | 20,000 | 8 | 4 × 625 | 7 × 357 |
+| 250 | 62,500 | 20 | 5 × 625 | 9 × 347 |
+| 550 | 137,500 | 43 | 5 × 639 | 9 × 355 |
+| 2,000 | 500,000 | 156 | 5 × 641 | 9 × 356 |
 
-Expert can set chapters from 0 to 40 and scenes per chapter from 1 to 8. Words per page stay between 100 and 600. Pages stop at 2,000.
+Expert chapters run from 0 to 400. Zero follows the planner. Words per page stay between 100 and 600. Pages stop at 2,000.
 
-The window stops at 250 pages because that is the longest book these calls reliably finish at 250 words a page and 2 scenes a chapter. 250 pages is 25 chapters. An indented outline of 25 short chapter purposes is about 1,900 tokens and fits in 2,048. 26 chapters almost fill that call. Each scene call stops at 4,096 tokens (`min(4096, max(512, words_per_scene × 3))`). 25 chapters × 2 scenes ask for 1,250 words, and the runner budgets 3,750 tokens, which fits. A 550-page book is 40 chapters (the ceiling; an uncapped split would be 55) and about 1,718 words a scene. That scene budget is 5,154 tokens and is cut at 4,096. A 40-chapter outline is past 2,048 tokens as well. The command line can still ask for more words; those same caps apply, and the window does not offer that length. A scene prompt carries the bible, that chapter, that scene, and the last 1,500 characters of the previous scene. It does not carry the rest of the book. When VRAM is tight the model context is halved and does not go below 4,096.
+2,000 pages is the longest length that is structurally within budget (mock-tested). Outline chapters are written in batches that fit a 2,048-token reply, and each scene is sized for a 4,096-token draft. Prose quality past about 550 pages, including Russian scenes of about 377 words and the 700-character rolling summary, has not been checked on a real model. A scene prompt carries a compact bible digest and a rolling story summary, plus the tail of the previous scene when it fits. It does not carry the rest of the book. When VRAM is tight the model context is halved and does not go below 4,096.
 
 The 16 GB tier uses the smaller stock model and keeps 2 GB free. The 24 GB tier uses the larger stock model and keeps 3 GB free. The larger model does more work per call, so a 24 GB card is not a shortcut to a shorter wait for the same page count. A long run can pause while the card is hot and resume when it cools.
 

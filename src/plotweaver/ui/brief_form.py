@@ -22,8 +22,9 @@ from PySide6.QtWidgets import (
 )
 
 from plotweaver.brief import BookBrief, Character, compile_brief
+from plotweaver.length import STRUCTURAL_MAX_PAGES, plan_shape
 from plotweaver.ui.i18n import tr
-from plotweaver.ui.presets import MAX_RELIABLE_PAGES
+from plotweaver.ui.presets import MAX_SCENES_PER_CHAPTER
 
 _POV = (
     ("pov_third", "third-person limited"),
@@ -62,7 +63,7 @@ class BriefForm:
         self.paste_button = QPushButton(tr("brief_paste"))
         self.paste_button.setObjectName("briefPaste")
         self.pages = QSpinBox()
-        self.pages.setRange(1, MAX_RELIABLE_PAGES)
+        self.pages.setRange(1, STRUCTURAL_MAX_PAGES)
         self.pages.setValue(250)
         self.words_per_page = QSpinBox()
         self.words_per_page.setRange(100, 600)
@@ -71,7 +72,7 @@ class BriefForm:
         self.chapter_hint = QLabel("")
         self.chapter_hint.setObjectName("muted")
         self.scenes = QSpinBox()
-        self.scenes.setRange(1, 8)
+        self.scenes.setRange(1, MAX_SCENES_PER_CHAPTER)
         self.scenes.setValue(2)
         self.genre = QLineEdit()
         self.subgenre = QLineEdit()
@@ -346,8 +347,17 @@ class BriefForm:
     def _watch_text(self, widget: QLineEdit | QPlainTextEdit, key: str) -> None:
         widget.textChanged.connect(lambda: self._clear_guess(key))
 
+    def _book_language(self) -> str:
+        combo = self._language
+        if combo is None:
+            return "ru"
+        data = combo.currentData()
+        if isinstance(data, str) and data:
+            return data
+        return "ru"
+
     def _refresh_numbers(self) -> None:
         words = self.pages.value() * self.words_per_page.value()
         self.target_label.setText(str(words))
-        chapters = min(40, max(8, round(words / 2500)))
-        self.chapter_hint.setText(tr("chapters_auto").format(count=chapters))
+        chapters, scenes, _per_scene = plan_shape(max(1, words), self._book_language(), None, None)
+        self.chapter_hint.setText(tr("chapters_auto").format(count=chapters, scenes=scenes))
