@@ -13,7 +13,7 @@ The project folder holds `project.json`, a SQLite canon, and one checkpoint per 
 5. Optional reference overlap, one rewrite if the lexical check flags the book.
 6. Export `book.vxbook` and EPUB 3, plus FictionBook 2.1, DOCX, Markdown, or legacy speaker marks when asked. Optional sound markup writes a second file, `book.sound.vxbook`.
 
-2,000 pages at 250 words per page is the longest book this plan treats as reliable: about 156 chapters, with each scene and each outline batch inside the token caps, and the rolling summary still able to carry the plot. A longer target still runs, up to a safety ceiling of 400 chapters, but the same fixed summary is then spread over more story than it can hold. The desktop form's chapter hint is unchanged until the shell migration lands; generation uses this planner.
+2,000 pages at 250 words per page is structurally within budget (mock-tested): about 156 chapters, with each scene and each outline batch inside the token caps. That is not a proven-quality length. Russian scenes of about 377 words and the 700-character rolling summary have not been checked for prose quality on a real model; real-model validation is pending. A longer target still runs, up to a safety ceiling of 400 chapters, but the same fixed summary is then spread over more story than it can hold. The desktop form's chapter hint is unchanged until the shell migration lands; generation uses this planner.
 
 Without `--yes`, autopilot stops after the bible and after the outline. Copilot also stops after each chapter. Manual also stops after each scene. The window has a checkbox for the bible and outline stop. It does not edit beats.
 

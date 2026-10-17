@@ -11,8 +11,8 @@ from plotweaver.domain import BookMode, BookRequest, Language
 from plotweaver.length import (
     CONTEXT_FLOOR,
     PLAN_MAX_TOKENS,
-    RELIABLE_MAX_PAGES,
     SCENE_MAX_TOKENS,
+    STRUCTURAL_MAX_PAGES,
     chapter_count_for,
     chapters_per_outline_call,
     estimate_tokens,
@@ -62,7 +62,7 @@ def _phase(call: dict[str, object]) -> str:
 
 @pytest.mark.parametrize(("pages", "chapters"), _PAGES)
 def test_page_targets_finish_a_complete_outline(tmp_path: Path, pages: int, chapters: int) -> None:
-    if pages == RELIABLE_MAX_PAGES:
+    if pages == STRUCTURAL_MAX_PAGES:
         assert chapters == chapter_count_for(pages * 250)
     request = _request(pages)
     planned_chapters, scenes, per_scene = request.shape()
@@ -270,7 +270,7 @@ def test_oversize_beats_are_split(tmp_path: Path) -> None:
 
 
 def test_scene_prompt_keeps_a_digest_inside_the_window() -> None:
-    request = _request(RELIABLE_MAX_PAGES)
+    request = _request(STRUCTURAL_MAX_PAGES)
     bible = _secret_bible()
     bible["logline"] = "пыль " * 400
     continuity = {

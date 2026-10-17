@@ -5,10 +5,11 @@ Russian is budgeted at a Gemma-class rate, the tighter of the 16 GB and 24 GB
 tokenisers. A spilled context on either tier is 4,096 tokens, so the prompt and
 the completion share that window.
 
-2,000 pages at 250 words per page is the longest book this budget can keep
-consistent. The rolling summary is a fixed size. Past that length the same
-digest is spread over more plot than it can hold. Calls for a longer book still
-fit; they are outside the length treated as reliable. A ceiling of 400 chapters
+2,000 pages at 250 words per page is structurally within budget (mock-tested).
+That is not a prose-quality claim. Russian scenes near 377 words and the
+700-character rolling summary have not been tried on a real model. Real-model
+validation is pending. Past that length the same fixed digest covers more plot.
+Calls for a longer book still fit the token caps. A ceiling of 400 chapters
 stops a runaway page count from queuing tens of thousands of calls.
 """
 
@@ -20,7 +21,7 @@ EXTRACT_MAX_TOKENS = 1024
 CONTEXT_FLOOR = 4096
 SYSTEM_TOKEN_RESERVE = 320
 PROOF_INSTRUCTION_TOKENS = 250
-RELIABLE_MAX_PAGES = 2000
+STRUCTURAL_MAX_PAGES = 2000
 MIN_CHAPTERS = 8
 MIN_WORDS_PER_CHAPTER = 2500
 MAX_WORDS_PER_CHAPTER = 4000
