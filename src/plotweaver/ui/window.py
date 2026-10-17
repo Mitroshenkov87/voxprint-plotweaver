@@ -16,8 +16,9 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from PySide6 import QtGui
 from PySide6.QtCore import QPoint, QRect, QSize, Qt, QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QPalette, QStandardItemModel
+from PySide6.QtGui import QDesktopServices, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -38,7 +39,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -48,7 +48,7 @@ from voxprint_common.i18n import tr as shell_tr
 from voxprint_common.paths import state_dir
 from voxprint_common.ui.expert import ExpertMode
 from voxprint_common.ui.settings import Settings
-from voxprint_common.ui.simple_image import Phase, SimpleLayout, SimpleWidget
+from voxprint_common.ui.simple_image import Phase, SimpleLayout, SimpleWidget, _darken
 from voxprint_common.ui.theme import build_shell_style
 from voxprint_common.ui.variants import AppSurface, state_names, surface_for
 
@@ -178,34 +178,6 @@ class _RunThread(QThread):
 def _zero_stretches(layout: QVBoxLayout) -> None:
     for index in range(layout.count()):
         layout.setStretch(index, 0)
-
-
-def _paint_dark(widget: QWidget, colour: str) -> None:
-    """Fill a widget from the suite palette.
-
-    A stylesheet background does not paint a scroll viewport. Qt fills that
-    viewport from QPalette.Base, which is light on this platform, and the
-    shell's light text then disappears. The same paint is what
-    ``voxprint_common.ui.simple_image._darken`` does for the history strip
-    and the expert scroll only. Reparenting a scroll resets the content
-    widget to that light palette and leaves auto-fill on, so the paint has
-    to run again after the shell column is built.
-    """
-    color = QColor(colour)
-    palette = widget.palette()
-    palette.setColor(QPalette.ColorRole.Window, color)
-    palette.setColor(QPalette.ColorRole.Base, color)
-    widget.setPalette(palette)
-    widget.setAutoFillBackground(True)
-    widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-
-
-def _paint_scroll(scroll: QScrollArea, colour: str) -> None:
-    _paint_dark(scroll, colour)
-    _paint_dark(scroll.viewport(), colour)
-    inner = scroll.widget()
-    if isinstance(inner, QWidget):
-        _paint_dark(inner, colour)
 
 
 class _ChipFlow(QLayout):
@@ -338,17 +310,8 @@ def _wrap_chip_lines(layout: QVBoxLayout) -> None:
 
 
 def _window_style(glass: bool) -> str:
-    """Shell style, dark scroll bars, and a readable Expert section label.
-
-    ``voxprint_common.ui.theme`` paints ``QLabel#settingGroup`` at 11px in
-    the muted colour. A longer selector here wins, so «Книга» stays readable
-    without editing the library.
-    """
+    """Shell style, dark scroll bars, and the save-menu arrow."""
     group = (
-        "QFrame#expertPanel QLabel#settingGroup {"
-        f" font-size: 15px; font-weight: 600; color: {TEXT};"
-        " background: transparent; padding: 8px 0 4px 0;"
-        "}"
         "QPushButton#saveMore::menu-indicator { image: none; width: 0px; }"
         "QScrollArea#presetScroll > QWidget,"
         "QScrollArea#briefScroll > QWidget,"
@@ -361,22 +324,6 @@ def _window_style(glass: bool) -> str:
         "}"
     )
     return build_shell_style(glass) + scrollbar_style() + group
-
-
-def _purge_layout(layout: QVBoxLayout | QFormLayout | QHBoxLayout) -> None:
-    """Delete every widget in ``layout``, including rows inside a nested form."""
-    while layout.count():
-        item = layout.takeAt(0)
-        if item is None:
-            continue
-        child = item.layout()
-        if isinstance(child, QVBoxLayout | QFormLayout | QHBoxLayout):
-            _purge_layout(child)
-        widget = item.widget()
-        if isinstance(widget, QWidget):
-            widget.hide()
-            widget.setParent(None)
-            widget.deleteLater()
 
 
 def _row_index(layout: QVBoxLayout, row_id: str) -> int:
@@ -449,25 +396,6 @@ class BookScreen(SimpleWidget):
         super().refresh(prompt=prompt)
         if self._live:
             self._paint_book()
-
-    def set_expert(self, enabled: bool) -> None:
-        """Open Expert on a clear form.
-
-        The shell's ``_clear`` drops a nested form layout and leaves its
-        widgets on the form. The next open paints those leftovers under the
-        new rows. Remove them before the shell builds the form again.
-        """
-        if enabled:
-            _purge_layout(self._expert_form)
-            host = self.root.findChild(QWidget, "expertForm")
-            if isinstance(host, QWidget):
-                for child in list(host.findChildren(QWidget)):
-                    if child.parentWidget() is not host:
-                        continue
-                    child.hide()
-                    child.setParent(None)
-                    child.deleteLater()
-        super().set_expert(enabled)
 
     def _choose(self, row_id: str, value: str) -> None:
         super()._choose(row_id, value)
@@ -602,7 +530,6 @@ class MainWindow(QMainWindow):
         self._build_form()
         self._contain_presets()
         self._build_expert_extras()
-        self._lift_expert_panel()
         self._install_book_text()
         self._build_result_actions()
         self._build_menus()
@@ -611,33 +538,15 @@ class MainWindow(QMainWindow):
         if self._expert.enabled():
             self._tune_expert()
         self.shell.refresh()
-        # Lifting the expert panel reparents the scrolls and restores the
-        # platform light palette on their content widgets.
-        self._paint_surfaces()
         QTimer.singleShot(0, self._check_update)
-
-    def _paint_surfaces(self) -> None:
-        """Fill every scroll and text view from the dark theme tokens.
-
-        ``QPalette.Window`` and ``QPalette.Base`` are the colours Qt actually
-        paints. The rows scroll and the book card use the card colour. Text
-        views and the result strip use the control colour.
-        """
-        for scroll in self.findChildren(QScrollArea):
-            colour = CONTROL_BG if scroll.objectName() == "historyStrip" else CARD_PLAIN
-            _paint_scroll(scroll, colour)
-        for edit in self.findChildren(QPlainTextEdit):
-            _paint_dark(edit.viewport(), CONTROL_BG)
 
     def showEvent(self, event: object) -> None:
         """Turn on Acrylic when Windows can blur this window."""
         super().showEvent(event)  # type: ignore[arg-type]
-        self._paint_surfaces()
         self._fit_preset_height()
         QTimer.singleShot(0, self._fit_preset_height)
         if enable_acrylic(int(self.winId())):
             self.setStyleSheet(_window_style(True))
-            self._paint_surfaces()
 
     def resizeEvent(self, event: object) -> None:
         """Keep the preset list from swallowing the book form."""
@@ -882,7 +791,7 @@ class MainWindow(QMainWindow):
         if isinstance(layout, QVBoxLayout):
             _zero_stretches(layout)
             layout.addWidget(scroll, 1)
-        _paint_scroll(scroll, CARD_PLAIN)
+        _darken(scroll, QtGui)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setObjectName("progressLog")
@@ -896,10 +805,6 @@ class MainWindow(QMainWindow):
             _zero_stretches(busy_layout)
             busy_layout.insertWidget(1, self.log, 1)
             busy_layout.insertWidget(2, self.approve)
-        _paint_dark(self.log.viewport(), CONTROL_BG)
-        document = self.shell._document
-        if isinstance(document, QPlainTextEdit):
-            _paint_dark(document.viewport(), CONTROL_BG)
         self.progress_label = self.shell._progress_text
         if not isinstance(self.progress_label, QLabel):
             self.progress_label = QLabel(tr("progress"))
@@ -992,7 +897,7 @@ class MainWindow(QMainWindow):
         self._preset_scroll = scroll
         self._build_length_row()
         self._build_more()
-        _paint_scroll(scroll, CARD_PLAIN)
+        _darken(scroll, QtGui)
         self._fit_preset_height()
 
     def _build_length_row(self) -> None:
@@ -1262,62 +1167,6 @@ class MainWindow(QMainWindow):
         column.addWidget(extras)
         scroll.setWidget(wrapper)
 
-    def _lift_expert_panel(self) -> None:
-        """Give Expert the full window height beside the book, not under the rows.
-
-        ``voxprint_common.ui.simple_image`` puts ``expertPanel`` in
-        ``expertSplit``, which only spans the stage under the preset rows.
-        ``_Scroll.sizeHint`` is 260×120 and the vertical size policy is
-        Ignored, so the values sit in a short box. The library fit
-        (``_fit_expert_panel``) only sets that splitter's width. Plotweaver
-        lifts the same panel to the shell's full height and leaves the fit
-        alone.
-        """
-        panel = self.shell._expert_panel
-        root_layout = self.shell.root.layout()
-        if not isinstance(panel, QWidget) or not isinstance(root_layout, QVBoxLayout):
-            return
-        if root_layout.indexOf(panel) >= 0:
-            return
-        stretches = [root_layout.stretch(index) for index in range(root_layout.count())]
-        taken: list[QLayoutItem] = []
-        while root_layout.count():
-            item = root_layout.takeAt(0)
-            if item is not None:
-                taken.append(item)
-        column_host = QWidget(self.shell.root)
-        column_host.setObjectName("shellColumn")
-        column = QVBoxLayout(column_host)
-        column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(root_layout.spacing())
-        for item, stretch in zip(taken, stretches, strict=True):
-            widget = item.widget()
-            child = item.layout()
-            if isinstance(widget, QWidget):
-                column.addWidget(widget, stretch)
-            elif child is not None:
-                column.addLayout(child, stretch)
-        panel.setParent(None)
-        panel.setMinimumWidth(380)
-        panel.setMaximumWidth(520)
-        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        body = QWidget(self.shell.root)
-        body.setObjectName("shellBody")
-        row = QHBoxLayout(body)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(12)
-        row.addWidget(column_host, 1)
-        row.addWidget(panel, 0)
-        root_layout.addWidget(body, 1)
-        scroll = self.shell.root.findChild(QScrollArea, "expertScroll")
-        if isinstance(scroll, QScrollArea):
-            scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.shell._fit_expert_panel = self._skip_expert_fit  # type: ignore[method-assign]
-
-    def _skip_expert_fit(self) -> None:
-        """Ignore the library's stage-height panel fit. The panel is already lifted."""
-        return
-
     def _expert_form_layout(self) -> QFormLayout | None:
         host = self.shell._expert_form
         if not isinstance(host, QVBoxLayout):
@@ -1330,13 +1179,7 @@ class MainWindow(QMainWindow):
         return None
 
     def _present_expert(self) -> None:
-        """Wrap Expert rows to the panel width and show pages as a live value.
-
-        ``simple_image._clear`` removes a nested form layout without deleting
-        the widgets inside it. Opening Expert again leaves the previous
-        fields under the new ones, so the heading sits on the model field.
-        Drop those leftovers before the new rows are measured.
-        """
+        """Wrap Expert rows to the panel width and show pages as a live value."""
         panel = self.shell._expert_panel
         if not isinstance(panel, QWidget) or not panel.isVisible():
             return
@@ -1464,8 +1307,6 @@ class MainWindow(QMainWindow):
             f"color: {TEXT}; background: transparent; font-size: 15px; padding: 12px;"
         )
         self._book_hint = hint
-        _paint_dark(strip, CONTROL_BG)
-        _paint_dark(strip.viewport(), CONTROL_BG)
         self._place_book_hint()
 
     def _place_book_hint(self) -> None:
@@ -1569,7 +1410,6 @@ class MainWindow(QMainWindow):
         self.shell.set_expert(enabled)
         if enabled:
             self._tune_expert()
-        self._paint_surfaces()
         self._fit_preset_height()
         QTimer.singleShot(0, self._fit_preset_height)
 
