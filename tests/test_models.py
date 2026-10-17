@@ -120,8 +120,8 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert qwen.role == "least-censored"
     assert qwen.enabled is True
     assert qwen.tier == "24gb"
-    assert qwen.repo == qwen_q3.repo
-    assert qwen.revision == qwen_q3.revision
+    assert qwen.repo == "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF"
+    assert qwen.revision == "2da8c0432f0a42c25c14cbc99f90028a90d3dcd3"
     assert qwen.filename == "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf"
     assert qwen.sha256 == "a4fd0da6216fb8b9a74e25a688a118b001888b704e17f5c851c2bd80f4f5e284"
     assert qwen.size == 19_535_700_288
@@ -129,8 +129,8 @@ def test_registry_lists_confirmed_apache_models() -> None:
     gemma_31 = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-q4")
     assert gemma_31.enabled is True
     assert gemma_31.tier == "24gb"
-    assert gemma_31.repo == "Mitroshenkov87/voxprint-gemma4-31b"
-    assert gemma_31.revision == "458a5cea1077218d72daf2e49334abe6eb1da930"
+    assert gemma_31.repo == "paperscarecrow/Gemma-4-31B-it-abliterated"
+    assert gemma_31.revision == "2491ee58472b82a2372d288f982943b9d5e6a82c"
     assert gemma_31.sha256 == "380f2f50f441225e669ab1541220985387bf3933573cd2f4f7e667f3790e73a3"
     assert gemma_31.size == 18_687_057_536
     assert gemma_31.min_vram_gb == 18
