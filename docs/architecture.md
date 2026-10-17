@@ -6,12 +6,14 @@ Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codena
 
 The project folder holds `project.json`, a SQLite canon, and one checkpoint per finished step. A crash resumes from the next missing step.
 
-1. Story bible: logline, characters, pronunciations.
-2. Outline: chapters with a purpose and a point of view.
-3. For each chapter: beats, then scene drafts, then one lightweight check and at most one rewrite, then a canon extraction.
+1. Story bible: logline, characters, pronunciations. One call, capped at 2,048 tokens.
+2. Outline: parts first, then chapters in batches that fit a 2,048-token reply. A missing chapter gets one repair call, and any index still missing is filled so the list has no holes. Chapter ids stay `chNN` (three digits when the book has more than 99 chapters). When the brief leaves the chapter count empty, a short book stays at 8 chapters and a longer one uses about 2,500 to 4,000 words per chapter. Scene count rises so each scene's requested words fit a 4,096-token draft, including Russian tokenisation. An oversize beat is split before it is drafted.
+3. For each chapter: beats, then scene drafts, then one lightweight check and at most one rewrite, then a canon extraction. Scene prompts carry a compact bible digest (no secrets) and a rolling story summary capped to a fixed size, plus the tail of the previous scene when it fits. That keeps the prompt and the completion inside 4,096 tokens, the spilled context on both the 16 GB and 24 GB tiers.
 4. Proofread while the model that should own the voice is loaded.
 5. Optional reference overlap, one rewrite if the lexical check flags the book.
 6. Export `book.vxbook` and EPUB 3, plus FictionBook 2.1, DOCX, Markdown, or legacy speaker marks when asked. Optional sound markup writes a second file, `book.sound.vxbook`.
+
+2,000 pages at 250 words per page is the longest book this plan treats as reliable: about 156 chapters, with each scene and each outline batch inside the token caps, and the rolling summary still able to carry the plot. A longer target still runs, up to a safety ceiling of 400 chapters, but the same fixed summary is then spread over more story than it can hold. The desktop form's chapter hint is unchanged until the shell migration lands; generation uses this planner.
 
 Without `--yes`, autopilot stops after the bible and after the outline. Copilot also stops after each chapter. Manual also stops after each scene. The window has a checkbox for the bible and outline stop. It does not edit beats.
 
