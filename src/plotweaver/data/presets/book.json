@@ -2,20 +2,27 @@
   "schema": "voxprint-presets/1",
   "groups": [
     {
-      "id": "language",
-      "label_key": "book.language",
-      "default": "ru",
+      "id": "genre",
+      "label_key": "book.genre",
+      "default": "drama",
       "options": [
-        {
-          "id": "ru",
-          "label_key": "book.language.ru",
-          "values": {"book.language": "ru"}
-        },
-        {
-          "id": "en",
-          "label_key": "book.language.en",
-          "values": {"book.language": "en"}
-        }
+        {"id": "drama", "label_key": "book.genre.drama", "values": {"book.genre": "drama"}},
+        {"id": "detective", "label_key": "book.genre.detective", "values": {"book.genre": "detective"}},
+        {"id": "fantasy", "label_key": "book.genre.fantasy", "values": {"book.genre": "fantasy"}},
+        {"id": "science", "label_key": "book.genre.science", "values": {"book.genre": "science"}},
+        {"id": "romance", "label_key": "book.genre.romance", "values": {"book.genre": "romance"}},
+        {"id": "thriller", "label_key": "book.genre.thriller", "values": {"book.genre": "thriller"}}
+      ]
+    },
+    {
+      "id": "tone",
+      "label_key": "book.tone",
+      "default": "serious",
+      "options": [
+        {"id": "light", "label_key": "book.tone.light", "values": {"book.tone": "light"}},
+        {"id": "serious", "label_key": "book.tone.serious", "values": {"book.tone": "serious"}},
+        {"id": "dark", "label_key": "book.tone.dark", "values": {"book.tone": "dark"}},
+        {"id": "comic", "label_key": "book.tone.comic", "values": {"book.tone": "comic"}}
       ]
     },
     {
@@ -64,23 +71,6 @@
           "id": "omniscient",
           "label_key": "book.pov.omniscient",
           "values": {"book.pov": "third-person omniscient"}
-        }
-      ]
-    },
-    {
-      "id": "tense",
-      "label_key": "book.tense",
-      "default": "past",
-      "options": [
-        {
-          "id": "past",
-          "label_key": "book.tense.past",
-          "values": {"book.tense": "past"}
-        },
-        {
-          "id": "present",
-          "label_key": "book.tense.present",
-          "values": {"book.tense": "present"}
         }
       ]
     },
@@ -135,6 +125,40 @@
           "id": "tragic",
           "label_key": "book.ending.tragic",
           "values": {"book.ending": "tragic"}
+        }
+      ]
+    },
+    {
+      "id": "language",
+      "label_key": "book.language",
+      "default": "ru",
+      "options": [
+        {
+          "id": "ru",
+          "label_key": "book.language.ru",
+          "values": {"book.language": "ru"}
+        },
+        {
+          "id": "en",
+          "label_key": "book.language.en",
+          "values": {"book.language": "en"}
+        }
+      ]
+    },
+    {
+      "id": "tense",
+      "label_key": "book.tense",
+      "default": "past",
+      "options": [
+        {
+          "id": "past",
+          "label_key": "book.tense.past",
+          "values": {"book.tense": "past"}
+        },
+        {
+          "id": "present",
+          "label_key": "book.tense.present",
+          "values": {"book.tense": "present"}
         }
       ]
     },

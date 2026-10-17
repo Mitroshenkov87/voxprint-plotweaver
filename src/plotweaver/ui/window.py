@@ -70,11 +70,16 @@ from plotweaver.ui.i18n import tr, ui_language
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.locked_io import install_locked_writes
 from plotweaver.ui.presets import (
+    GENRES,
     LONG_BOOK_NOTE_PAGES,
     MAX_SCENES_PER_CHAPTER,
+    TONES,
+    PlainChoice,
     book_presets,
     book_settings,
     grouped_number,
+    match_plain,
+    plain_for_book,
     reading_estimate,
     resolved_model_id,
 )
@@ -99,6 +104,8 @@ _READERS = {"adult": "adults", "teen": "teenagers", "child": "children"}
 _ENDING = ("closed", "open", "bittersweet", "twist", "tragic")
 _GUESSES = {
     "language": "language",
+    "genre": "genre",
+    "tone": "tone",
     "pov": "pov",
     "tense": "tense",
     "readers": "audience",
@@ -106,6 +113,16 @@ _GUESSES = {
     "themes": "dark_themes",
     "length": "pages",
 }
+_MORE_ROWS = (
+    "tense",
+    "stops",
+    "themes",
+    "save-fb2",
+    "save-docx",
+    "save-markdown",
+    "save-marks",
+    "sound",
+)
 
 
 class _RunThread(QThread):
@@ -184,8 +201,9 @@ def _paint_scroll(scroll: QScrollArea, colour: str) -> None:
         _paint_dark(inner, colour)
 
 
-def _length_row_index(layout: QVBoxLayout) -> int:
-    """Return the preset row that holds the length chips."""
+def _row_index(layout: QVBoxLayout, row_id: str) -> int:
+    """Return the preset row whose label is ``preset-{row_id}``."""
+    name = f"preset-{row_id}"
     for index in range(layout.count()):
         item = layout.itemAt(index)
         row = None if item is None else item.layout()
@@ -194,9 +212,15 @@ def _length_row_index(layout: QVBoxLayout) -> int:
         for child_index in range(row.count()):
             child = row.itemAt(child_index)
             widget = None if child is None else child.widget()
-            if isinstance(widget, QLabel) and widget.objectName() == "preset-length":
+            if isinstance(widget, QLabel) and widget.objectName() == name:
                 return index
-    return 1
+    return -1
+
+
+def _length_row_index(layout: QVBoxLayout) -> int:
+    """Return the preset row that holds the length chips."""
+    found = _row_index(layout, "length")
+    return 1 if found < 0 else found
 
 
 def _backend(mock: bool) -> LLMBackend:
@@ -568,6 +592,12 @@ class MainWindow(QMainWindow):
         self.chapters.setRange(0, SAFETY_CHAPTER_CEILING)
         self.chapters.hide()
         self.brief_form.bind(self.title, self.language, self.synopsis, self.dark, self.chapters)
+        self.brief_form.genre.textChanged.connect(
+            lambda text: self._on_plain_typed("book.genre", GENRES, text)
+        )
+        self.brief_form.tone.textChanged.connect(
+            lambda text: self._on_plain_typed("book.tone", TONES, text)
+        )
         form.addRow(tr("title"), self.title)
         form.addRow(tr("author"), self.author)
         form.addRow(tr("language"), self.language)
@@ -743,6 +773,7 @@ class MainWindow(QMainWindow):
         layout.insertWidget(index, scroll)
         self._preset_scroll = scroll
         self._build_length_row()
+        self._build_more()
         _paint_scroll(scroll, CARD_PLAIN)
         self._fit_preset_height()
 
@@ -787,6 +818,117 @@ class MainWindow(QMainWindow):
         column.addWidget(estimate)
         layout.insertWidget(_length_row_index(layout) + 1, block)
         self._sync_length()
+
+    def _build_more(self) -> None:
+        """Park the less common chips under a More settings expander."""
+        host = self.shell._preset_host
+        layout = None if not isinstance(host, QWidget) else host.layout()
+        if not isinstance(layout, QVBoxLayout):
+            return
+        body = QWidget()
+        body.setObjectName("moreSettingsBody")
+        column = QVBoxLayout(body)
+        column.setContentsMargins(0, 4, 0, 0)
+        column.setSpacing(8)
+        for row_id in _MORE_ROWS:
+            index = _row_index(layout, row_id)
+            if index < 0:
+                continue
+            item = layout.takeAt(index)
+            row = None if item is None else item.layout()
+            if isinstance(row, QHBoxLayout):
+                column.addLayout(row)
+        header = QPushButton("▸  " + shell_tr("book.more"))
+        header.setObjectName("moreSettings")
+        header.setFlat(True)
+        header.setCursor(Qt.CursorShape.PointingHandCursor)
+        header.setStyleSheet(
+            "QPushButton#moreSettings {"
+            f" text-align: left; padding: 6px 2px; background: transparent;"
+            f" border: none; color: {TEXT}; font-weight: 600;"
+            "}"
+        )
+        header.clicked.connect(self._toggle_more)
+        self._more_header = header
+        self._more_body = body
+        body.hide()
+        wrap = QWidget()
+        wrap.setObjectName("moreSettingsWrap")
+        wrap_layout = QVBoxLayout(wrap)
+        wrap_layout.setContentsMargins(0, 4, 0, 0)
+        wrap_layout.setSpacing(4)
+        wrap_layout.addWidget(header)
+        wrap_layout.addWidget(body)
+        layout.addWidget(wrap)
+        self._wire_other("genre", "book.genre")
+        self._wire_other("tone", "book.tone")
+        self._sync_plain()
+
+    def _toggle_more(self) -> None:
+        body = getattr(self, "_more_body", None)
+        header = getattr(self, "_more_header", None)
+        if not isinstance(body, QWidget) or not isinstance(header, QPushButton):
+            return
+        open_more = not body.isVisible()
+        body.setVisible(open_more)
+        mark = "▾  " if open_more else "▸  "
+        header.setText(mark + shell_tr("book.more"))
+        self._fit_preset_height()
+
+    def _wire_other(self, row_id: str, key: str) -> None:
+        button = self.shell.root.findChild(QPushButton, f"chip-{row_id}-custom")
+        if button is None:
+            return
+        button.clicked.connect(lambda _checked=False, setting=key: self._choose_other(setting))
+
+    def _choose_other(self, key: str) -> None:
+        if self._text(key) != "":
+            self.book.set_value(key, "")
+        self.shell.refresh()
+
+    def _on_plain_typed(self, key: str, choices: tuple[PlainChoice, ...], text: str) -> None:
+        if self.brief_form._loading:
+            return
+        stored = match_plain(text, choices)
+        if stored == self._text(key):
+            return
+        self.book.set_value(key, stored)
+        self.shell.refresh()
+
+    def _sync_plain(self) -> None:
+        """Keep Genre and Tone chips, including Other, on the brief fields."""
+        self._show_other("genre", "book.genre", GENRES, self.brief_form.genre)
+        self._show_other("tone", "book.tone", TONES, self.brief_form.tone)
+        self._fit_preset_height()
+
+    def _show_other(
+        self,
+        row_id: str,
+        key: str,
+        choices: tuple[PlainChoice, ...],
+        edit: QLineEdit,
+    ) -> None:
+        button = self.shell.root.findChild(QPushButton, f"chip-{row_id}-custom")
+        value = self._text(key)
+        known = any(choice.option_id == value for choice in choices)
+        if button is not None:
+            button.setText(shell_tr("book.other"))
+            button.ensurePolished()
+            advance = button.fontMetrics().horizontalAdvance(button.text())
+            button.setMinimumWidth(advance + 36)
+            button.setVisible(True)
+            button.setChecked(not known)
+        if edit.hasFocus():
+            return
+        shown = value
+        for choice in choices:
+            if choice.option_id == value:
+                shown = shell_tr(choice.label_key)
+                break
+        if edit.text() != shown:
+            edit.blockSignals(True)
+            edit.setText(shown)
+            edit.blockSignals(False)
 
     def _on_custom_pages(self, value: int) -> None:
         if self._integer("book.pages") == value:
@@ -834,9 +976,11 @@ class MainWindow(QMainWindow):
         rows = None if host is None else host.layout()
         if not isinstance(rows, QVBoxLayout):
             return
-        # Leave a book form on screen, and stop the preset list on a whole row.
+        rows.activate()
+        # The seven main rows stay fully visible. More settings can grow the
+        # list, and the document view gives up space before a vertical scroll.
         top = scroll.mapTo(self, scroll.rect().topLeft()).y()
-        cap = max(180, self.height() - top - 300)
+        room = max(180, self.height() - top - 120)
         bottoms: list[int] = []
         for index in range(rows.count()):
             item = rows.itemAt(index)
@@ -845,15 +989,13 @@ class MainWindow(QMainWindow):
             bottom = item.geometry().y() + item.geometry().height()
             if bottom > 0:
                 bottoms.append(bottom)
-        if not bottoms:
-            height = min(360, cap)
+        content = max(bottoms) if bottoms else min(360, room)
+        if content <= room:
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            height = content
         else:
-            height = bottoms[0]
-            for bottom in bottoms:
-                if bottom <= cap:
-                    height = bottom
-                else:
-                    break
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            height = room
         bar = scroll.horizontalScrollBar()
         if bar.isVisible():
             height += bar.height()
@@ -1109,6 +1251,8 @@ class MainWindow(QMainWindow):
 
     def _sync_model(self) -> None:
         self._sync_length()
+        if hasattr(self, "brief_form"):
+            self._sync_plain()
         if self.book.state is None or not self.book.state.has("book.model"):
             return
         from plotweaver.registry import detected_tier
@@ -1149,9 +1293,13 @@ class MainWindow(QMainWindow):
             language=self._text("book.language") or "ru",
             pages=pages,
             words_per_page=words,
-            genre=form.genre.text().strip(),
+            genre=plain_for_book(
+                self._text("book.genre"), self._text("book.language") or "ru", GENRES
+            ),
             subgenre=form.subgenre.text().strip(),
-            tone=form.tone.text().strip(),
+            tone=plain_for_book(
+                self._text("book.tone"), self._text("book.language") or "ru", TONES
+            ),
             pov=self._text("book.pov") or "third-person limited",
             tense=self._text("book.tense") or "past",
             audience=self._text("book.readers") or "adult",
@@ -1264,7 +1412,11 @@ class MainWindow(QMainWindow):
             brief=None,
             title=self.title.text().strip() or "Untitled",
             language=self._text("book.language") or "ru",
-            genre=self.brief_form.genre.text().strip(),
+            genre=plain_for_book(
+                self._text("book.genre"),
+                self._text("book.language") or "ru",
+                GENRES,
+            ),
             target_words=self.target_words.value() or self._current_brief().target_words,
             chapters=self._integer("book.chapters"),
             scenes_per_chapter=max(1, self._integer("book.scenes") or 2),
@@ -1434,6 +1586,8 @@ class MainWindow(QMainWindow):
         if brief.ending_type in _ENDING:
             self._choose_known("ending", brief.ending_type)
         self._choose_known("themes", "on" if brief.dark_themes else "off")
+        self.book.set_value("book.genre", match_plain(brief.genre, GENRES))
+        self.book.set_value("book.tone", match_plain(brief.tone, TONES))
         self.book.set_value("book.pages", min(STRUCTURAL_MAX_PAGES, max(1, brief.pages)))
         self.book.set_value("book.words_per_page", brief.words_per_page)
         self.book.set_value(
