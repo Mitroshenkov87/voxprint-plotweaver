@@ -1,16 +1,19 @@
 """Chapter and scene budgets for a target length.
 
-Outline replies stay inside 2,048 tokens. A scene reply stays inside 4,096.
-Russian is budgeted at a Gemma-class rate, the tighter of the 16 GB and 24 GB
-tokenisers. A spilled context on either tier is 4,096 tokens, so the prompt and
-the completion share that window.
+Outline replies stay inside 2,048 tokens. A scene draft uses the 4,096-token
+window it shares with its prompt. Proofread is a later call, split when the
+scene does not fit one proofread window, so the draft is not cut in half to
+leave room for it. Russian is budgeted at a Gemma-class rate, the tighter of
+the 16 GB and 24 GB tokenisers.
 
-2,000 pages at 250 words per page is structurally within budget (mock-tested).
-That is not a prose-quality claim. Russian scenes near 377 words and the
-700-character rolling summary have not been tried on a real model. Real-model
-validation is pending. Past that length the same fixed digest covers more plot.
-Calls for a longer book still fit the token caps. A ceiling of 400 chapters
-stops a runaway page count from queuing tens of thousands of calls.
+Up to about 600 pages (150,000 words) a chapter stays at 2 or 3 scenes and
+each scene targets about 1,000 to 1,500 words. A longer book shrinks scenes
+to the words one draft completion can finish. 2,000 pages at 250 words per
+page is structurally within budget (mock-tested). That is not a prose-quality
+claim. Scenes of about 1,000 words and the 700-character rolling summary have
+not been tried on a real model. Real-model validation is pending. A ceiling
+of 400 chapters stops a runaway page count from queuing tens of thousands of
+calls.
 """
 
 from __future__ import annotations
@@ -33,8 +36,10 @@ OUTLINE_TOKENS_PER_CHAPTER = 180
 OUTLINE_USABLE_TOKENS = 1600
 STORY_SO_FAR_CHARS = 700
 CHAPTER_SUMMARY_CHARS = 240
+NORMAL_BOOK_WORDS = 150_000
+SCENE_TARGET_WORDS = 1500
+DRAFT_PROMPT_FLOOR = 1280
 
-_PROOF_MARGIN = 80
 _COMPLETION_PAD = 48
 
 
@@ -70,20 +75,35 @@ def chapters_per_outline_call() -> int:
 
 
 def scene_word_cap(language: str) -> int:
-    """Words one scene may request and still survive a proofread round trip."""
+    """Words one draft completion can hold in the 4,096-token window.
+
+    Proofread is a later call, so this does not reserve a second copy of the
+    scene in the same window.
+    """
     rate = tokens_per_word(language)
-    overhead = SYSTEM_TOKEN_RESERVE + PROOF_INSTRUCTION_TOKENS + _COMPLETION_PAD + _PROOF_MARGIN
-    room = CONTEXT_FLOOR - overhead
-    if room <= 0:
+    completion_room = max(512, CONTEXT_FLOOR - SYSTEM_TOKEN_RESERVE - DRAFT_PROMPT_FLOOR)
+    usable = completion_room - _COMPLETION_PAD
+    if usable <= 0:
         return 200
-    return max(200, (room * 4) // (rate * 9))
+    return max(200, (usable * 4) // (rate * 5))
+
+
+def scene_plan_limit(target_words: int, language: str) -> int:
+    """Word ceiling used to choose how many scenes a chapter gets.
+
+    Up to about 600 pages the ceiling is 1,500 words, so a normal chapter
+    stays at two or three scenes. A longer book uses the draft completion cap.
+    """
+    if max(0, target_words) <= NORMAL_BOOK_WORDS:
+        return SCENE_TARGET_WORDS
+    return min(SCENE_TARGET_WORDS, scene_word_cap(language))
 
 
 def scene_max_tokens(words: int, language: str) -> int:
     """Completion cap for one scene. Never above 4,096, and the prompt keeps room."""
     rate = tokens_per_word(language)
     needed = (max(1, words) * rate * 5) // 4 + _COMPLETION_PAD
-    room = max(512, CONTEXT_FLOOR - SYSTEM_TOKEN_RESERVE - 256)
+    room = max(512, CONTEXT_FLOOR - SYSTEM_TOKEN_RESERVE - DRAFT_PROMPT_FLOOR)
     return min(SCENE_MAX_TOKENS, max(512, needed), room)
 
 
@@ -102,9 +122,11 @@ def plan_shape(
 ) -> tuple[int, int, int]:
     """Return chapters, scenes per chapter, and words per scene.
 
-    An explicit chapter count is kept. Scene count is at least the requested
-    number, and higher when a scene would not fit the draft budget. An explicit
-    ``scene_words`` value is clamped to that budget and does not add scenes.
+    An explicit chapter count is kept. Up to about 600 pages the scene count
+    stays at two or three, with about 1,000 to 1,500 words in each scene when
+    the chapter is long enough. A longer book adds scenes so each one fits a
+    draft completion. An explicit ``scene_words`` value is clamped to that
+    completion cap and does not add scenes.
     """
     words = max(1, target_words)
     if chapter_count is not None and chapter_count > 0:
@@ -115,14 +137,14 @@ def plan_shape(
         minimum = 2
     else:
         minimum = max(1, scenes_per_chapter)
-    cap = scene_word_cap(language)
+    limit = scene_plan_limit(words, language)
     if scene_words is not None and scene_words > 0:
-        return chapters, minimum, min(max(1, scene_words), cap)
+        return chapters, minimum, min(max(1, scene_words), scene_word_cap(language))
     per_chapter = max(1, words // chapters)
-    needed = max(1, (per_chapter + cap - 1) // cap)
+    needed = max(1, (per_chapter + limit - 1) // limit)
     scenes = max(minimum, needed)
     per_scene = max(1, words // (chapters * scenes))
-    while per_scene > cap:
+    while per_scene > limit:
         scenes += 1
         per_scene = max(1, words // (chapters * scenes))
     return chapters, scenes, per_scene
@@ -192,6 +214,103 @@ def call_fits(
     """True when the reserved prompt, the text, and the completion share the floor."""
     prompt = SYSTEM_TOKEN_RESERVE + instruction_tokens + estimate_tokens(text, russian=russian)
     return prompt + max_tokens <= CONTEXT_FLOOR
+
+
+def proofread_calls(
+    paragraphs: list[str], *, russian: bool
+) -> list[tuple[int, list[tuple[int, str]]]]:
+    """Split paragraphs into proofread calls that fit the context floor.
+
+    Each item is ``(max_tokens, [(paragraph_index, text), ...])``. A paragraph
+    that does not fit alone is split, and every piece keeps that index so the
+    caller can join them back.
+    """
+    pieces = _proof_pieces(paragraphs, russian=russian)
+    if not pieces:
+        return []
+    groups: list[list[tuple[int, str]]] = []
+    current: list[tuple[int, str]] = []
+    for piece in pieces:
+        trial = [*current, piece]
+        if current and not _proof_fits(_join_pieces(trial), russian):
+            groups.append(current)
+            current = [piece]
+        else:
+            current.append(piece)
+    if current:
+        groups.append(current)
+    return [(_proof_max_tokens(_join_pieces(group), russian), group) for group in groups]
+
+
+def _proof_pieces(paragraphs: list[str], *, russian: bool) -> list[tuple[int, str]]:
+    pieces: list[tuple[int, str]] = []
+    for index, paragraph in enumerate(paragraphs):
+        text = paragraph.strip()
+        if not text:
+            continue
+        rest = text
+        while rest:
+            piece = rest if _proof_fits(rest, russian) else _proof_prefix(rest, russian=russian)
+            if not piece:
+                piece = rest[:1]
+            pieces.append((index, piece))
+            if piece == rest:
+                break
+            rest = rest[len(piece) :].lstrip()
+    return pieces
+
+
+def _proof_prefix(text: str, *, russian: bool) -> str:
+    lo, hi = 1, len(text)
+    best = ""
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        piece = text[:mid].rstrip()
+        if piece and _proof_fits(piece, russian):
+            best = piece
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    if not best:
+        return text[:1]
+    if len(best) < len(text):
+        cut = best.rfind(" ")
+        if cut >= max(1, len(best) // 2):
+            return best[:cut]
+    return best
+
+
+def _join_pieces(pieces: list[tuple[int, str]]) -> str:
+    return "\n\n".join(text for _index, text in pieces)
+
+
+def _proof_room(text: str, russian: bool) -> int:
+    return (
+        CONTEXT_FLOOR
+        - SYSTEM_TOKEN_RESERVE
+        - PROOF_INSTRUCTION_TOKENS
+        - estimate_tokens(text, russian=russian)
+    )
+
+
+def _proof_max_tokens(text: str, russian: bool) -> int:
+    text_tokens = estimate_tokens(text, russian=russian)
+    room = _proof_room(text, russian)
+    needed = text_tokens + _COMPLETION_PAD
+    return min(SCENE_MAX_TOKENS, max(256, min(needed, max(0, room))))
+
+
+def _proof_fits(text: str, russian: bool) -> bool:
+    text_tokens = estimate_tokens(text, russian=russian)
+    needed = text_tokens + _COMPLETION_PAD
+    if _proof_room(text, russian) < needed:
+        return False
+    return call_fits(
+        text,
+        russian=russian,
+        max_tokens=needed,
+        instruction_tokens=PROOF_INSTRUCTION_TOKENS,
+    )
 
 
 def _words_each(words: int, count: int) -> int:

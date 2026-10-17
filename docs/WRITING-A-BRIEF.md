@@ -106,7 +106,7 @@ The seal on the station fails. The crew stays and keeps the log.
 - ending
 ```
 
-Leave `chapters` and `scenes_per_chapter` empty to derive them. At 250 words per page, 40 pages is 10,000 words. The automatic chapter count for that length is 8, and a short English book keeps 2 scenes per chapter. A longer book, and a Russian book, adds scenes so each one fits a single draft. Type a chapter count when you want a different split. The longest length that is structurally within budget (mock-tested) is 2,000 pages. Prose quality at that length, including Russian scenes of about 377 words and the 700-character rolling summary, has not been checked on a real model.
+Leave `chapters` and `scenes_per_chapter` empty to derive them. At 250 words per page, 40 pages is 10,000 words. The automatic chapter count for that length is 8, with 2 scenes per chapter. Up to about 600 pages the planner keeps 2 or 3 scenes and targets about 1,000 to 1,500 words in each scene when the chapter is long enough. A short chapter stays at 2 scenes even when each one is under 1,000 words. Past about 600 pages, Russian scenes shrink so one draft call can finish them. Type a chapter count when you want a different split. The longest length that is structurally within budget (mock-tested) is 2,000 pages. Prose quality at that length, including scenes of about 1,000 words and the 700-character rolling summary, has not been checked on a real model.
 
 ## A good brief and a weak one
 
