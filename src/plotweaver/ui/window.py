@@ -53,6 +53,7 @@ from plotweaver.atomic import exclusive_lock, write_text
 from plotweaver.brief import BookBrief, BriefError, chat_prompt, compile_brief, parse_brief
 from plotweaver.domain import BookMode, BookRequest, Language, ModelTier
 from plotweaver.errors import PlotweaverError
+from plotweaver.length import SAFETY_CHAPTER_CEILING, STRUCTURAL_MAX_PAGES
 from plotweaver.llm import LLMBackend
 from plotweaver.settings import (
     model_tier_override,
@@ -69,7 +70,8 @@ from plotweaver.ui.i18n import tr, ui_language
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.locked_io import install_locked_writes
 from plotweaver.ui.presets import (
-    MAX_RELIABLE_PAGES,
+    LONG_BOOK_NOTE_PAGES,
+    MAX_SCENES_PER_CHAPTER,
     book_presets,
     book_settings,
     grouped_number,
@@ -563,7 +565,7 @@ class MainWindow(QMainWindow):
         self.dark = QCheckBox(tr("dark"))
         self.dark.hide()
         self.chapters = QSpinBox()
-        self.chapters.setRange(0, 40)
+        self.chapters.setRange(0, SAFETY_CHAPTER_CEILING)
         self.chapters.hide()
         self.brief_form.bind(self.title, self.language, self.synopsis, self.dark, self.chapters)
         form.addRow(tr("title"), self.title)
@@ -763,25 +765,20 @@ class MainWindow(QMainWindow):
         caption.setMinimumWidth(108)
         self._custom_pages = QSpinBox()
         self._custom_pages.setObjectName("customPages")
-        self._custom_pages.setRange(1, MAX_RELIABLE_PAGES)
-        self._custom_pages.setValue(max(1, self._integer("book.pages") or MAX_RELIABLE_PAGES))
+        self._custom_pages.setRange(1, STRUCTURAL_MAX_PAGES)
+        self._custom_pages.setValue(max(1, self._integer("book.pages") or 250))
         self._custom_pages.valueChanged.connect(self._on_custom_pages)
         row.addWidget(caption)
         row.addWidget(self._custom_pages)
         row.addStretch(1)
         column.addLayout(row)
-        later = QLabel(shell_tr("book.length.big.later"))
-        later.setObjectName("lengthBigLater")
-        later.setProperty("presetLabel", True)
-        later.setWordWrap(True)
-        column.insertWidget(0, later)
-        cap = QLabel(shell_tr("book.length.cap"))
-        cap.setObjectName("lengthCapHint")
-        cap.setProperty("presetLabel", True)
-        cap.setWordWrap(True)
-        cap.hide()
-        self._length_cap = cap
-        column.addWidget(cap)
+        note = QLabel(shell_tr("book.length.long_note"))
+        note.setObjectName("lengthLongNote")
+        note.setProperty("presetLabel", True)
+        note.setWordWrap(True)
+        note.hide()
+        self._length_note = note
+        column.addWidget(note)
         estimate = QLabel("")
         estimate.setObjectName("lengthEstimate")
         estimate.setProperty("presetLabel", True)
@@ -789,30 +786,7 @@ class MainWindow(QMainWindow):
         self._length_estimate = estimate
         column.addWidget(estimate)
         layout.insertWidget(_length_row_index(layout) + 1, block)
-        self._add_long_novel_chip(layout)
         self._sync_length()
-
-    def _add_long_novel_chip(self, layout: QVBoxLayout) -> None:
-        """Keep the long-novel chip visible and switched off."""
-        item = layout.itemAt(_length_row_index(layout))
-        row = None if item is None else item.layout()
-        if not isinstance(row, QHBoxLayout):
-            return
-        button = QPushButton(shell_tr("book.length.big"))
-        button.setObjectName("chip-length-big")
-        button.setProperty("chip", "true")
-        button.setAutoDefault(False)
-        button.setEnabled(False)
-        button.ensurePolished()
-        advance = button.fontMetrics().horizontalAdvance(button.text())
-        button.setMinimumWidth(advance + 36)
-        button.style().unpolish(button)
-        button.style().polish(button)
-        insert_at = row.count()
-        last = row.itemAt(row.count() - 1)
-        if last is not None and last.spacerItem() is not None:
-            insert_at = row.count() - 1
-        row.insertWidget(insert_at, button)
 
     def _on_custom_pages(self, value: int) -> None:
         if self._integer("book.pages") == value:
@@ -844,9 +818,9 @@ class MainWindow(QMainWindow):
                     time=time,
                 )
             )
-        hint = getattr(self, "_length_cap", None)
-        if isinstance(hint, QLabel):
-            hint.setVisible(pages >= MAX_RELIABLE_PAGES)
+        note = getattr(self, "_length_note", None)
+        if isinstance(note, QLabel):
+            note.setVisible(pages > LONG_BOOK_NOTE_PAGES)
         if hasattr(self, "brief_form"):
             self._sync_hidden()
             self._refresh_target()
@@ -1239,6 +1213,7 @@ class MainWindow(QMainWindow):
         form.words_per_page.setValue(max(100, self._integer("book.words_per_page") or 250))
         form.scenes.setValue(max(1, self._integer("book.scenes") or 2))
         form._loading = False
+        form._refresh_numbers()
 
     def _refresh_target(self) -> None:
         pages = max(0, self._integer("book.pages"))
@@ -1459,10 +1434,16 @@ class MainWindow(QMainWindow):
         if brief.ending_type in _ENDING:
             self._choose_known("ending", brief.ending_type)
         self._choose_known("themes", "on" if brief.dark_themes else "off")
-        self.book.set_value("book.pages", min(MAX_RELIABLE_PAGES, max(1, brief.pages)))
+        self.book.set_value("book.pages", min(STRUCTURAL_MAX_PAGES, max(1, brief.pages)))
         self.book.set_value("book.words_per_page", brief.words_per_page)
-        self.book.set_value("book.scenes", brief.derived_scenes())
-        self.book.set_value("book.chapters", brief.chapter_count or 0)
+        self.book.set_value(
+            "book.scenes",
+            min(MAX_SCENES_PER_CHAPTER, max(1, brief.derived_scenes())),
+        )
+        self.book.set_value(
+            "book.chapters",
+            min(SAFETY_CHAPTER_CEILING, max(0, brief.chapter_count or 0)),
+        )
 
     def _choose_known(self, row_id: str, option_id: str) -> None:
         try:

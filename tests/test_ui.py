@@ -13,13 +13,14 @@ from voxprint_common.ui.splash import HEIGHT, WIDTH, layout
 
 from plotweaver.appinfo import version_label
 from plotweaver.domain import BookRequest, Language
+from plotweaver.length import STRUCTURAL_MAX_PAGES, plan_shape
 from plotweaver.paths import splash_art
 from plotweaver.settings import model_tier_override, uncensored_models_preference
 from plotweaver.ui.gate import FictionGate
 from plotweaver.ui.i18n import STRINGS, tr
 from plotweaver.ui.icons import ICON_NAMES, suite_icon
 from plotweaver.ui.presets import (
-    MAX_RELIABLE_PAGES,
+    LONG_BOOK_NOTE_PAGES,
     READING_WORDS_PER_MINUTE,
     preset_path,
     reading_estimate,
@@ -280,11 +281,11 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     readers_bottom = readers.mapTo(scroll.viewport(), readers.rect().bottomLeft()).y()
     assert 0 <= readers_bottom <= scroll.viewport().height()
     big = window.findChild(QPushButton, "chip-length-big")
-    later = window.findChild(QLabel, "lengthBigLater")
-    cap_hint = window.findChild(QLabel, "lengthCapHint")
-    assert big is not None and big.isEnabled() is False
-    assert later is not None and later.isVisible()
-    assert cap_hint is not None and cap_hint.isVisible()
+    note = window.findChild(QLabel, "lengthLongNote")
+    hint = window.brief_form.chapter_hint
+    assert big is not None and big.isEnabled()
+    assert note is not None and note.isVisible() is False
+    assert "20" in hint.text() and "9" in hint.text()
     window.book.set_value("book.pages", 200)
     window.shell.refresh()
     chip = window.findChild(QPushButton, "chip-length-novel")
@@ -294,14 +295,14 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     assert chip is not None and "changes" not in chip.text()
     assert custom is not None and custom.isVisible()
     assert reset is not None and reset.isVisible()
-    assert spin is not None and spin.maximum() == MAX_RELIABLE_PAGES
+    assert spin is not None and spin.maximum() == STRUCTURAL_MAX_PAGES
     assert spin.value() == 200
     assert estimate is not None and "50 000" in estimate.text()
-    assert cap_hint.isVisible() is False
+    assert note.isVisible() is False
     pages = window.book.get("book.pages")
     window._expert.toggle()
     pages_spin = window.findChild(QSpinBox, "book.pages")
-    assert pages_spin is not None and pages_spin.maximum() == MAX_RELIABLE_PAGES
+    assert pages_spin is not None and pages_spin.maximum() == STRUCTURAL_MAX_PAGES
     assert window.book.get("book.pages") == pages
     window._expert.toggle()
     assert window.book.get("book.pages") == pages
@@ -315,6 +316,15 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     window.book.set_value("book.words_per_page", 200)
     window.shell.refresh()
     assert "16 000" in estimate.text()
+    window.book.choose("length", "big")
+    window.shell.refresh()
+    assert window.book.get("book.pages") == 550
+    assert big.isChecked()
+    assert note.isVisible() is False
+    spin.setValue(600)
+    assert note.isVisible() is False
+    spin.setValue(601)
+    assert note.isVisible()
     del app
 
 
@@ -330,17 +340,21 @@ def test_page_presets_and_the_chapter_cap() -> None:
         "story": {"book.pages": 25},
         "novella": {"book.pages": 80},
         "novel": {"book.pages": 250},
+        "big": {"book.pages": 550},
     }
-    assert MAX_RELIABLE_PAGES == 250
+    assert STRUCTURAL_MAX_PAGES == 2000
+    assert LONG_BOOK_NOTE_PAGES == 600
     story = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=25 * 250)
     novel = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=250 * 250)
     big = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=550 * 250)
     huge = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=2000 * 250)
-    assert story.shape() == (8, 2, 400)
-    assert novel.shape() == (25, 2, 1250)
-    assert big.shape() == (40, 2, 1718)
-    assert huge.shape()[0] == 40
-    assert huge.shape()[2] == 6250
+    assert story.shape() == plan_shape(25 * 250, "en", None, 2)
+    assert novel.shape() == plan_shape(250 * 250, "en", None, 2)
+    assert big.shape() == plan_shape(550 * 250, "en", None, 2)
+    assert huge.shape() == plan_shape(2000 * 250, "en", None, 2)
+    assert novel.shape()[0] == 20
+    assert big.shape() == (43, 5, 639)
+    assert huge.shape()[0] == 156
 
 
 def test_feature_map_keeps_commands_and_flags_the_mock_control() -> None:

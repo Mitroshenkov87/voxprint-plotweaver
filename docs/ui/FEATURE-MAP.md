@@ -26,7 +26,7 @@ The simple shell is the same product. Every control that was on the old window, 
 | Notes, Help me write the brief, Copy prompt, Paste brief | Book form | kept |
 | Open a synopsis file (`run --synopsis`) | Open synopsis file | kept |
 | Open a brief file (`run --brief`) | Open brief file | kept |
-| Pages, words per page, scenes, chapters | Length chips: story 25 pages, novella 80, novel 250 (the default). The long-novel chip (~500–600 pages) stays on the row and is switched off until long books are reworked. Simple mode has “Your own length, pages” and Expert has Pages; both stop at 250. A count none of the chips own shows Custom. The line under the chips is pages, words (pages × words per page), and reading time at 250 words per minute. Expert words per page stay on the same settings state. | moved |
+| Pages, words per page, scenes, chapters | Length chips: story 25 pages, novella 80, novel 250 (the default), long novel 550. Simple mode has “Your own length, pages” and Expert has Pages; both accept 1 to 2,000. Above 600 pages a note says very long books are written as short scenes and quality is still being checked. A count none of the chips own shows Custom. The line under the chips is pages, words (pages × words per page), and reading time at 250 words per minute. The chapter line uses the same planner as generation. Expert words per page, scenes, and chapters stay on the same settings state. Chapters left at 0 follow the planner, up to 400. | moved |
 | Target words (`--target-words`) | Expert “Target words (0 = pages)” | kept |
 | Genre, subgenre, tone, setting | Book form | kept |
 | Point of view, tense, audience, ending | Chips. Stored values are unchanged. Ending chips use plain words. Guessed marks stay on the form. | moved |
@@ -102,15 +102,16 @@ Simple mode does not hide a command behind a missing control. Expert mode, the T
 
 The length chips and the free field set `book.pages`. Words are pages × words per page (Expert, 100–600, default 250). The reading line uses 250 words per minute (`READING_WORDS_PER_MINUTE` in `src/plotweaver/ui/presets.py`). A novel of 250 pages is 62,500 words and about 4 hours, not a measured run time.
 
-The window stops at 250 pages (`MAX_RELIABLE_PAGES`). That is the largest page count that still fits the current generator at the default 250 words a page and 2 scenes a chapter. 250 pages is 62,500 words and 25 chapters. An indented outline of 25 chapters, one Russian sentence of purpose each, is about 1,900 tokens and fits in the 2,048-token outline call. 26 chapters leave almost no room once the model indents the JSON. Each scene call budgets 3 tokens a word and stops at 4,096 (`runner._max_tokens`). 25 chapters × 2 scenes ask for 1,250 words, which is 3,750 tokens and still fits.
+The free field and Expert pages accept 1 to 2,000 (`STRUCTURAL_MAX_PAGES`). The long-novel chip writes 550 and is on. Above 600 pages (`LONG_BOOK_NOTE_PAGES`) the window shows a plain note and does not block: very long books are written as short scenes, and quality is still being checked. 550 and 600 do not show that note.
 
-A 550-page book does not fit those calls. It is 137,500 words. Empty chapters use `min(40, max(8, round(words / 2500)))`, so the chapter count stops at 40 instead of 55, and each scene is asked for about 1,718 words. The runner would budget 5,154 tokens and then stop at 4,096, so the scene is cut off. A 40-chapter outline is about 2,400 tokens even when each purpose is one short sentence, so the 2,048-token outline call is cut off too. The long-novel chip stays visible and is switched off, with the note that very long books arrive in the next update. The free field and Expert pages show the same plain hint when they are already at 250. Raising words per page, or setting scenes per chapter to 1, makes a 250-page book longer than this budget. Expert “Target words (0 = pages)” can still ask for more words; the generator caps below still apply. The command line is not limited to 250 pages.
+Empty chapters follow `chapter_count_for` in `src/plotweaver/length.py`: at least 8 chapters, about 3,200 words a chapter, kept between 2,500 and 4,000. Scene count starts at 2 and rises so each scene fits a 4,096-token draft. English scenes stay near 750 words. Russian scenes stay near 377 words. An explicit chapter count is kept, up to the safety ceiling of 400. An explicit scene count is a minimum; the planner still adds scenes. Outlines are written in batches that fit a 2,048-token reply. The chapter line on the book form uses this same split.
 
-| Pages | Words at 250 per page | Chapters if left at 0 | Words asked per scene | Window |
+2,000 pages at 250 words a page is structurally within budget (mock-tested): about 156 chapters, with each scene and each outline batch inside the token caps. That is not a proven-quality length. Russian scenes of about 377 words and the 700-character rolling summary have not been checked on a real model. The same numbers are in [Writing a brief](../WRITING-A-BRIEF.md).
+
+| Pages | Words at 250 per page | Chapters if left at 0 | English scenes × words | Russian scenes × words |
 | --- | --- | --- | --- | --- |
-| 25 | 6,250 | 8 (floor; the uncapped round is 2) | 400 (floor). 16 scenes × 400 is 6,400 words, a little over the target. | offered |
-| 80 | 20,000 | 8 | 1,250 | offered |
-| 250 | 62,500 | 25 | 1,250 (3,750 tokens, inside 4,096) | offered, and the ceiling |
-| 550 | 137,500 | 40 (ceiling; the uncapped round is 55) | 1,718 (the 4,096-token scene call clips a 5,154-token budget) | chip shown, switched off |
-
-Empty chapters use `min(40, max(8, round(words / 2500)))`. Scenes per chapter default to 2 (Expert 1–8). Words per scene are `max(400, words // (chapters × scenes))`. Expert chapters stop at 40. A scene prompt carries the bible, that chapter, that scene, and the last 1,500 characters of the previous scene. It does not carry the whole book. When VRAM is tight the model context is halved and does not go below 4,096. The same numbers are in [Writing a brief](../WRITING-A-BRIEF.md).
+| 25 | 6,250 | 8 | 2 × 390 | 3 × 260 |
+| 80 | 20,000 | 8 | 4 × 625 | 7 × 357 |
+| 250 | 62,500 | 20 | 5 × 625 | 9 × 347 |
+| 550 | 137,500 | 43 | 5 × 639 | 9 × 355 |
+| 2,000 | 500,000 | 156 | 5 × 641 | 9 × 356 |
