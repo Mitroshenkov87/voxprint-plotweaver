@@ -7,7 +7,15 @@ import os
 from pathlib import Path
 
 from PySide6.QtGui import QStandardItemModel
-from PySide6.QtWidgets import QApplication, QCheckBox, QLabel, QPushButton, QScrollArea, QSpinBox
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QWidget,
+)
 from voxprint_common.ui.safety import reject_reserved_key
 from voxprint_common.ui.splash import HEIGHT, WIDTH, layout
 
@@ -20,8 +28,12 @@ from plotweaver.ui.gate import FictionGate
 from plotweaver.ui.i18n import STRINGS, tr
 from plotweaver.ui.icons import ICON_NAMES, suite_icon
 from plotweaver.ui.presets import (
+    GENRES,
     LONG_BOOK_NOTE_PAGES,
     READING_WORDS_PER_MINUTE,
+    TONES,
+    match_plain,
+    plain_for_book,
     preset_path,
     reading_estimate,
 )
@@ -163,7 +175,10 @@ def test_brief_form_marks_guesses_and_shows_pov(tmp_path: Path) -> None:
     limited = window.findChild(QPushButton, "chip-pov-limited")
     past = window.findChild(QPushButton, "chip-tense-past")
     first = window.findChild(QPushButton, "chip-pov-first")
+    more = window.findChild(QPushButton, "moreSettings")
     assert limited is not None and limited.isVisible()
+    assert more is not None
+    more.click()
     assert past is not None and past.isVisible()
     assert first is not None
     assert window.brief_form._marks["pov"].isVisible()
@@ -325,6 +340,80 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     assert note.isVisible() is False
     spin.setValue(601)
     assert note.isVisible()
+    del app
+
+
+def test_genre_tone_and_more_settings(tmp_path: Path) -> None:
+    os.environ["PLOTWEAVER_UI_PROJECT"] = str(tmp_path / "ui")
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.resize(1200, 900)
+    window.show()
+    app.processEvents()
+    document = json.loads(preset_path().read_text(encoding="utf-8"))
+    ids = [group["id"] for group in document["groups"]]
+    assert ids[:7] == ["genre", "tone", "length", "pov", "readers", "ending", "language"]
+    assert ids[7:] == [
+        "tense",
+        "stops",
+        "themes",
+        "save-fb2",
+        "save-docx",
+        "save-markdown",
+        "save-marks",
+        "sound",
+    ]
+    drama = window.findChild(QPushButton, "chip-genre-drama")
+    other = window.findChild(QPushButton, "chip-genre-custom")
+    serious = window.findChild(QPushButton, "chip-tone-serious")
+    assert drama is not None and drama.isChecked()
+    assert other is not None and other.isVisible() and other.text() == "Other"
+    assert other.isChecked() is False
+    assert serious is not None and serious.isChecked()
+    assert window.brief_form.genre.text() == "Drama"
+    assert window.brief_form.tone.text() == "Serious"
+    assert window._current_brief().genre == "драма"
+    assert window._current_brief().tone == "серьёзный"
+    window.brief_form.genre.setText("coastal gothic")
+    app.processEvents()
+    assert window.book.get("book.genre") == "coastal gothic"
+    assert other.isChecked()
+    assert drama.isChecked() is False
+    other.click()
+    app.processEvents()
+    assert window.book.get("book.genre") == ""
+    window.book.choose("tone", "comic")
+    window.shell.refresh()
+    app.processEvents()
+    assert window.brief_form.tone.text() == "With humour"
+    assert window._current_brief().tone == "с юмором"
+    window.book.choose("language", "en")
+    window.shell.refresh()
+    app.processEvents()
+    assert window._current_brief().tone == "with humour"
+    more = window.findChild(QPushButton, "moreSettings")
+    body = window.findChild(QWidget, "moreSettingsBody")
+    tense = window.findChild(QPushButton, "chip-tense-past")
+    scroll = window.findChild(QScrollArea, "presetScroll")
+    assert more is not None and more.text().endswith("More settings")
+    assert body is not None and body.isVisible() is False
+    assert tense is not None and tense.isVisible() is False
+    assert scroll is not None and scroll.verticalScrollBar().maximum() == 0
+    tops: list[int] = []
+    for row_id in ("genre", "tone", "length", "pov", "readers", "ending", "language"):
+        label = window.findChild(QLabel, f"preset-{row_id}")
+        assert label is not None and label.isVisible()
+        point = label.mapTo(scroll.viewport(), label.rect().bottomLeft())
+        assert 0 <= point.y() <= scroll.viewport().height()
+        tops.append(point.y())
+    assert tops == sorted(tops)
+    more.click()
+    app.processEvents()
+    assert body.isVisible()
+    assert tense.isVisible()
+    assert match_plain("Драма", GENRES) == "drama"
+    assert match_plain("Mit Humor", TONES) == "comic"
+    assert plain_for_book("fantasy", "en", GENRES) == "fantasy"
     del app
 
 

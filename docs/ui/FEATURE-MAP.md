@@ -28,17 +28,20 @@ The simple shell is the same product. Every control that was on the old window, 
 | Open a brief file (`run --brief`) | Open brief file | kept |
 | Pages, words per page, scenes, chapters | Length chips: story 25 pages, novella 80, novel 250 (the default), long novel 550. Simple mode has “Your own length, pages” and Expert has Pages; both accept 1 to 2,000. Above 600 pages a note says very long books are written as short scenes and quality is still being checked. A count none of the chips own shows Custom. The line under the chips is pages, words (pages × words per page), and reading time at 250 words per minute. The chapter line uses the same planner as generation. Expert words per page, scenes, and chapters stay on the same settings state. Chapters left at 0 follow the planner, up to 400. | moved |
 | Target words (`--target-words`) | Expert “Target words (0 = pages)” | kept |
-| Genre, subgenre, tone, setting | Book form | kept |
-| Point of view, tense, audience, ending | Chips. Stored values are unchanged. Ending chips use plain words. Guessed marks stay on the form. | moved |
+| Genre | Genre chips on the main screen: Drama, Detective, Fantasy, Science fiction, Romance, Thriller, and Other. The brief field stays editable and writes the same value. Other, or any text that is not a chip, is Custom. | moved |
+| Tone | Tone chips on the main screen: Light, Serious, Dark, and With humour. The brief field stays editable. Other, or typed text, is Custom. | moved |
+| Subgenre, setting | Book form | kept |
+| Point of view, audience, ending | Chips on the main screen. Stored values are unchanged. Ending chips use plain words. Guessed marks stay on the form. | moved |
+| Tense | More settings. The brief combo stays in sync. | moved |
 | Characters, plot points, style references, prompt preview | Book form | kept |
 | Reference books | Book form | kept |
-| Dark/mature themes | Dark/mature themes chips. Off is one model. On is the two-pass swap. | moved |
+| Dark/mature themes | More settings. Off is one model. On is the two-pass swap. | moved |
 | Model tier | Expert model tier, also written by the dark-themes chip | moved |
-| Mode (autopilot / copilot / manual) | Stops chips: At the plan / After each chapter / After each scene | moved |
+| Mode (autopilot / copilot / manual) | More settings → Stops: At the plan / After each chapter / After each scene | moved |
 | Stop for bible and outline approval | Stops → At the plan. Expert “Skip approval stops” is the old unchecked box and `--yes`. | moved |
 | EPUB (always on) | “EPUB is always saved.” It is not a chip. | kept |
-| FictionBook, DOCX, Markdown, speaker marks | Also save chips, one pair per format | moved |
-| Sound markup on the request | Sound marks chips | moved |
+| FictionBook, DOCX, Markdown, speaker marks | More settings → Also save, one pair per format | moved |
+| Sound markup on the request | More settings → Sound marks | moved |
 | Add sound markup on the result | Result action, and Tools → Add sound to a file | kept |
 | Write the book | Shell Write button (`simple.action.write`) | moved |
 | Progress log, bar, Approve and continue | Busy page. Cancel is on that page and on the status row. | kept |
@@ -97,6 +100,8 @@ The commands themselves are unchanged. Each one also opens from Tools, except `g
 | `plotweaver` as the program name | Still prints the deprecation line and asks for `voxprint-plotweaver-cli`. Command line only. | kept |
 
 Simple mode does not hide a command behind a missing control. Expert mode, the Tools wizard, and the overflow are part of the simple window.
+
+The main preset rows, top to bottom, are Genre, Tone, Length (with the page field and the reading line), Point of view, Readers, Ending, and Language. At 1200×900 those rows sit on screen without a vertical scroll. Tense, Stops, Dark/mature themes, Also save, and Sound marks are under More settings («Ещё настройки»). That expander is still simple mode.
 
 ## Length limits
 
