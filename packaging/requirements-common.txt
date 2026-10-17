@@ -1,6 +1,5 @@
-# Normative pin, including the ui extra (PySide6):
-# voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@0d1e30de68cc49549a2a94cb3695e5601c17e7db
+# Normative pin (v0.2.5 Yitro), including the ui extra (PySide6):
+# voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@8a94b531cb4f3526425a80a86a1e64624b5de606
 # --require-hashes cannot install a git URL, so this line is the wheel built from that commit.
-# TODO: rebase onto the shared UI tag (Yitro) when it is cut.
 # Path is relative to the repo root, which is where CI runs this file.
-voxprint-common @ file:packaging/wheels/voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:75852d5b88e955d3de9de17e1d9e701f4bdba3c8243e454adcc4c3b58c4b9cab
+voxprint-common @ file:packaging/wheels/voxprint_common-0.2.5-py3-none-any.whl --hash=sha256:334fdac85082b64fe6bb2f4c7ef17ed71419550f6050e043f29519a4139fea87
