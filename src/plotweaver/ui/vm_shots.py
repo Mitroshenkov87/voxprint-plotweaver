@@ -8,10 +8,11 @@ from pathlib import Path
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QImage, QPainter
 from PySide6.QtWidgets import QApplication
+from voxprint_common.ui.simple_image import Phase
 
 from plotweaver.hardware import query_gpu
 from plotweaver.ui.fonts import register_ui_fonts, ui_font
-from plotweaver.ui.window import FORM, PROGRESS, RESULT, SETTINGS, MainWindow
+from plotweaver.ui.window import MainWindow
 
 _FAKE_4090 = "NVIDIA GeForce RTX 4090,8.9,24576,22000"
 _EXPORT_NAMES = ("book.epub", "book.fb2", "book.vxbook", "book.sound.vxbook")
@@ -56,7 +57,6 @@ def save_vm_shots(folder: Path, *, export_dir: Path | None = None) -> list[Path]
 
 
 def _shot_brief(window: MainWindow, path: Path) -> Path:
-    window.stack.setCurrentIndex(FORM)
     window.mock.setChecked(True)
     english = window.language.findData("en")
     if english >= 0:
@@ -71,8 +71,11 @@ def _shot_brief(window: MainWindow, path: Path) -> Path:
 
 
 def _shot_progress(window: MainWindow, path: Path) -> Path:
-    window.stack.setCurrentIndex(PROGRESS)
-    window.progress_label.setText("Writing")
+    window.synopsis.setPlainText("A night ferry sticks in a lock.")
+    window.shell.set_prompt_text(window.synopsis.toPlainText())
+    if window.book.phase is not Phase.BUSY:
+        window.book.generate()
+    window.book.progress(1, 1, "Writing")
     window.log.setPlainText(
         "\n".join(
             [
@@ -85,11 +88,11 @@ def _shot_progress(window: MainWindow, path: Path) -> Path:
             ]
         )
     )
+    window.shell.refresh()
     return _save(window, path)
 
 
 def _shot_settings(window: MainWindow, path: Path) -> Path:
-    window.stack.setCurrentIndex(SETTINGS)
     window._open_settings()
     note = window.vram_note.text()
     if "16" not in note and "24" not in note:
@@ -104,8 +107,15 @@ def _shot_result(window: MainWindow, path: Path, export_dir: Path | None) -> Pat
             raise RuntimeError("result screen has no book.vxbook path")
         return _save(window, path)
     lines = [str(export_dir / name) for name in _EXPORT_NAMES]
-    window.result_label.setText("Done\n" + "\n".join(lines))
-    window.stack.setCurrentIndex(RESULT)
+    text = "Done\n" + "\n".join(lines)
+    window.result_label.setText(text)
+    window.shell.export_text = text
+    if window.book.phase is not Phase.BUSY:
+        window.synopsis.setPlainText("A finished book.")
+        window.shell.set_prompt_text(window.synopsis.toPlainText())
+        window.book.generate()
+    window.book.finish("vm-shot-result")
+    window.shell.refresh()
     return _save(window, path)
 
 

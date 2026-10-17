@@ -25,7 +25,9 @@ _COPY_FILES = (
     "NOTICE",
     "BUILD.json",
 )
-_COMMON_SHA256 = "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+# Wheel built from voxprint-common 0d1e30de68cc49549a2a94cb3695e5601c17e7db.
+# The normative pin is the git URL in pyproject.toml. --require-hashes cannot use it.
+_COMMON_SHA256 = "75852d5b88e955d3de9de17e1d9e701f4bdba3c8243e454adcc4c3b58c4b9cab"
 _FETCH = """
 from pathlib import Path
 import sys
