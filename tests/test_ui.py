@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import QStandardItemModel
+from PySide6.QtGui import QColor, QImage, QPainter, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -39,6 +39,7 @@ from plotweaver.ui.presets import (
     plain_for_book,
     preset_path,
     reading_estimate,
+    resolved_model_id,
 )
 from plotweaver.ui.shell_shots import sample_synopsis
 from plotweaver.ui.theme import (
@@ -435,10 +436,17 @@ def test_expert_panel_shows_full_values_without_overlap(tmp_path: Path) -> None:
     window = MainWindow(mock=True)
     window.resize(1200, 900)
     window.show()
+    app.processEvents()
+    assert _surface_problems(window) == []
+    assert _chips_share_a_line(window, "preset-genre", "chip-genre-thriller")
     long_id = "t-lite-it-2.1-abliterated-iq4-xs"
+    full_id = resolved_model_id(vram="auto", tier="standard", detected="16gb")
+    assert full_id == "t-lite-it-2.1-q4"
     window._open_settings()
     window._expert.toggle()
     window._expert.toggle()
+    shown = window.findChild(QPlainTextEdit, "book.model")
+    assert shown is not None and shown.toPlainText() == full_id
     window.book.set_value("book.model", long_id)
     window.shell.refresh()
     app.processEvents()
@@ -478,6 +486,16 @@ def test_expert_panel_shows_full_values_without_overlap(tmp_path: Path) -> None:
         assert label.font().pixelSize() >= 14, label.text()
     problems = _expert_layout_problems(body)
     assert problems == []
+    assert _surface_problems(window) == []
+    scroll_rows = window.findChild(QScrollArea, "presetScroll")
+    assert scroll_rows is not None
+    assert scroll_rows.horizontalScrollBar().maximum() == 0
+    for name in ("chip-genre-thriller", "chip-length-big", "chip-ending-tragic"):
+        chip = window.findChild(QPushButton, name)
+        assert chip is not None and chip.isVisible()
+        origin = chip.mapTo(scroll_rows.viewport(), QPoint(0, 0))
+        assert origin.x() >= 0
+        assert origin.x() + chip.width() <= scroll_rows.viewport().width() + 1
     hint = window.findChild(QLabel, "bookTextHint")
     assert hint is not None and hint.isVisible()
     assert hint.text() == "Здесь появится текст книги"
@@ -493,6 +511,110 @@ def test_expert_panel_shows_full_values_without_overlap(tmp_path: Path) -> None:
 
 def _content_rect(widget: QWidget, ancestor: QWidget) -> QRect:
     return QRect(widget.mapTo(ancestor, QPoint(0, 0)), widget.size())
+
+
+def _chips_share_a_line(window: QWidget, label_name: str, chip_name: str) -> bool:
+    """Return whether a chip still sits on its label's line."""
+    label = window.findChild(QLabel, label_name)
+    chip = window.findChild(QPushButton, chip_name)
+    if label is None or chip is None:
+        return False
+    label_y = label.mapTo(window, QPoint(0, 0)).y()
+    chip_y = chip.mapTo(window, QPoint(0, 0)).y()
+    return abs(label_y - chip_y) < 20
+
+
+def _render_window(window: QWidget) -> QImage:
+    image = QImage(window.size(), QImage.Format.Format_ARGB32)
+    image.fill(0xFF17171C)
+    painter = QPainter(image)
+    window.render(painter, QPoint())
+    painter.end()
+    return image
+
+
+def _uniform_light(image: QImage, x: int, y: int, size: int = 8) -> bool:
+    """Return whether an ``size`` square is a near-white background."""
+    if x < 0 or y < 0 or x + size > image.width() or y + size > image.height():
+        return False
+    light = 0
+    for yy in range(y, y + size):
+        for xx in range(x, x + size):
+            color = image.pixelColor(xx, yy)
+            if color.red() >= 0xE0 and color.green() >= 0xE0 and color.blue() >= 0xE0:
+                light += 1
+    return light >= size * size * 9 // 10
+
+
+def _label_contrast(image: QImage, label: QLabel, window: QWidget) -> float | None:
+    """Return the contrast of a label's text against the colour behind it."""
+    if not label.isVisible() or not label.text().strip():
+        return None
+    if label.width() < 4 or label.height() < 4:
+        return None
+    origin = label.mapTo(window, QPoint(0, 0))
+    if not window.rect().contains(origin + QPoint(1, 1)):
+        return None
+    parent: QWidget | None = label.parentWidget()
+    while parent is not None and parent is not window:
+        if isinstance(parent, QScrollArea):
+            point = label.mapTo(parent.viewport(), QPoint(1, 1))
+            if not parent.viewport().rect().contains(point):
+                return None
+        parent = parent.parentWidget()
+    rect = QRect(origin, label.size()).intersected(image.rect())
+    if rect.width() < 4 or rect.height() < 4:
+        return None
+    samples: list[QColor] = []
+    step_x = max(1, rect.width() // 12)
+    step_y = max(1, rect.height() // 6)
+    for y in range(rect.top(), rect.bottom() + 1, step_y):
+        for x in range(rect.left(), rect.right() + 1, step_x):
+            samples.append(image.pixelColor(x, y))
+    buckets: dict[tuple[int, int, int], list[QColor]] = {}
+    for color in samples:
+        key = (color.red() // 16, color.green() // 16, color.blue() // 16)
+        buckets.setdefault(key, []).append(color)
+    background = max(buckets.values(), key=len)[0]
+    foreground = label.palette().color(label.foregroundRole())
+    painted = contrast_ratio(foreground.name(), background.name())
+    # A short label is mostly background, so the sampled pixels can miss the
+    # glyphs. The palette colour is the stylesheet text. A light glyph on a
+    # light card still fails both checks.
+    lightest = max(samples, key=lambda color: color.red() + color.green() + color.blue())
+    return max(painted, contrast_ratio(lightest.name(), background.name()))
+
+
+def _surface_problems(window: QWidget) -> list[str]:
+    """Return light backgrounds and labels below a 4.5:1 contrast ratio."""
+    image = _render_window(window)
+    problems: list[str] = []
+    for scroll in window.findChildren(QScrollArea):
+        if not scroll.isVisible():
+            continue
+        viewport = scroll.viewport()
+        origin = viewport.mapTo(window, QPoint(0, 0))
+        probes = (
+            (2, 2),
+            (max(2, viewport.width() // 2), 2),
+            (2, max(2, viewport.height() // 2)),
+        )
+        for dx, dy in probes:
+            if _uniform_light(image, origin.x() + dx, origin.y() + dy):
+                problems.append(f"light background {scroll.objectName() or 'scroll'}")
+                break
+    for edit in window.findChildren(QPlainTextEdit):
+        if not edit.isVisible():
+            continue
+        viewport = edit.viewport()
+        origin = viewport.mapTo(window, QPoint(0, 0))
+        if _uniform_light(image, origin.x() + 2, origin.y() + 2):
+            problems.append(f"light text {edit.objectName() or 'text'}")
+    for label in window.findChildren(QLabel):
+        ratio = _label_contrast(image, label, window)
+        if ratio is not None and ratio < 4.5:
+            problems.append(f"contrast {ratio:.2f} {label.objectName() or label.text()}")
+    return problems
 
 
 def _expert_layout_problems(body: QWidget) -> list[str]:

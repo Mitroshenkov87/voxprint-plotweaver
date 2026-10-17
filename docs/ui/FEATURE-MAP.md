@@ -101,7 +101,7 @@ The commands themselves are unchanged. Each one also opens from Tools, except `g
 
 Simple mode does not hide a command behind a missing control. Expert mode, the Tools wizard, and the overflow are part of the simple window.
 
-The main preset rows, top to bottom, are Genre, Tone, Length (with the page field and the reading line), Point of view, Readers, Ending, and Language. At 1200×900 those rows sit on screen without a vertical scroll. Tense, Stops, Dark/mature themes, Also save, and Sound marks are under More settings («Ещё настройки»). That expander is still simple mode.
+The main preset rows, top to bottom, are Genre, Tone, Length (with the page field and the reading line), Point of view, Readers, Ending, and Language. At 1200×900 those rows sit on screen without a vertical scroll. Tense, Stops, Dark/mature themes, Also save, and Sound marks are under More settings («Ещё настройки»). That expander is still simple mode. The rows and the book card use the dark card colour. With the Expert panel open, a chip row wraps onto a second line instead of growing a horizontal scrollbar.
 
 The strip under the book form is the result and progress area. Before a book exists it says “The book text will appear here” («Здесь появится текст книги», “Hier erscheint der Text des Buches”). A run shows the progress text there, and a finished export shows the result path.
 

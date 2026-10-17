@@ -16,7 +16,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QPalette, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLayoutItem,
     QLineEdit,
     QMainWindow,
@@ -186,7 +187,9 @@ def _paint_dark(widget: QWidget, colour: str) -> None:
     viewport from QPalette.Base, which is light on this platform, and the
     shell's light text then disappears. The same paint is what
     ``voxprint_common.ui.simple_image._darken`` does for the history strip
-    and the expert scroll only.
+    and the expert scroll only. Reparenting a scroll resets the content
+    widget to that light palette and leaves auto-fill on, so the paint has
+    to run again after the shell column is built.
     """
     color = QColor(colour)
     palette = widget.palette()
@@ -194,6 +197,7 @@ def _paint_dark(widget: QWidget, colour: str) -> None:
     palette.setColor(QPalette.ColorRole.Base, color)
     widget.setPalette(palette)
     widget.setAutoFillBackground(True)
+    widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
 
 def _paint_scroll(scroll: QScrollArea, colour: str) -> None:
@@ -202,6 +206,135 @@ def _paint_scroll(scroll: QScrollArea, colour: str) -> None:
     inner = scroll.widget()
     if isinstance(inner, QWidget):
         _paint_dark(inner, colour)
+
+
+class _ChipFlow(QLayout):
+    """One chip line that wraps onto the next line when the column is narrow."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._items: list[QLayoutItem] = []
+
+    def addItem(self, item: QLayoutItem) -> None:
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int) -> QLayoutItem | None:
+        if 0 <= index < len(self._items):
+            return self._items[index]
+        return None
+
+    def takeAt(self, index: int) -> QLayoutItem | None:
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+        return None
+
+    def expandingDirections(self) -> Qt.Orientation:
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._arrange(QRect(0, 0, width, 0), apply=False)
+
+    def setGeometry(self, rect: QRect) -> None:
+        super().setGeometry(rect)
+        self._arrange(rect, apply=True)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._visible_items():
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        return size + QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+
+    def _visible_items(self) -> list[QLayoutItem]:
+        visible: list[QLayoutItem] = []
+        for item in self._items:
+            widget = item.widget()
+            if isinstance(widget, QWidget) and not widget.isVisible():
+                continue
+            visible.append(item)
+        return visible
+
+    def _arrange(self, rect: QRect, *, apply: bool) -> int:
+        margins = self.contentsMargins()
+        left = rect.x() + margins.left()
+        top = rect.y() + margins.top()
+        available = max(0, rect.width() - margins.left() - margins.right())
+        spacing = self.spacing()
+        x = left
+        y = top
+        line_height = 0
+        line: list[tuple[QLayoutItem, QSize]] = []
+
+        def place(row: list[tuple[QLayoutItem, QSize]], row_y: int, row_height: int) -> None:
+            if not apply:
+                return
+            cursor = left
+            for item, hint in row:
+                offset = max(0, (row_height - hint.height()) // 2)
+                item.setGeometry(QRect(QPoint(cursor, row_y + offset), hint))
+                cursor += hint.width() + spacing
+
+        for item in self._visible_items():
+            hint = item.sizeHint()
+            gap = spacing if line else 0
+            if line and x + gap + hint.width() - left > available:
+                place(line, y, line_height)
+                y += line_height + spacing
+                x = left
+                line_height = 0
+                line = []
+                gap = 0
+            line.append((item, hint))
+            x += gap + hint.width()
+            line_height = max(line_height, hint.height())
+        place(line, y, line_height)
+        if line_height == 0:
+            return margins.top() + margins.bottom()
+        return y + line_height + margins.bottom() - rect.y()
+
+
+def _wrap_chip_lines(layout: QVBoxLayout) -> None:
+    """Turn each chip row into a wrapping line, including rows under More settings."""
+    index = 0
+    while index < layout.count():
+        item = layout.itemAt(index)
+        row = None if item is None else item.layout()
+        if isinstance(row, QHBoxLayout):
+            host = QWidget()
+            host.setObjectName("chipLine")
+            flow = _ChipFlow(host)
+            flow.setSpacing(row.spacing())
+            margins = row.contentsMargins()
+            flow.setContentsMargins(
+                margins.left(),
+                margins.top(),
+                margins.right(),
+                margins.bottom(),
+            )
+            while row.count():
+                taken = row.takeAt(0)
+                if taken is None:
+                    break
+                widget = taken.widget()
+                if isinstance(widget, QWidget):
+                    flow.addWidget(widget)
+            layout.takeAt(index)
+            layout.insertWidget(index, host)
+        else:
+            widget = None if item is None else item.widget()
+            nested = None if widget is None else widget.layout()
+            if isinstance(nested, QVBoxLayout):
+                _wrap_chip_lines(nested)
+        index += 1
 
 
 def _window_style(glass: bool) -> str:
@@ -217,6 +350,15 @@ def _window_style(glass: bool) -> str:
         " background: transparent; padding: 8px 0 4px 0;"
         "}"
         "QPushButton#saveMore::menu-indicator { image: none; width: 0px; }"
+        "QScrollArea#presetScroll > QWidget,"
+        "QScrollArea#briefScroll > QWidget,"
+        "QScrollArea#presetScroll > QWidget > QWidget,"
+        "QScrollArea#briefScroll > QWidget > QWidget {"
+        f" background: {CARD_PLAIN};"
+        "}"
+        "QScrollArea#historyStrip > QWidget > QWidget {"
+        f" background: {CONTROL_BG};"
+        "}"
     )
     return build_shell_style(glass) + scrollbar_style() + group
 
@@ -469,14 +611,33 @@ class MainWindow(QMainWindow):
         if self._expert.enabled():
             self._tune_expert()
         self.shell.refresh()
+        # Lifting the expert panel reparents the scrolls and restores the
+        # platform light palette on their content widgets.
+        self._paint_surfaces()
         QTimer.singleShot(0, self._check_update)
+
+    def _paint_surfaces(self) -> None:
+        """Fill every scroll and text view from the dark theme tokens.
+
+        ``QPalette.Window`` and ``QPalette.Base`` are the colours Qt actually
+        paints. The rows scroll and the book card use the card colour. Text
+        views and the result strip use the control colour.
+        """
+        for scroll in self.findChildren(QScrollArea):
+            colour = CONTROL_BG if scroll.objectName() == "historyStrip" else CARD_PLAIN
+            _paint_scroll(scroll, colour)
+        for edit in self.findChildren(QPlainTextEdit):
+            _paint_dark(edit.viewport(), CONTROL_BG)
 
     def showEvent(self, event: object) -> None:
         """Turn on Acrylic when Windows can blur this window."""
         super().showEvent(event)  # type: ignore[arg-type]
+        self._paint_surfaces()
         self._fit_preset_height()
+        QTimer.singleShot(0, self._fit_preset_height)
         if enable_acrylic(int(self.winId())):
             self.setStyleSheet(_window_style(True))
+            self._paint_surfaces()
 
     def resizeEvent(self, event: object) -> None:
         """Keep the preset list from swallowing the book form."""
@@ -825,7 +986,7 @@ class MainWindow(QMainWindow):
         scroll.setObjectName("presetScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(host)
         layout.insertWidget(index, scroll)
         self._preset_scroll = scroll
@@ -917,6 +1078,7 @@ class MainWindow(QMainWindow):
         wrap_layout.addWidget(header)
         wrap_layout.addWidget(body)
         layout.addWidget(wrap)
+        _wrap_chip_lines(layout)
         self._wire_other("genre", "book.genre")
         self._wire_other("tone", "book.tone")
         self._sync_plain()
@@ -1036,11 +1198,32 @@ class MainWindow(QMainWindow):
         rows = None if host is None else host.layout()
         if not isinstance(rows, QVBoxLayout):
             return
+        width = scroll.viewport().width()
+        needed = 0
+        if isinstance(host, QWidget) and width > 40:
+            host.setMinimumWidth(0)
+            host.setMaximumWidth(width)
+            needed = host.heightForWidth(width)
         rows.activate()
-        # The seven main rows stay fully visible. More settings can grow the
-        # list, and the document view gives up space before a vertical scroll.
+        # The seven main rows stay fully visible in simple mode. More settings
+        # can grow the list. With Expert open, wrapped rows scroll vertically
+        # so the book card keeps the title and the tagline.
+        # heightForWidth is the real content height: row geometry is still
+        # short on the first show, before the column has its width.
         top = scroll.mapTo(self, scroll.rect().topLeft()).y()
-        room = max(180, self.height() - top - 120)
+        history = self.shell._history_scroll
+        history_top = history.mapTo(self, history.rect().topLeft()).y()
+        # 150 leaves the simple card its title and tagline. Wrapped Expert
+        # rows are taller, so they give the card another 40px instead of
+        # covering that text.
+        card_floor = 150
+        if history_top > top + card_floor:
+            available = history_top - top
+            room = max(180, available - card_floor)
+            if needed > room + 40:
+                room = max(180, available - card_floor - 40)
+        else:
+            room = max(180, self.height() - top - 120)
         bottoms: list[int] = []
         for index in range(rows.count()):
             item = rows.itemAt(index)
@@ -1049,7 +1232,7 @@ class MainWindow(QMainWindow):
             bottom = item.geometry().y() + item.geometry().height()
             if bottom > 0:
                 bottoms.append(bottom)
-        content = max(bottoms) if bottoms else min(360, room)
+        content = max([needed, *bottoms]) if bottoms or needed else min(360, room)
         if content <= room:
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             height = content
@@ -1386,6 +1569,9 @@ class MainWindow(QMainWindow):
         self.shell.set_expert(enabled)
         if enabled:
             self._tune_expert()
+        self._paint_surfaces()
+        self._fit_preset_height()
+        QTimer.singleShot(0, self._fit_preset_height)
 
     def _on_command(self, command: str) -> None:
         if command == "view.toggle_expert_mode":
