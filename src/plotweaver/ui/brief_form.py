@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from plotweaver.brief import BookBrief, Character, compile_brief
 from plotweaver.ui.i18n import tr
+from plotweaver.ui.presets import MAX_RELIABLE_PAGES
 
 _POV = (
     ("pov_third", "third-person limited"),
@@ -61,7 +62,7 @@ class BriefForm:
         self.paste_button = QPushButton(tr("brief_paste"))
         self.paste_button.setObjectName("briefPaste")
         self.pages = QSpinBox()
-        self.pages.setRange(1, 2000)
+        self.pages.setRange(1, MAX_RELIABLE_PAGES)
         self.pages.setValue(250)
         self.words_per_page = QSpinBox()
         self.words_per_page.setRange(100, 600)

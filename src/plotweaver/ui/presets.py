@@ -16,6 +16,15 @@ from voxprint_common.ui.settings import Choice, Settings, SettingSpec, SettingTy
 _PRESET_FILE = Path(__file__).resolve().parents[1] / "data" / "presets" / "book.json"
 # A page of fiction, read aloud or silently. The estimate under the length chips uses this.
 READING_WORDS_PER_MINUTE = 250
+# Largest page count the window will request until long books are reworked.
+# At 250 words a page and 2 scenes a chapter, 250 pages is 62,500 words and 25
+# chapters. An indented one-sentence Russian outline of 25 chapters is about
+# 1,900 tokens and fits in the 2,048-token outline call. 26 chapters leave
+# almost no room. Scene calls budget 3 tokens a word and stop at 4,096: 25
+# chapters × 2 scenes ask for 1,250 words (3,750 tokens), which still fits.
+# A 550-page book becomes 40 chapters and about 1,718 words a scene, and both
+# the outline call and that scene budget are cut off.
+MAX_RELIABLE_PAGES = 250
 _MANIFEST = Path(__file__).resolve().parents[1] / "data" / "mdl.json"
 
 
@@ -49,7 +58,7 @@ def book_settings() -> Settings:
     """
     return Settings(
         (
-            _int("book.pages", "setting.book.pages", 250, 1, 2000, expert=True),
+            _int("book.pages", "setting.book.pages", 250, 1, MAX_RELIABLE_PAGES, expert=True),
             _int("book.words_per_page", "setting.book.words", 250, 100, 600, expert=True),
             _int("book.scenes", "setting.book.scenes", 2, 1, 8, expert=True),
             _int("book.chapters", "setting.book.chapters", 0, 0, 40, expert=True),

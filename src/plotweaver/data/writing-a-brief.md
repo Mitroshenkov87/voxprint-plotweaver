@@ -116,7 +116,7 @@ A weak brief is only a mood ("something sad in space") or a synopsis that implie
 
 ## Length
 
-Words are pages times words per page. On the window the length chips are a story (25 pages), a novella (80), a novel (250, the default), and a long novel (550). The free field accepts any page count from 1 to 2,000 and writes the same page count Expert uses. The line under the chips shows pages, words, and a reading time at 250 words per minute. These are planning labels, not measured run times.
+Words are pages times words per page. On the window the length chips are a story (25 pages), a novella (80), and a novel (250, the default and the ceiling). The long-novel chip (~500–600 pages) stays on the row and is switched off: very long books arrive in the next update. The free field and Expert pages accept 1 to 250. At 250 they say this is as long as this update can write. The line under the chips shows pages, words, and a reading time at 250 words per minute. These are planning labels, not measured run times.
 
 A longer book is more chapters only until the ceiling. Empty `chapters` uses `min(40, max(8, round(words / 2500)))`. Scenes per chapter default to 2. Words per scene are `max(400, words // (chapters × scenes))`.
 
@@ -129,7 +129,7 @@ A longer book is more chapters only until the ceiling. Empty `chapters` uses `mi
 
 Expert can set chapters from 0 to 40 and scenes per chapter from 1 to 8. Words per page stay between 100 and 600. Pages stop at 2,000.
 
-Each scene call stops at 4,096 tokens (`min(4096, max(512, words_per_scene × 3))`). At 1,718 words that still fits. Past the chapter ceiling, for example 2,000 pages, a scene is asked for about 6,250 words and the 4,096-token cap can cut it short. The story bible and the outline are separate calls capped at 2,048 tokens, so a 40-chapter outline can come back incomplete. A scene prompt carries the bible, that chapter, that scene, and the last 1,500 characters of the previous scene. It does not carry the rest of the book. When VRAM is tight the model context is halved and does not go below 4,096.
+The window stops at 250 pages because that is the longest book these calls reliably finish at 250 words a page and 2 scenes a chapter. 250 pages is 25 chapters. An indented outline of 25 short chapter purposes is about 1,900 tokens and fits in 2,048. 26 chapters almost fill that call. Each scene call stops at 4,096 tokens (`min(4096, max(512, words_per_scene × 3))`). 25 chapters × 2 scenes ask for 1,250 words, and the runner budgets 3,750 tokens, which fits. A 550-page book is 40 chapters (the ceiling; an uncapped split would be 55) and about 1,718 words a scene. That scene budget is 5,154 tokens and is cut at 4,096. A 40-chapter outline is past 2,048 tokens as well. The command line can still ask for more words; those same caps apply, and the window does not offer that length. A scene prompt carries the bible, that chapter, that scene, and the last 1,500 characters of the previous scene. It does not carry the rest of the book. When VRAM is tight the model context is halved and does not go below 4,096.
 
 The 16 GB tier uses the smaller stock model and keeps 2 GB free. The 24 GB tier uses the larger stock model and keeps 3 GB free. The larger model does more work per call, so a 24 GB card is not a shortcut to a shorter wait for the same page count. A long run can pause while the card is hot and resume when it cools.
 

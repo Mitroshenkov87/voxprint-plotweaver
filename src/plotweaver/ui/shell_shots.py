@@ -68,7 +68,7 @@ def _grab(
     window.synopsis.setPlainText("A night ferry sticks. The keeper stays.")
     window.shell.set_prompt_text(window.synopsis.toPlainText())
     if modified:
-        window.book.set_value("book.pages", 300)
+        window.book.set_value("book.pages", 200)
     if expert:
         window._open_settings()
     window.shell.refresh()
