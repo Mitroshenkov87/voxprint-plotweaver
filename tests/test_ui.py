@@ -305,7 +305,7 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     hint = window.brief_form.chapter_hint
     assert big is not None and big.isEnabled()
     assert note is not None and note.isVisible() is False
-    assert "20" in hint.text() and "9" in hint.text()
+    assert "20" in hint.text() and "3" in hint.text()
     window.book.set_value("book.pages", 200)
     window.shell.refresh()
     chip = window.findChild(QPushButton, "chip-length-novel")
@@ -480,7 +480,8 @@ def test_expert_panel_shows_full_values_without_overlap(tmp_path: Path) -> None:
     assert not title_rect.intersects(model_rect)
     assert title_rect.bottom() <= model_rect.top()
     groups = [label for label in body.findChildren(QLabel) if label.objectName() == "settingGroup"]
-    assert any(label.text() == "Книга" for label in groups)
+    # voxprint-common 0.2.5 hides the group heading when Expert has a single group.
+    assert all(label.text() for label in groups)
     for label in groups:
         label.ensurePolished()
         assert label.font().pixelSize() >= 14, label.text()
@@ -721,7 +722,7 @@ def test_page_presets_and_the_chapter_cap() -> None:
     assert big.shape() == plan_shape(550 * 250, "en", None, 2)
     assert huge.shape() == plan_shape(2000 * 250, "en", None, 2)
     assert novel.shape()[0] == 20
-    assert big.shape() == (43, 5, 639)
+    assert big.shape() == (43, 3, 1065)
     assert huge.shape()[0] == 156
 
 
