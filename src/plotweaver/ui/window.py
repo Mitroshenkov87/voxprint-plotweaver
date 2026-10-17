@@ -29,12 +29,15 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayoutItem,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -201,6 +204,39 @@ def _paint_scroll(scroll: QScrollArea, colour: str) -> None:
         _paint_dark(inner, colour)
 
 
+def _window_style(glass: bool) -> str:
+    """Shell style, dark scroll bars, and a readable Expert section label.
+
+    ``voxprint_common.ui.theme`` paints ``QLabel#settingGroup`` at 11px in
+    the muted colour. A longer selector here wins, so «Книга» stays readable
+    without editing the library.
+    """
+    group = (
+        "QFrame#expertPanel QLabel#settingGroup {"
+        f" font-size: 15px; font-weight: 600; color: {TEXT};"
+        " background: transparent; padding: 8px 0 4px 0;"
+        "}"
+        "QPushButton#saveMore::menu-indicator { image: none; width: 0px; }"
+    )
+    return build_shell_style(glass) + scrollbar_style() + group
+
+
+def _purge_layout(layout: QVBoxLayout | QFormLayout | QHBoxLayout) -> None:
+    """Delete every widget in ``layout``, including rows inside a nested form."""
+    while layout.count():
+        item = layout.takeAt(0)
+        if item is None:
+            continue
+        child = item.layout()
+        if isinstance(child, QVBoxLayout | QFormLayout | QHBoxLayout):
+            _purge_layout(child)
+        widget = item.widget()
+        if isinstance(widget, QWidget):
+            widget.hide()
+            widget.setParent(None)
+            widget.deleteLater()
+
+
 def _row_index(layout: QVBoxLayout, row_id: str) -> int:
     """Return the preset row whose label is ``preset-{row_id}``."""
     name = f"preset-{row_id}"
@@ -271,6 +307,25 @@ class BookScreen(SimpleWidget):
         super().refresh(prompt=prompt)
         if self._live:
             self._paint_book()
+
+    def set_expert(self, enabled: bool) -> None:
+        """Open Expert on a clear form.
+
+        The shell's ``_clear`` drops a nested form layout and leaves its
+        widgets on the form. The next open paints those leftovers under the
+        new rows. Remove them before the shell builds the form again.
+        """
+        if enabled:
+            _purge_layout(self._expert_form)
+            host = self.root.findChild(QWidget, "expertForm")
+            if isinstance(host, QWidget):
+                for child in list(host.findChildren(QWidget)):
+                    if child.parentWidget() is not host:
+                        continue
+                    child.hide()
+                    child.setParent(None)
+                    child.deleteLater()
+        super().set_expert(enabled)
 
     def _choose(self, row_id: str, value: str) -> None:
         super()._choose(row_id, value)
@@ -401,10 +456,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(shell_tr("splash.app.plotweaver"))
         self.resize(1200, 900)
         self.setMinimumSize(960, 640)
-        self.setStyleSheet(build_shell_style(False) + scrollbar_style())
+        self.setStyleSheet(_window_style(False))
         self._build_form()
         self._contain_presets()
         self._build_expert_extras()
+        self._lift_expert_panel()
+        self._install_book_text()
         self._build_result_actions()
         self._build_menus()
         self._restore_geometry()
@@ -419,12 +476,15 @@ class MainWindow(QMainWindow):
         super().showEvent(event)  # type: ignore[arg-type]
         self._fit_preset_height()
         if enable_acrylic(int(self.winId())):
-            self.setStyleSheet(build_shell_style(True) + scrollbar_style())
+            self.setStyleSheet(_window_style(True))
 
     def resizeEvent(self, event: object) -> None:
         """Keep the preset list from swallowing the book form."""
         super().resizeEvent(event)  # type: ignore[arg-type]
         self._fit_preset_height()
+        self._fit_expert_fields()
+        self._grow_expert_form()
+        self._place_book_hint()
 
     def closeEvent(self, event: object) -> None:
         """Remember where the window sat."""
@@ -557,9 +617,6 @@ class MainWindow(QMainWindow):
         self._title_label.setObjectName("titlebar")
         self._title_label.mousePressEvent = self._logo_click  # type: ignore[method-assign]
         form.addRow(self._title_label)
-        version = QLabel(version_label())
-        version.setObjectName("faint")
-        form.addRow(version)
         subtitle = QLabel(tr("subtitle"))
         subtitle.setObjectName("muted")
         subtitle.setWordWrap(True)
@@ -966,6 +1023,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "brief_form"):
             self._sync_hidden()
             self._refresh_target()
+        shown = self.shell.root.findChild(QLabel, "expertPages")
+        if isinstance(shown, QLabel):
+            shown.setText(str(pages))
         self._fit_preset_height()
 
     def _fit_preset_height(self) -> None:
@@ -1019,6 +1079,240 @@ class MainWindow(QMainWindow):
         column.addWidget(extras)
         scroll.setWidget(wrapper)
 
+    def _lift_expert_panel(self) -> None:
+        """Give Expert the full window height beside the book, not under the rows.
+
+        ``voxprint_common.ui.simple_image`` puts ``expertPanel`` in
+        ``expertSplit``, which only spans the stage under the preset rows.
+        ``_Scroll.sizeHint`` is 260×120 and the vertical size policy is
+        Ignored, so the values sit in a short box. The library fit
+        (``_fit_expert_panel``) only sets that splitter's width. Plotweaver
+        lifts the same panel to the shell's full height and leaves the fit
+        alone.
+        """
+        panel = self.shell._expert_panel
+        root_layout = self.shell.root.layout()
+        if not isinstance(panel, QWidget) or not isinstance(root_layout, QVBoxLayout):
+            return
+        if root_layout.indexOf(panel) >= 0:
+            return
+        stretches = [root_layout.stretch(index) for index in range(root_layout.count())]
+        taken: list[QLayoutItem] = []
+        while root_layout.count():
+            item = root_layout.takeAt(0)
+            if item is not None:
+                taken.append(item)
+        column_host = QWidget(self.shell.root)
+        column_host.setObjectName("shellColumn")
+        column = QVBoxLayout(column_host)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(root_layout.spacing())
+        for item, stretch in zip(taken, stretches, strict=True):
+            widget = item.widget()
+            child = item.layout()
+            if isinstance(widget, QWidget):
+                column.addWidget(widget, stretch)
+            elif child is not None:
+                column.addLayout(child, stretch)
+        panel.setParent(None)
+        panel.setMinimumWidth(380)
+        panel.setMaximumWidth(520)
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        body = QWidget(self.shell.root)
+        body.setObjectName("shellBody")
+        row = QHBoxLayout(body)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
+        row.addWidget(column_host, 1)
+        row.addWidget(panel, 0)
+        root_layout.addWidget(body, 1)
+        scroll = self.shell.root.findChild(QScrollArea, "expertScroll")
+        if isinstance(scroll, QScrollArea):
+            scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.shell._fit_expert_panel = self._skip_expert_fit  # type: ignore[method-assign]
+
+    def _skip_expert_fit(self) -> None:
+        """Ignore the library's stage-height panel fit. The panel is already lifted."""
+        return
+
+    def _expert_form_layout(self) -> QFormLayout | None:
+        host = self.shell._expert_form
+        if not isinstance(host, QVBoxLayout):
+            return None
+        for index in range(host.count()):
+            item = host.itemAt(index)
+            layout = None if item is None else item.layout()
+            if isinstance(layout, QFormLayout):
+                return layout
+        return None
+
+    def _present_expert(self) -> None:
+        """Wrap Expert rows to the panel width and show pages as a live value.
+
+        ``simple_image._clear`` removes a nested form layout without deleting
+        the widgets inside it. Opening Expert again leaves the previous
+        fields under the new ones, so the heading sits on the model field.
+        Drop those leftovers before the new rows are measured.
+        """
+        panel = self.shell._expert_panel
+        if not isinstance(panel, QWidget) or not panel.isVisible():
+            return
+        form = self._expert_form_layout()
+        if form is not None:
+            form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+            self._show_pages_readonly(form)
+        extras = panel.findChild(QWidget, "expertExtras")
+        extra_form = None if extras is None else extras.layout()
+        if isinstance(extra_form, QFormLayout):
+            extra_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        scroll = panel.findChild(QScrollArea, "expertScroll")
+        available = scroll.viewport().width() - 12 if isinstance(scroll, QScrollArea) else 320
+        for label in panel.findChildren(QLabel):
+            if label.objectName() in {"expertTitle", "settingGroup"}:
+                continue
+            label.setMinimumWidth(0)
+            advance = label.fontMetrics().horizontalAdvance(label.text())
+            if advance <= available:
+                label.setWordWrap(False)
+                continue
+            label.setWordWrap(True)
+            label.setMinimumHeight(max(label.minimumHeight(), label.heightForWidth(available)))
+        title = panel.findChild(QLabel, "expertTitle")
+        if isinstance(title, QLabel):
+            title.setMinimumHeight(title.fontMetrics().height() + 8)
+        if form is not None:
+            form.setVerticalSpacing(8)
+        if isinstance(extra_form, QFormLayout):
+            extra_form.setVerticalSpacing(8)
+        self._fit_expert_fields()
+        if form is not None:
+            form.invalidate()
+        if isinstance(extra_form, QFormLayout):
+            extra_form.invalidate()
+        self._grow_expert_form()
+
+    def _grow_expert_form(self, *, retry: bool = True) -> None:
+        """Let the Expert form use its real height so rows do not stack."""
+        panel = self.shell._expert_panel
+        if not isinstance(panel, QWidget) or not panel.isVisible():
+            return
+        form = self._expert_form_layout()
+        form_host = panel.findChild(QWidget, "expertForm")
+        if isinstance(form_host, QWidget) and form is not None:
+            height = max(form.sizeHint().height(), form_host.sizeHint().height())
+            if height <= 0:
+                if retry:
+                    self._schedule_expert_grow()
+                return
+            form_host.setMinimumHeight(height)
+        extras = panel.findChild(QWidget, "expertExtras")
+        extra_form = None if extras is None else extras.layout()
+        if isinstance(extras, QWidget) and isinstance(extra_form, QFormLayout):
+            height = max(extra_form.sizeHint().height(), extras.sizeHint().height())
+            if height > 0:
+                extras.setMinimumHeight(height)
+        scroll = panel.findChild(QScrollArea, "expertScroll")
+        host = None if not isinstance(scroll, QScrollArea) else scroll.widget()
+        column = None if not isinstance(host, QWidget) else host.layout()
+        if isinstance(host, QWidget) and column is not None:
+            host.setMinimumWidth(0)
+            column.activate()
+            height = column.sizeHint().height()
+            if height > 0:
+                host.setMinimumHeight(height)
+
+    def _grow_expert_form_later(self) -> None:
+        self._expert_grow_queued = False
+        self._grow_expert_form(retry=False)
+
+    def _schedule_expert_grow(self) -> None:
+        if getattr(self, "_expert_grow_queued", False):
+            return
+        self._expert_grow_queued = True
+        QTimer.singleShot(0, self._grow_expert_form_later)
+
+    def _show_pages_readonly(self, form: QFormLayout) -> None:
+        text = str(max(1, self._integer("book.pages") or 250))
+        for row in range(form.rowCount()):
+            field = form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+            widget = None if field is None else field.widget()
+            if isinstance(widget, QLabel) and widget.objectName() == "expertPages":
+                widget.setText(text)
+                return
+        label = QLabel(text)
+        label.setObjectName("expertPages")
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        form.insertRow(1, tr("pages"), label)
+
+    def _fit_expert_fields(self) -> None:
+        """Show the whole model id. The library text box is 48px and min-width 0."""
+        panel = self.shell._expert_panel
+        if not isinstance(panel, QWidget) or not panel.isVisible():
+            return
+        edit = panel.findChild(QPlainTextEdit, "book.model")
+        if not isinstance(edit, QPlainTextEdit):
+            return
+        edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        width = edit.viewport().width()
+        if width < 40:
+            return
+        edit.document().setDocumentMargin(2)
+        edit.document().setTextWidth(width)
+        height = int(edit.document().size().height()) + 28
+        edit.setFixedHeight(max(40, height))
+        parent = edit.parentWidget()
+        parent_layout = None if parent is None else parent.layout()
+        if parent_layout is not None:
+            parent_layout.invalidate()
+
+    def _install_book_text(self) -> None:
+        """Use the empty history strip as the place the book text will land."""
+        strip = self.shell._history_scroll
+        if not isinstance(strip, QScrollArea):
+            return
+        hint = QLabel(tr("book_placeholder"))
+        hint.setObjectName("bookTextHint")
+        hint.setWordWrap(True)
+        hint.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        hint.setParent(strip.viewport())
+        hint.setStyleSheet(
+            f"color: {TEXT}; background: transparent; font-size: 15px; padding: 12px;"
+        )
+        self._book_hint = hint
+        _paint_dark(strip, CONTROL_BG)
+        _paint_dark(strip.viewport(), CONTROL_BG)
+        self._place_book_hint()
+
+    def _place_book_hint(self) -> None:
+        hint = getattr(self, "_book_hint", None)
+        strip = self.shell._history_scroll
+        if not isinstance(hint, QLabel) or not isinstance(strip, QScrollArea):
+            return
+        thumbs = [
+            button
+            for button in strip.findChildren(QPushButton)
+            if button.objectName().startswith("thumb-")
+        ]
+        if thumbs:
+            hint.hide()
+            strip.setFixedHeight(104)
+            return
+        text = tr("book_placeholder")
+        if self.book.phase is Phase.READY and self.result_label.text().strip():
+            text = self.result_label.text().strip()
+        elif self.log.toPlainText().strip():
+            text = self.log.toPlainText().strip()
+        if hint.text() != text:
+            hint.setText(text)
+        width = max(1, strip.viewport().width())
+        needed = hint.heightForWidth(width)
+        strip.setFixedHeight(max(120, min(180, needed + 8)))
+        hint.setGeometry(0, 0, width, strip.viewport().height())
+        hint.show()
+        hint.raise_()
+
     def _path_row(self, edit: QLineEdit, *, directory: bool) -> QWidget:
         host = QWidget()
         row = QHBoxLayout(host)
@@ -1044,16 +1338,20 @@ class MainWindow(QMainWindow):
             save.setIconSize(QSize(22, 22))
         bar = save.parentWidget() if isinstance(save, QPushButton) else None
         layout = None if bar is None else bar.layout()
-        self._save_as_button = self._icon_button(tr("save_as"), "save-as")
-        self._save_as_button.clicked.connect(self._save_as)
-        self._save_copy_button = self._icon_button(tr("save_copy"), "save-copy")
-        self._save_copy_button.clicked.connect(self._save_copy)
+        menu = QMenu(self)
+        menu.addAction(tr("save_as"), self._save_as)
+        menu.addAction(tr("save_copy"), self._save_copy)
+        self._save_menu = menu
+        more = QPushButton("▾")
+        more.setObjectName("saveMore")
+        more.setMenu(menu)
+        more.setToolTip(tr("save_as"))
+        self._save_menu_button = more
         self.sound_button = QPushButton(tr("sound_markup"))
         self.sound_button.setObjectName("soundMarkup")
         self.sound_button.clicked.connect(self._add_sound)
-        if layout is not None:
-            layout.addWidget(self._save_as_button)
-            layout.addWidget(self._save_copy_button)
+        if layout is not None and isinstance(save, QPushButton):
+            layout.insertWidget(layout.indexOf(save) + 1, more)
             layout.addWidget(self.sound_button)
 
     def _build_menus(self) -> None:
@@ -1139,6 +1437,7 @@ class MainWindow(QMainWindow):
         )
         self.settings_status.setText("")
         self._bind_uncensored()
+        self._present_expert()
 
     def _bind_uncensored(self) -> None:
         box = self.uncensored_models
@@ -1253,6 +1552,15 @@ class MainWindow(QMainWindow):
         self._sync_length()
         if hasattr(self, "brief_form"):
             self._sync_plain()
+        try:
+            self._sync_resolved_model()
+        finally:
+            self._fit_expert_fields()
+            self._grow_expert_form()
+            self._schedule_expert_grow()
+            self._place_book_hint()
+
+    def _sync_resolved_model(self) -> None:
         if self.book.state is None or not self.book.state.has("book.model"):
             return
         from plotweaver.registry import detected_tier

@@ -12,6 +12,8 @@ from voxprint_common.ui.simple_image import Phase
 
 from plotweaver.hardware import query_gpu
 from plotweaver.ui.fonts import register_ui_fonts, ui_font
+from plotweaver.ui.i18n import ui_language
+from plotweaver.ui.shell_shots import sample_synopsis
 from plotweaver.ui.window import MainWindow
 
 _FAKE_4090 = "NVIDIA GeForce RTX 4090,8.9,24576,22000"
@@ -70,7 +72,7 @@ def _shot_brief(window: MainWindow, path: Path) -> Path:
 
 
 def _shot_progress(window: MainWindow, path: Path) -> Path:
-    window.synopsis.setPlainText("A night ferry sticks in a lock.")
+    window.synopsis.setPlainText(sample_synopsis(ui_language()))
     window.shell.set_prompt_text(window.synopsis.toPlainText())
     if window.book.phase is not Phase.BUSY:
         window.book.generate()
@@ -110,7 +112,7 @@ def _shot_result(window: MainWindow, path: Path, export_dir: Path | None) -> Pat
     window.result_label.setText(text)
     window.shell.export_text = text
     if window.book.phase is not Phase.BUSY:
-        window.synopsis.setPlainText("A finished book.")
+        window.synopsis.setPlainText(sample_synopsis(ui_language()))
         window.shell.set_prompt_text(window.synopsis.toPlainText())
         window.book.generate()
     window.book.finish("vm-shot-result")

@@ -22,6 +22,15 @@ from plotweaver.ui.window import MainWindow
 
 _WIDTH = 1200
 _HEIGHT = 900
+_SAMPLE_EN = "A night ferry sticks. The keeper stays."
+_SAMPLE_RU = "Ночной паром сел на мель. Смотритель остаётся."
+
+
+def sample_synopsis(language: str) -> str:
+    """Return the seeded synopsis for a shell grab in ``language``."""
+    if language == "ru":
+        return _SAMPLE_RU
+    return _SAMPLE_EN
 
 
 def save_shell_shots(folder: Path) -> list[Path]:
@@ -65,7 +74,7 @@ def _grab(
     window.show()
     window.title.setText("The lock")
     window.author.setText("Ilya")
-    window.synopsis.setPlainText("A night ferry sticks. The keeper stays.")
+    window.synopsis.setPlainText(sample_synopsis(language))
     window.shell.set_prompt_text(window.synopsis.toPlainText())
     if modified:
         window.book.set_value("book.pages", 200)
@@ -82,7 +91,7 @@ def _progress(path: Path) -> Path:
     window = MainWindow(mock=True)
     window.resize(_WIDTH, _HEIGHT)
     window.show()
-    window.synopsis.setPlainText("A night ferry sticks. The keeper stays.")
+    window.synopsis.setPlainText(sample_synopsis("en"))
     window.shell.set_prompt_text(window.synopsis.toPlainText())
     window.book.generate()
     window.book.progress(1, 1, tr("progress"))

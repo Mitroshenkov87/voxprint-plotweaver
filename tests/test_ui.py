@@ -6,11 +6,14 @@ import json
 import os
 from pathlib import Path
 
+from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QLabel,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -37,6 +40,7 @@ from plotweaver.ui.presets import (
     preset_path,
     reading_estimate,
 )
+from plotweaver.ui.shell_shots import sample_synopsis
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
     CARD_PLAIN,
@@ -316,11 +320,17 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     assert note.isVisible() is False
     pages = window.book.get("book.pages")
     window._expert.toggle()
-    pages_spin = window.findChild(QSpinBox, "book.pages")
-    assert pages_spin is not None and pages_spin.maximum() == STRUCTURAL_MAX_PAGES
+    app.processEvents()
+    assert window.findChild(QSpinBox, "book.pages") is None
+    shown = window.findChild(QLabel, "expertPages")
+    assert shown is not None and shown.text() == "200"
     assert window.book.get("book.pages") == pages
+    spin.setValue(180)
+    app.processEvents()
+    assert shown.text() == "180"
+    assert window.book.get("book.pages") == 180
     window._expert.toggle()
-    assert window.book.get("book.pages") == pages
+    assert window.book.get("book.pages") == 180
     reset.click()
     assert window.book.get("book.pages") == 250
     assert spin.value() == 250
@@ -414,6 +424,153 @@ def test_genre_tone_and_more_settings(tmp_path: Path) -> None:
     assert match_plain("Драма", GENRES) == "drama"
     assert match_plain("Mit Humor", TONES) == "comic"
     assert plain_for_book("fantasy", "en", GENRES) == "fantasy"
+    del app
+
+
+def test_expert_panel_shows_full_values_without_overlap(tmp_path: Path) -> None:
+    os.environ["PLOTWEAVER_UI_PROJECT"] = str(tmp_path / "ui")
+    previous_lang = os.environ.get("PLOTWEAVER_LANG")
+    os.environ["PLOTWEAVER_LANG"] = "ru"
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.resize(1200, 900)
+    window.show()
+    long_id = "t-lite-it-2.1-abliterated-iq4-xs"
+    window._open_settings()
+    window._expert.toggle()
+    window._expert.toggle()
+    window.book.set_value("book.model", long_id)
+    window.shell.refresh()
+    app.processEvents()
+    app.processEvents()
+    panel = window.shell._expert_panel
+    scroll = window.findChild(QScrollArea, "expertScroll")
+    assert isinstance(panel, QWidget) and panel.isVisible()
+    assert scroll is not None
+    assert panel.height() >= int(window.height() * 0.7)
+    body = scroll.widget()
+    assert body is not None
+    assert body.width() <= scroll.viewport().width() + 1
+    models = body.findChildren(QPlainTextEdit, "book.model")
+    assert len(models) == 1
+    model = models[0]
+    assert model.toPlainText() == long_id
+    assert model.horizontalScrollBar().maximum() == 0
+    needed = model.fontMetrics().boundingRect(
+        0,
+        0,
+        model.viewport().width(),
+        1000,
+        int(Qt.TextFlag.TextWordWrap),
+        long_id,
+    )
+    assert model.viewport().height() >= needed.height()
+    title = body.findChild(QLabel, "expertTitle")
+    assert title is not None and title.text()
+    title_rect = _content_rect(title, body)
+    model_rect = _content_rect(model, body)
+    assert not title_rect.intersects(model_rect)
+    assert title_rect.bottom() <= model_rect.top()
+    groups = [label for label in body.findChildren(QLabel) if label.objectName() == "settingGroup"]
+    assert any(label.text() == "Книга" for label in groups)
+    for label in groups:
+        label.ensurePolished()
+        assert label.font().pixelSize() >= 14, label.text()
+    problems = _expert_layout_problems(body)
+    assert problems == []
+    hint = window.findChild(QLabel, "bookTextHint")
+    assert hint is not None and hint.isVisible()
+    assert hint.text() == "Здесь появится текст книги"
+    assert all(version_label() not in label.text() for label in window.findChildren(QLabel))
+    assert sample_synopsis("ru") == "Ночной паром сел на мель. Смотритель остаётся."
+    assert sample_synopsis("en") == "A night ferry sticks. The keeper stays."
+    if previous_lang is None:
+        os.environ.pop("PLOTWEAVER_LANG", None)
+    else:
+        os.environ["PLOTWEAVER_LANG"] = previous_lang
+    del app
+
+
+def _content_rect(widget: QWidget, ancestor: QWidget) -> QRect:
+    return QRect(widget.mapTo(ancestor, QPoint(0, 0)), widget.size())
+
+
+def _expert_layout_problems(body: QWidget) -> list[str]:
+    """Return overlap and clipping failures for the open Expert panel."""
+    problems: list[str] = []
+    widgets = [
+        widget
+        for widget in body.findChildren(QWidget)
+        if widget.isVisible() and widget.width() > 2 and widget.height() > 2
+    ]
+    for index, left in enumerate(widgets):
+        left_rect = _content_rect(left, body)
+        for right in widgets[index + 1 :]:
+            if left.isAncestorOf(right) or right.isAncestorOf(left):
+                continue
+            inter = left_rect.intersected(_content_rect(right, body))
+            if inter.width() > 4 and inter.height() > 4:
+                problems.append(
+                    f"overlap {left.objectName() or left.metaObject().className()}"
+                    f" and {right.objectName() or right.metaObject().className()}"
+                )
+    for label in body.findChildren(QLabel):
+        if not label.isVisible() or not label.text().strip():
+            continue
+        if label.wordWrap():
+            needed = label.heightForWidth(max(1, label.width()))
+            if label.height() + 2 < needed:
+                problems.append(f"clipped label {label.text()}")
+            continue
+        if label.fontMetrics().horizontalAdvance(label.text()) > label.width() + 1:
+            problems.append(f"clipped label {label.text()}")
+    for box in body.findChildren(QCheckBox):
+        if not box.isVisible() or not box.text().strip():
+            continue
+        needed = box.fontMetrics().horizontalAdvance(box.text()) + 28
+        if needed > box.width() + 1:
+            problems.append(f"clipped check {box.text()}")
+    for combo in body.findChildren(QComboBox):
+        if not combo.isVisible():
+            continue
+        fitted = combo.property("fittedText")
+        if isinstance(fitted, str) and fitted != combo.currentText():
+            problems.append(f"clipped combo {combo.objectName()}: {fitted}")
+    return problems
+
+
+def test_save_menu_and_the_audiobook_action(tmp_path: Path) -> None:
+    os.environ["PLOTWEAVER_UI_PROJECT"] = str(tmp_path / "ui")
+    previous_lang = os.environ.get("PLOTWEAVER_LANG")
+    os.environ["PLOTWEAVER_LANG"] = "en"
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    app.processEvents()
+    save = window.shell._save
+    assert isinstance(save, QPushButton)
+    more = window.findChild(QPushButton, "saveMore")
+    assert more is not None and more.text() == "▾"
+    bar = save.parentWidget()
+    assert bar is not None
+    assert all(
+        button.text() not in {"Save as", "Save a copy"} for button in bar.findChildren(QPushButton)
+    )
+    texts = [action.text() for action in window._save_menu.actions()]
+    assert texts == ["Save as", "Save a copy"]
+    window._save_as()
+    window._save_copy()
+    assert window.sound_button.text() == "Prepare for audiobook"
+    assert tr("sound_markup") == "Prepare for audiobook"
+    assert STRINGS["de"]["sound_markup"] == "Für Hörbuch vorbereiten"
+    assert STRINGS["ru"]["book_placeholder"] == "Здесь появится текст книги"
+    assert STRINGS["de"]["book_placeholder"] == "Hier erscheint der Text des Buches"
+    hint = window.findChild(QLabel, "bookTextHint")
+    assert hint is not None and hint.text() == "The book text will appear here"
+    if previous_lang is None:
+        os.environ.pop("PLOTWEAVER_LANG", None)
+    else:
+        os.environ["PLOTWEAVER_LANG"] = previous_lang
     del app
 
 
