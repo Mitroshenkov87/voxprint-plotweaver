@@ -24,37 +24,24 @@
       "default": "novel",
       "options": [
         {
-          "id": "short",
-          "label_key": "book.length.short",
-          "values": {
-            "book.pages": 120,
-            "book.words_per_page": 250,
-            "book.chapters": 0,
-            "book.scenes": 2,
-            "book.prompt": ""
-          }
+          "id": "story",
+          "label_key": "book.length.story",
+          "values": {"book.pages": 25}
+        },
+        {
+          "id": "novella",
+          "label_key": "book.length.novella",
+          "values": {"book.pages": 80}
         },
         {
           "id": "novel",
           "label_key": "book.length.novel",
-          "values": {
-            "book.pages": 320,
-            "book.words_per_page": 250,
-            "book.chapters": 0,
-            "book.scenes": 2,
-            "book.prompt": ""
-          }
+          "values": {"book.pages": 250}
         },
         {
-          "id": "long",
-          "label_key": "book.length.long",
-          "values": {
-            "book.pages": 480,
-            "book.words_per_page": 250,
-            "book.chapters": 0,
-            "book.scenes": 2,
-            "book.prompt": ""
-          }
+          "id": "big",
+          "label_key": "book.length.big",
+          "values": {"book.pages": 550}
         }
       ]
     },

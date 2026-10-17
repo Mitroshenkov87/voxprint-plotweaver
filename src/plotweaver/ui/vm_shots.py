@@ -57,7 +57,6 @@ def save_vm_shots(folder: Path, *, export_dir: Path | None = None) -> list[Path]
 
 
 def _shot_brief(window: MainWindow, path: Path) -> Path:
-    window.mock.setChecked(True)
     english = window.language.findData("en")
     if english >= 0:
         window.language.setCurrentIndex(english)

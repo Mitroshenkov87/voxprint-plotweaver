@@ -106,7 +106,7 @@ The seal on the station fails. The crew stays and keeps the log.
 - ending
 ```
 
-Leave `chapters` and `scenes_per_chapter` empty to derive them. At 250 words per page, 40 pages is 10,000 words. The automatic chapter count for that length is 8, with 2 scenes per chapter. Up to about 600 pages the planner keeps 2 or 3 scenes and targets about 1,000 to 1,500 words in each scene when the chapter is long enough. A short chapter stays at 2 scenes even when each one is under 1,000 words. Past about 600 pages, Russian scenes shrink so one draft call can finish them. Type a chapter count when you want a different split. The longest length that is structurally within budget (mock-tested) is 2,000 pages. Prose quality at that length, including scenes of about 1,000 words and the 700-character rolling summary, has not been checked on a real model.
+Leave `chapters` and `scenes_per_chapter` empty to derive them. At 250 words per page, 40 pages is 10,000 words. The automatic chapter count for that length is 8, with 2 scenes per chapter. Up to about 600 pages the planner keeps 2 or 3 scenes and targets about 1,000 to 1,500 words in each scene when the chapter is long enough. A short chapter stays at 2 scenes even when each one is under 1,000 words. Past about 600 pages, Russian scenes shrink so one draft call can finish them. Type a chapter count when you want a different split. The longest length that is structurally within budget (mock-tested) is 2,000 pages. Prose quality at that length, including scenes of about 1,000 words and the 700-character rolling summary, has not been checked on a real model. The window's length chips are 25, 80, 250, and 550 pages.
 
 ## A good brief and a weak one
 
@@ -116,14 +116,20 @@ A weak brief is only a mood ("something sad in space") or a synopsis that implie
 
 ## Length
 
-Words are pages times words per page. The form shows both numbers and the resulting word count. These planning labels are estimates, not measured run times. A longer book is more chapters, and each chapter is its own set of local model calls.
+Words are pages times words per page. On the window the length chips are a story (25 pages), a novella (80), a novel (250, the default), and a long novel (550). The free field accepts any page count from 1 to 2,000 and writes the same page count Expert uses. The line under the chips shows pages, words, and a reading time at 250 words per minute. These are planning labels, not measured run times.
 
-| Pages | Words at 250 per page | Chapters if left at 0 | Planning label |
+A longer book is more chapters only until the ceiling. Empty `chapters` uses `min(40, max(8, round(words / 2500)))`. Scenes per chapter default to 2. Words per scene are `max(400, words // (chapters × scenes))`.
+
+| Pages | Words at 250 per page | Chapters if left empty | Words asked per scene (2 scenes) |
 | --- | --- | --- | --- |
-| 40 | 10,000 | 8 | short, one sitting |
-| 80 | 20,000 | 8 | short |
-| 160 | 40,000 | 13 | medium, several hours |
-| 320 | 80,000 | 25 | long, many hours |
+| 25 | 6,250 | 8, the floor | 400, the floor (16 × 400 is 6,400 words) |
+| 80 | 20,000 | 8 | 1,250 |
+| 250 | 62,500 | 25 | 1,250 |
+| 550 | 137,500 | 40, the ceiling (an uncapped split would be 55) | 1,718 |
+
+Expert can set chapters from 0 to 40 and scenes per chapter from 1 to 8. Words per page stay between 100 and 600. Pages stop at 2,000.
+
+Each scene call stops at 4,096 tokens (`min(4096, max(512, words_per_scene × 3))`). At 1,718 words that still fits. Past the chapter ceiling, for example 2,000 pages, a scene is asked for about 6,250 words and the 4,096-token cap can cut it short. The story bible and the outline are separate calls capped at 2,048 tokens, so a 40-chapter outline can come back incomplete. A scene prompt carries the bible, that chapter, that scene, and the last 1,500 characters of the previous scene. It does not carry the rest of the book. When VRAM is tight the model context is halved and does not go below 4,096.
 
 The 16 GB tier uses the smaller stock model and keeps 2 GB free. The 24 GB tier uses the larger stock model and keeps 3 GB free. The larger model does more work per call, so a 24 GB card is not a shortcut to a shorter wait for the same page count. A long run can pause while the card is hot and resume when it cools.
 
