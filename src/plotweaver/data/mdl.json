@@ -183,6 +183,12 @@
           "mirrors": [
             {
               "source": "huggingface",
+              "repo": "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF",
+              "filename": "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf",
+              "revision": "2da8c0432f0a42c25c14cbc99f90028a90d3dcd3"
+            },
+            {
+              "source": "huggingface",
               "repo": "Mitroshenkov87/voxprint-huihui-qwen36-27b",
               "filename": "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf",
               "revision": "cc596c1a74791b7fca57d037ef168dd57c76ed34"
@@ -203,6 +209,12 @@
           "size": 18687057536,
           "sha256": "380f2f50f441225e669ab1541220985387bf3933573cd2f4f7e667f3790e73a3",
           "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "paperscarecrow/Gemma-4-31B-it-abliterated",
+              "filename": "gemma-4-31b-abliterated-Q4_K_M.gguf",
+              "revision": "2491ee58472b82a2372d288f982943b9d5e6a82c"
+            },
             {
               "source": "huggingface",
               "repo": "Mitroshenkov87/voxprint-gemma4-31b",
