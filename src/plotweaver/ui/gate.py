@@ -27,15 +27,16 @@ class FictionGate:
         del prompt
         return None
 
-    def review_result(self, prompt: str, item_id: str) -> str | None:
+    def review_result(self, prompt: str, item_id: str, output: object = None) -> str | None:
         """Allow the finished book into the history strip.
 
         Args:
             prompt: The synopsis that produced the book.
             item_id: History id the window chose.
+            output: The exported book the layout reviews. Unused.
 
         Returns:
             None. The book is kept.
         """
-        del prompt, item_id
+        del prompt, item_id, output
         return None

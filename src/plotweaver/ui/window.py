@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -331,6 +332,9 @@ def _row_index(layout: QVBoxLayout, row_id: str) -> int:
     name = f"preset-{row_id}"
     for index in range(layout.count()):
         item = layout.itemAt(index)
+        host = None if item is None else item.widget()
+        if isinstance(host, QWidget) and host.findChild(QLabel, name) is not None:
+            return index
         row = None if item is None else item.layout()
         if row is None:
             continue
@@ -530,6 +534,7 @@ class MainWindow(QMainWindow):
         self._build_form()
         self._contain_presets()
         self._build_expert_extras()
+        self._lift_expert_panel()
         self._install_book_text()
         self._build_result_actions()
         self._build_menus()
@@ -958,8 +963,11 @@ class MainWindow(QMainWindow):
             if index < 0:
                 continue
             item = layout.takeAt(index)
+            moved = None if item is None else item.widget()
             row = None if item is None else item.layout()
-            if isinstance(row, QHBoxLayout):
+            if isinstance(moved, QWidget):
+                column.addWidget(moved)
+            elif isinstance(row, QHBoxLayout):
                 column.addLayout(row)
         header = QPushButton("▸  " + shell_tr("book.more"))
         header.setObjectName("moreSettings")
@@ -1166,6 +1174,63 @@ class MainWindow(QMainWindow):
         column.addWidget(inner)
         column.addWidget(extras)
         scroll.setWidget(wrapper)
+
+    def _lift_expert_panel(self) -> None:
+        """Give Expert the full window height beside the book, not under the rows.
+
+        ``voxprint_common.ui.simple_image`` puts ``expertPanel`` in
+        ``expertSplit``, which only spans the stage under the preset rows.
+        ``_Scroll.sizeHint`` is 260×120 and the vertical size policy is
+        Ignored, so the values sit in a short box. The library fit
+        (``_fit_expert_panel``) only sets that splitter's width. Plotweaver
+        lifts the same panel to the shell's full height and leaves the fit
+        alone.
+        """
+        panel = self.shell._expert_panel
+        root_layout = self.shell.root.layout()
+        if not isinstance(panel, QWidget) or not isinstance(root_layout, QVBoxLayout):
+            return
+        if root_layout.indexOf(panel) >= 0:
+            return
+        stretches = [root_layout.stretch(index) for index in range(root_layout.count())]
+        taken: list[QLayoutItem] = []
+        while root_layout.count():
+            item = root_layout.takeAt(0)
+            if item is not None:
+                taken.append(item)
+        column_host = QWidget(self.shell.root)
+        column_host.setObjectName("shellColumn")
+        column = QVBoxLayout(column_host)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(root_layout.spacing())
+        for item, stretch in zip(taken, stretches, strict=True):
+            widget = item.widget()
+            child = item.layout()
+            if isinstance(widget, QWidget):
+                column.addWidget(widget, stretch)
+            elif child is not None:
+                column.addLayout(child, stretch)
+        panel.setParent(None)
+        panel.setMinimumWidth(380)
+        panel.setMaximumWidth(520)
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        body = QWidget(self.shell.root)
+        body.setObjectName("shellBody")
+        row = QHBoxLayout(body)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
+        row.addWidget(column_host, 1)
+        row.addWidget(panel, 0)
+        root_layout.addWidget(body, 1)
+        scroll = self.shell.root.findChild(QScrollArea, "expertScroll")
+        if isinstance(scroll, QScrollArea):
+            scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            _darken(scroll, QtGui)
+        self.shell._fit_expert_panel = self._skip_expert_fit  # type: ignore[method-assign]
+
+    def _skip_expert_fit(self) -> None:
+        """Ignore the library's stage-height panel fit. The panel is already lifted."""
+        return
 
     def _expert_form_layout(self) -> QFormLayout | None:
         host = self.shell._expert_form
@@ -1844,7 +1909,14 @@ class MainWindow(QMainWindow):
         self.result_label.setText(text)
         self.shell.export_text = text
         self._seq += 1
-        self.book.finish(f"book-{self._seq}")
+        from voxprint_common.ui.safety import ReviewedOutput
+
+        output = (
+            ReviewedOutput(path=result.export_dir / "book.vxbook")
+            if result.export_dir is not None
+            else ReviewedOutput(data=text.encode("utf-8"), mime="text/plain")
+        )
+        self.book.finish(f"book-{self._seq}", output)
         self.shell.refresh()
 
     def _on_fail(self, message: str) -> None:
