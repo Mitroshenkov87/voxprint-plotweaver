@@ -7,7 +7,9 @@ requires-python = ">=3.14"
 license = "Apache-2.0"
 authors = [{ name = "Aleksandr Mitroshenkov" }]
 dependencies = [
-  "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl",
+  # TODO: rebase onto the shared voxprint-common UI tag (Yitro) when it is cut.
+  # Pin is PR 13 head 0d1e30d, not the moving branch. The [ui] extra is PySide6.
+  "voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@0d1e30de68cc49549a2a94cb3695e5601c17e7db",
   "PySide6-Essentials>=6.10",
   "httpx>=0.28",
   "python-docx>=1.2",
@@ -56,7 +58,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-plotweaver = ["data/fb2/*", "data/splash.jpg", "data/*.json", "ui/icons/*.svg", "ui/fonts/*", "data/writing-a-brief.md"]
+plotweaver = ["data/fb2/*", "data/splash.jpg", "data/*.json", "data/presets/*.json", "ui/icons/*.svg", "ui/fonts/*", "ui/locales/*.json", "data/writing-a-brief.md"]
 
 [tool.ruff]
 target-version = "py314"

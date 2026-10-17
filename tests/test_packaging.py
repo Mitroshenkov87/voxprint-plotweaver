@@ -29,15 +29,15 @@ def test_version_is_shared() -> None:
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     pin = (
-        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/"
-        "releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl"
+        "voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@"
+        "0d1e30de68cc49549a2a94cb3695e5601c17e7db"
     )
     assert pin in project
     wheels = root / "packaging" / "wheels"
     wheel = wheels / "voxprint_common-0.2.4-py3-none-any.whl"
     assert wheel.is_file()
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    assert digest == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+    assert digest == "75852d5b88e955d3de9de17e1d9e701f4bdba3c8243e454adcc4c3b58c4b9cab"
     requirements = (root / "packaging" / "requirements-common.txt").read_text(encoding="utf-8")
     assert f"--hash=sha256:{digest}" in requirements
     assert (wheels / "voxprint_common-0.2.4-py3-none-any.whl.sha256").is_file()

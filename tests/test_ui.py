@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 from PySide6.QtGui import QStandardItemModel
-from PySide6.QtWidgets import QApplication, QComboBox
+from PySide6.QtWidgets import QApplication, QCheckBox, QPushButton
+from voxprint_common.ui.safety import reject_reserved_key
 from voxprint_common.ui.splash import HEIGHT, WIDTH, layout
 
 from plotweaver.appinfo import version_label
 from plotweaver.paths import splash_art
 from plotweaver.settings import model_tier_override, uncensored_models_preference
+from plotweaver.ui.gate import FictionGate
 from plotweaver.ui.i18n import STRINGS
 from plotweaver.ui.icons import ICON_NAMES, suite_icon
+from plotweaver.ui.presets import preset_path
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
     CARD_PLAIN,
@@ -58,7 +62,7 @@ def test_settings_offers_abliterated_downloads_on_16gb(tmp_path: Path, monkeypat
     window = MainWindow(mock=True)
     window.show()
     window._open_settings()
-    assert window.stack.currentIndex() == 4
+    assert window.shell._expert_panel.isVisible() is True
     assert window.uncensored_models.isEnabled() is True
     window.uncensored_models.setChecked(True)
     window._save_settings()
@@ -144,19 +148,20 @@ def test_brief_form_marks_guesses_and_shows_pov(tmp_path: Path) -> None:
     app = QApplication.instance() or QApplication([])
     window = MainWindow(mock=True)
     window.show()
-    window.stack.setCurrentIndex(1)
     window.mock.setChecked(True)
     window.brief_form.notes.setPlainText("The seal fails.\nThe crew stays.")
     window._draft_brief()
     assert window.title.text()
     assert window.synopsis.toPlainText()
-    pov = window.findChild(QComboBox, "pov")
-    tense = window.findChild(QComboBox, "tense")
-    assert pov is not None and pov.isVisible()
-    assert tense is not None and tense.isVisible()
+    limited = window.findChild(QPushButton, "chip-pov-limited")
+    past = window.findChild(QPushButton, "chip-tense-past")
+    first = window.findChild(QPushButton, "chip-pov-first")
+    assert limited is not None and limited.isVisible()
+    assert past is not None and past.isVisible()
+    assert first is not None
     assert window.brief_form._marks["pov"].isVisible()
     assert window.brief_form._marks["tense"].isVisible()
-    pov.setCurrentIndex(1)
+    first.click()
     assert window.brief_form._marks["pov"].isVisible() is False
     window.brief_form.preview_toggle.setChecked(True)
     assert "BOOK BRIEF" in window.brief_form.preview.toPlainText()
@@ -205,4 +210,89 @@ def test_suite_icons_and_splash() -> None:
     )
     assert not save.icon().isNull()
     assert not window.manage_models.icon().isNull()
+    assert window.mock.text()
+    assert window.findChild(QCheckBox, "mock") is window.mock
     del app
+
+
+def test_shell_catalogs_share_keys() -> None:
+    folder = Path(__file__).parents[1] / "src" / "plotweaver" / "ui" / "locales"
+    catalogs = {
+        name: set(json.loads((folder / f"{name}.json").read_text(encoding="utf-8")))
+        for name in ("en", "ru", "de")
+    }
+    assert catalogs["ru"] == catalogs["en"]
+    assert catalogs["de"] == catalogs["en"]
+
+
+def test_readers_choice_is_not_a_filter(tmp_path: Path) -> None:
+    os.environ["PLOTWEAVER_UI_PROJECT"] = str(tmp_path / "ui")
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    window.book.choose("readers", "children")
+    assert window.book.get("book.readers") == "child"
+    gate = FictionGate()
+    assert gate.review_prompt("a child walks home") is None
+    assert gate.review_result("a child walks home", "book-1") is None
+    state = window.book.state
+    assert state is not None
+    snapshot = state.snapshot()
+    values = snapshot["values"]
+    assert isinstance(values, dict)
+    for key in values:
+        reject_reserved_key(str(key))
+    document = json.loads(preset_path().read_text(encoding="utf-8"))
+    blob = json.dumps(document)
+    assert "minor" not in blob.casefold()
+    assert "guard" not in blob.casefold()
+    del app
+
+
+def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
+    os.environ["PLOTWEAVER_UI_PROJECT"] = str(tmp_path / "ui")
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(mock=True)
+    window.show()
+    window.book.set_value("book.pages", 321)
+    window.shell.refresh()
+    chip = window.findChild(QPushButton, "chip-length-novel")
+    reset = window.findChild(QPushButton, "reset-length")
+    assert chip is not None and "changes" in chip.text()
+    assert reset is not None and reset.isVisible()
+    pages = window.book.get("book.pages")
+    window._expert.toggle()
+    assert window.book.get("book.pages") == pages
+    window._expert.toggle()
+    assert window.book.get("book.pages") == pages
+    reset.click()
+    assert window.book.get("book.pages") == 320
+    del app
+
+
+def test_feature_map_keeps_commands_and_flags_the_mock_control() -> None:
+    root = Path(__file__).parents[1]
+    text = (root / "docs" / "ui" / "FEATURE-MAP.md").read_text(encoding="utf-8")
+    assert "proposed removal, needs Aleksandr OK" in text
+    for command in (
+        "version",
+        "doctor",
+        "run",
+        "export",
+        "scenario-mars",
+        "bakeoff",
+        "gui",
+        "vxbook",
+        "models",
+        "sound",
+        "brief",
+        "provision",
+        "mdl-progress",
+        "release-shared",
+        "--selftest",
+        "--dry-run",
+        "--json",
+        "--mock",
+    ):
+        assert command in text
+    del root
