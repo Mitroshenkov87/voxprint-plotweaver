@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QStandardItemModel
+from PySide6.QtGui import QColor, QDesktopServices, QPalette, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -68,8 +68,14 @@ from plotweaver.ui.gate import FictionGate
 from plotweaver.ui.i18n import tr, ui_language
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.locked_io import install_locked_writes
-from plotweaver.ui.presets import book_presets, book_settings, resolved_model_id
-from plotweaver.ui.theme import TEXT, TEXT_ON_PRIMARY, enable_acrylic
+from plotweaver.ui.presets import (
+    book_presets,
+    book_settings,
+    grouped_number,
+    reading_estimate,
+    resolved_model_id,
+)
+from plotweaver.ui.theme import CARD_PLAIN, CONTROL_BG, TEXT, TEXT_ON_PRIMARY, enable_acrylic
 from plotweaver.ui.tools import ToolsDialog, run_captured
 
 _LOCALES = Path(__file__).resolve().parent / "locales"
@@ -143,6 +149,46 @@ def _zero_stretches(layout: QVBoxLayout) -> None:
         layout.setStretch(index, 0)
 
 
+def _paint_dark(widget: QWidget, colour: str) -> None:
+    """Fill a widget from the suite palette.
+
+    A stylesheet background does not paint a scroll viewport. Qt fills that
+    viewport from QPalette.Base, which is light on this platform, and the
+    shell's light text then disappears. The same paint is what
+    ``voxprint_common.ui.simple_image._darken`` does for the history strip
+    and the expert scroll only.
+    """
+    color = QColor(colour)
+    palette = widget.palette()
+    palette.setColor(QPalette.ColorRole.Window, color)
+    palette.setColor(QPalette.ColorRole.Base, color)
+    widget.setPalette(palette)
+    widget.setAutoFillBackground(True)
+
+
+def _paint_scroll(scroll: QScrollArea, colour: str) -> None:
+    _paint_dark(scroll, colour)
+    _paint_dark(scroll.viewport(), colour)
+    inner = scroll.widget()
+    if isinstance(inner, QWidget):
+        _paint_dark(inner, colour)
+
+
+def _length_row_index(layout: QVBoxLayout) -> int:
+    """Return the preset row that holds the length chips."""
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        row = None if item is None else item.layout()
+        if row is None:
+            continue
+        for child_index in range(row.count()):
+            child = row.itemAt(child_index)
+            widget = None if child is None else child.widget()
+            if isinstance(widget, QLabel) and widget.objectName() == "preset-length":
+                return index
+    return 1
+
+
 def _backend(mock: bool) -> LLMBackend:
     from plotweaver.hardware import require_supported_gpu
     from plotweaver.llama_release import ensure_llama_server
@@ -166,10 +212,12 @@ class BookScreen(SimpleWidget):
         on_generate: Callable[[], None] | None = None,
         on_command: Callable[[str], None] | None = None,
         on_chip: Callable[[str], None] | None = None,
+        on_length: Callable[[], None] | None = None,
         compiled: Callable[[], str] | None = None,
         surface: AppSurface | None = None,
     ) -> None:
         self._on_chip = on_chip
+        self._on_length = on_length
         self._compiled = compiled
         self._after_paint: Callable[[], None] | None = None
         self._live = False
@@ -194,6 +242,20 @@ class BookScreen(SimpleWidget):
         super()._choose(row_id, value)
         if self._on_chip is not None:
             self._on_chip(row_id)
+        self._notify_length()
+
+    def _reset_group(self, row_id: str) -> None:
+        super()._reset_group(row_id)
+        self._notify_length()
+
+    def _on_expert_edit(self, setting_id: str, value: object) -> None:
+        super()._on_expert_edit(setting_id, value)
+        if setting_id in {"book.pages", "book.words_per_page"}:
+            self._notify_length()
+
+    def _notify_length(self) -> None:
+        if self._on_length is not None:
+            self._on_length()
 
     def _fit_shell(self) -> None:
         prompt = self._prompt
@@ -257,7 +319,7 @@ class MainWindow(QMainWindow):
         install_locked_writes()
         set_language(ui_language())
         add_catalogs(_LOCALES)
-        self.mock_default = mock
+        self._use_mock = mock
         self._clicks: list[float] = []
         self._egg_shown = False
         self._thread: _RunThread | None = None
@@ -293,6 +355,7 @@ class MainWindow(QMainWindow):
             on_generate=lambda: self.start(synchronous=False),
             on_command=self._on_command,
             on_chip=self._on_chip,
+            on_length=self._sync_length,
             compiled=self._compiled_prompt,
             surface=surface,
         )
@@ -402,7 +465,7 @@ class MainWindow(QMainWindow):
         export_to = self._export_path()
         self.approve.setVisible(False)
         self._waiting = False
-        mock = self.mock.isChecked()
+        mock = self._use_mock
         yes = self.skip_approval.isChecked()
         if synchronous:
             self._run_sync(mock, yes, approve, export_to)
@@ -428,20 +491,24 @@ class MainWindow(QMainWindow):
         self.book.set_value("book.words_per_page", 200)
         self.book.set_value("book.chapters", 1)
         self.book.set_value("book.dark", False)
-        self.mock.setChecked(True)
+        previous_mock = self._use_mock
+        self._use_mock = True
         self.skip_approval.setChecked(False)
         self.dry_run.setChecked(False)
         self.shell.refresh()
-        self.start(synchronous=True)
-        guard = 0
-        while self._waiting and guard < 8:
-            guard += 1
-            self.start(synchronous=True, approve=True)
-        if self.book.phase is not Phase.READY:
-            raise RuntimeError("self-test did not reach the result")
-        if "book.vxbook" not in self.result_label.text():
-            raise RuntimeError("self-test result has no book.vxbook path")
-        self.sound_button.click()
+        try:
+            self.start(synchronous=True)
+            guard = 0
+            while self._waiting and guard < 8:
+                guard += 1
+                self.start(synchronous=True, approve=True)
+            if self.book.phase is not Phase.READY:
+                raise RuntimeError("self-test did not reach the result")
+            if "book.vxbook" not in self.result_label.text():
+                raise RuntimeError("self-test result has no book.vxbook path")
+            self.sound_button.click()
+        finally:
+            self._use_mock = previous_mock
         if self._project is None or not (self._project.export_dir / "book.sound.vxbook").is_file():
             raise RuntimeError("self-test did not write book.sound.vxbook")
 
@@ -557,6 +624,7 @@ class MainWindow(QMainWindow):
         if isinstance(layout, QVBoxLayout):
             _zero_stretches(layout)
             layout.addWidget(scroll, 1)
+        _paint_scroll(scroll, CARD_PLAIN)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setObjectName("progressLog")
@@ -570,6 +638,10 @@ class MainWindow(QMainWindow):
             _zero_stretches(busy_layout)
             busy_layout.insertWidget(1, self.log, 1)
             busy_layout.insertWidget(2, self.approve)
+        _paint_dark(self.log.viewport(), CONTROL_BG)
+        document = self.shell._document
+        if isinstance(document, QPlainTextEdit):
+            _paint_dark(document.viewport(), CONTROL_BG)
         self.progress_label = self.shell._progress_text
         if not isinstance(self.progress_label, QLabel):
             self.progress_label = QLabel(tr("progress"))
@@ -591,9 +663,6 @@ class MainWindow(QMainWindow):
         extras = QWidget()
         extras.setObjectName("expertExtras")
         form = QFormLayout(extras)
-        self.mock = QCheckBox(tr("mock"))
-        self.mock.setObjectName("mock")
-        self.mock.setChecked(self.mock_default)
         self.skip_approval = QCheckBox(tr("skip_approval"))
         self.skip_approval.setObjectName("skipApproval")
         self.dry_run = QCheckBox(tr("dry_run"))
@@ -611,7 +680,6 @@ class MainWindow(QMainWindow):
         self.project_path.setPlaceholderText(tr("choose_project"))
         self.export_path_edit = QLineEdit()
         self.export_path_edit.setPlaceholderText(tr("choose_export"))
-        form.addRow("", self.mock)
         form.addRow("", self.skip_approval)
         form.addRow("", self.dry_run)
         form.addRow("", self.json_report)
@@ -641,7 +709,8 @@ class MainWindow(QMainWindow):
         self.manage_models.clicked.connect(self._manage_models)
         form.addRow(self.manage_models)
         self.vram_tier = QComboBox()
-        self.uncensored_models = self.mock
+        self.uncensored_models = QCheckBox(extras)
+        self.uncensored_models.hide()
         self._mount_expert_extras(extras)
 
     def _contain_presets(self) -> None:
@@ -659,11 +728,82 @@ class MainWindow(QMainWindow):
         scroll.setObjectName("presetScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setWidget(host)
         layout.insertWidget(index, scroll)
         self._preset_scroll = scroll
+        self._build_length_row()
+        _paint_scroll(scroll, CARD_PLAIN)
         self._fit_preset_height()
+
+    def _build_length_row(self) -> None:
+        """Put the free page count and the reading estimate under the length chips."""
+        host = self.shell._preset_host
+        layout = None if not isinstance(host, QWidget) else host.layout()
+        if not isinstance(layout, QVBoxLayout):
+            return
+        block = QWidget()
+        block.setObjectName("lengthExtras")
+        column = QVBoxLayout(block)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        caption = QLabel(shell_tr("book.length.custom_pages"))
+        caption.setObjectName("customPagesLabel")
+        caption.setProperty("presetLabel", True)
+        caption.setMinimumWidth(108)
+        self._custom_pages = QSpinBox()
+        self._custom_pages.setObjectName("customPages")
+        self._custom_pages.setRange(1, 2000)
+        self._custom_pages.setValue(max(1, self._integer("book.pages") or 250))
+        self._custom_pages.valueChanged.connect(self._on_custom_pages)
+        row.addWidget(caption)
+        row.addWidget(self._custom_pages)
+        row.addStretch(1)
+        column.addLayout(row)
+        estimate = QLabel("")
+        estimate.setObjectName("lengthEstimate")
+        estimate.setProperty("presetLabel", True)
+        estimate.setWordWrap(True)
+        self._length_estimate = estimate
+        column.addWidget(estimate)
+        layout.insertWidget(_length_row_index(layout) + 1, block)
+        self._sync_length()
+
+    def _on_custom_pages(self, value: int) -> None:
+        if self._integer("book.pages") == value:
+            return
+        self.book.set_value("book.pages", value)
+        self.shell.refresh()
+
+    def _sync_length(self) -> None:
+        """Copy pages and words per page onto the free field and the estimate."""
+        pages = max(1, self._integer("book.pages") or 250)
+        words_per_page = max(1, self._integer("book.words_per_page") or 250)
+        spin = getattr(self, "_custom_pages", None)
+        if isinstance(spin, QSpinBox) and spin.value() != pages:
+            spin.blockSignals(True)
+            spin.setValue(pages)
+            spin.blockSignals(False)
+        label = getattr(self, "_length_estimate", None)
+        if isinstance(label, QLabel):
+            shown, words, minutes = reading_estimate(pages, words_per_page)
+            if minutes >= 60:
+                time = shell_tr("book.length.hours", count=max(1, round(minutes / 60)))
+            else:
+                time = shell_tr("book.length.minutes", count=minutes)
+            label.setText(
+                shell_tr(
+                    "book.length.estimate",
+                    pages=grouped_number(shown),
+                    words=grouped_number(words),
+                    time=time,
+                )
+            )
+        if hasattr(self, "brief_form"):
+            self._sync_hidden()
+            self._refresh_target()
 
     def _fit_preset_height(self) -> None:
         scroll = getattr(self, "_preset_scroll", None)
@@ -921,6 +1061,7 @@ class MainWindow(QMainWindow):
         return "auto"
 
     def _sync_model(self) -> None:
+        self._sync_length()
         if self.book.state is None or not self.book.state.has("book.model"):
             return
         from plotweaver.registry import detected_tier
@@ -952,7 +1093,7 @@ class MainWindow(QMainWindow):
 
     def _current_brief(self) -> BookBrief:
         form = self.brief_form
-        pages = max(1, self._integer("book.pages") or 320)
+        pages = max(1, self._integer("book.pages") or 250)
         words = max(1, self._integer("book.words_per_page") or 250)
         chapters = self._integer("book.chapters")
         scenes = self._integer("book.scenes") or 2
@@ -1021,7 +1162,7 @@ class MainWindow(QMainWindow):
             self.language.blockSignals(False)
         self.dark.setChecked(self._flag("book.dark"))
         self.chapters.setValue(self._integer("book.chapters"))
-        form.pages.setValue(max(1, self._integer("book.pages") or 320))
+        form.pages.setValue(max(1, self._integer("book.pages") or 250))
         form.words_per_page.setValue(max(100, self._integer("book.words_per_page") or 250))
         form.scenes.setValue(max(1, self._integer("book.scenes") or 2))
         form._loading = False
@@ -1083,7 +1224,7 @@ class MainWindow(QMainWindow):
             tier=self._text("book.tier") or ModelTier.STANDARD.value,
             mode=self._text("book.mode") or BookMode.AUTOPILOT.value,
             reference=list(self._refs),
-            mock=self.mock.isChecked(),
+            mock=self._use_mock,
             yes=self.skip_approval.isChecked(),
             approve=False,
             export_dir=self._export_path(),
@@ -1188,7 +1329,7 @@ class MainWindow(QMainWindow):
         source = self._project.export_dir / "book.vxbook"
         dest = self._project.export_dir / "book.sound.vxbook"
         try:
-            add_sound(source, dest, _backend(self.mock.isChecked()))
+            add_sound(source, dest, _backend(self._use_mock))
         except PlotweaverError as exc:
             QMessageBox.warning(self, tr("app"), str(exc))
             return
@@ -1208,7 +1349,7 @@ class MainWindow(QMainWindow):
             return
         language = self._text("book.language") or str(self.language.currentData() or "en")
         try:
-            brief = draft_book_brief(notes, language, _backend(self.mock.isChecked()))
+            brief = draft_book_brief(notes, language, _backend(self._use_mock))
         except PlotweaverError as exc:
             QMessageBox.warning(self, tr("app"), str(exc))
             return
@@ -1332,7 +1473,7 @@ class MainWindow(QMainWindow):
         box.exec()
 
     def _show_tools(self) -> None:
-        dialog = ToolsDialog(self, mock=self.mock.isChecked())
+        dialog = ToolsDialog(self, mock=self._use_mock)
         dialog.project.setText(str(self._project_path()))
         export_to = self._export_path()
         if export_to is not None:

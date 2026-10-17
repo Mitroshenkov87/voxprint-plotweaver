@@ -64,6 +64,7 @@ class ToolsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("tools"))
         self.resize(760, 640)
+        self._mock = mock
         root = QVBoxLayout(self)
         form = QFormLayout()
         self.tool = QComboBox()
@@ -118,8 +119,6 @@ class ToolsDialog(QDialog):
         self.language.addItem("English", "en")
         self.limit = QSpinBox()
         self.limit.setRange(0, 1000)
-        self.mock = QCheckBox(tr("mock"))
-        self.mock.setChecked(mock)
         self.dry_run = QCheckBox(tr("dry_run"))
         self.dry_run.setChecked(True)
         self.json_report = QCheckBox(tr("json_report"))
@@ -148,7 +147,6 @@ class ToolsDialog(QDialog):
             (tr("main_model"), self.main_model),
             (tr("least_model"), self.least_model),
             (tr("bakeoff_limit"), self.limit),
-            ("", self.mock),
             ("", self.dry_run),
             ("", self.json_report),
             ("", self.yes),
@@ -261,7 +259,7 @@ class ToolsDialog(QDialog):
             least_censored_gguf=self.least_gguf.text().strip(),
             main_model_id=self.main_model.text().strip(),
             least_censored_model_id=self.least_model.text().strip(),
-            mock=self.mock.isChecked(),
+            mock=self._mock,
             dry_run=self.dry_run.isChecked(),
             json=self.json_report.isChecked(),
             yes=self.yes.isChecked(),

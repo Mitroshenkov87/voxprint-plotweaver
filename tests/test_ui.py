@@ -7,17 +7,18 @@ import os
 from pathlib import Path
 
 from PySide6.QtGui import QStandardItemModel
-from PySide6.QtWidgets import QApplication, QCheckBox, QPushButton
+from PySide6.QtWidgets import QApplication, QCheckBox, QLabel, QPushButton, QSpinBox
 from voxprint_common.ui.safety import reject_reserved_key
 from voxprint_common.ui.splash import HEIGHT, WIDTH, layout
 
 from plotweaver.appinfo import version_label
+from plotweaver.domain import BookRequest, Language
 from plotweaver.paths import splash_art
 from plotweaver.settings import model_tier_override, uncensored_models_preference
 from plotweaver.ui.gate import FictionGate
-from plotweaver.ui.i18n import STRINGS
+from plotweaver.ui.i18n import STRINGS, tr
 from plotweaver.ui.icons import ICON_NAMES, suite_icon
-from plotweaver.ui.presets import preset_path
+from plotweaver.ui.presets import READING_WORDS_PER_MINUTE, preset_path, reading_estimate
 from plotweaver.ui.theme import (
     ACCENT_STRONG,
     CARD_PLAIN,
@@ -31,6 +32,7 @@ from plotweaver.ui.theme import (
     WHITE,
     contrast_ratio,
 )
+from plotweaver.ui.tools import ToolsDialog
 from plotweaver.ui.vm_shots import save_vm_shots
 from plotweaver.ui.window import MainWindow
 
@@ -148,7 +150,6 @@ def test_brief_form_marks_guesses_and_shows_pov(tmp_path: Path) -> None:
     app = QApplication.instance() or QApplication([])
     window = MainWindow(mock=True)
     window.show()
-    window.mock.setChecked(True)
     window.brief_form.notes.setPlainText("The seal fails.\nThe crew stays.")
     window._draft_brief()
     assert window.title.text()
@@ -210,8 +211,10 @@ def test_suite_icons_and_splash() -> None:
     )
     assert not save.icon().isNull()
     assert not window.manage_models.icon().isNull()
-    assert window.mock.text()
-    assert window.findChild(QCheckBox, "mock") is window.mock
+    assert all(box.text() != tr("mock") for box in window.findChildren(QCheckBox))
+    dialog = ToolsDialog(window, mock=True)
+    assert dialog._mock is True
+    assert all(box.text() != tr("mock") for box in dialog.findChildren(QCheckBox))
     del app
 
 
@@ -254,26 +257,68 @@ def test_expert_toggle_keeps_pages(tmp_path: Path) -> None:
     app = QApplication.instance() or QApplication([])
     window = MainWindow(mock=True)
     window.show()
+    assert window.book.get("book.pages") == 250
+    estimate = window.findChild(QLabel, "lengthEstimate")
+    assert estimate is not None and "62 500" in estimate.text()
     window.book.set_value("book.pages", 321)
     window.shell.refresh()
     chip = window.findChild(QPushButton, "chip-length-novel")
+    custom = window.findChild(QPushButton, "chip-length-custom")
     reset = window.findChild(QPushButton, "reset-length")
-    assert chip is not None and "changes" in chip.text()
+    spin = window.findChild(QSpinBox, "customPages")
+    assert chip is not None and "changes" not in chip.text()
+    assert custom is not None and custom.isVisible()
     assert reset is not None and reset.isVisible()
+    assert spin is not None and spin.value() == 321
+    assert estimate is not None and "80 250" in estimate.text()
     pages = window.book.get("book.pages")
     window._expert.toggle()
     assert window.book.get("book.pages") == pages
     window._expert.toggle()
     assert window.book.get("book.pages") == pages
     reset.click()
-    assert window.book.get("book.pages") == 320
+    assert window.book.get("book.pages") == 250
+    assert spin.value() == 250
+    spin.setValue(80)
+    novella = window.findChild(QPushButton, "chip-length-novella")
+    assert novella is not None and novella.isChecked()
+    assert custom.isVisible() is False
+    window.book.set_value("book.words_per_page", 200)
+    window.shell.refresh()
+    assert "16 000" in estimate.text()
     del app
+
+
+def test_page_presets_and_the_chapter_cap() -> None:
+    assert READING_WORDS_PER_MINUTE == 250
+    assert reading_estimate(250, 250) == (250, 62_500, 250)
+    assert reading_estimate(25, 250) == (25, 6_250, 25)
+    document = json.loads(preset_path().read_text(encoding="utf-8"))
+    length = next(group for group in document["groups"] if group["id"] == "length")
+    assert length["default"] == "novel"
+    values = {option["id"]: option["values"] for option in length["options"]}
+    assert values == {
+        "story": {"book.pages": 25},
+        "novella": {"book.pages": 80},
+        "novel": {"book.pages": 250},
+        "big": {"book.pages": 550},
+    }
+    story = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=25 * 250)
+    novel = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=250 * 250)
+    big = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=550 * 250)
+    huge = BookRequest(title="T", language=Language.EN, synopsis="s", target_words=2000 * 250)
+    assert story.shape() == (8, 2, 400)
+    assert novel.shape() == (25, 2, 1250)
+    assert big.shape() == (40, 2, 1718)
+    assert huge.shape()[0] == 40
+    assert huge.shape()[2] == 6250
 
 
 def test_feature_map_keeps_commands_and_flags_the_mock_control() -> None:
     root = Path(__file__).parents[1]
     text = (root / "docs" / "ui" / "FEATURE-MAP.md").read_text(encoding="utf-8")
-    assert "proposed removal, needs Aleksandr OK" in text
+    phrase = "removed from GUI, approved by Aleksandr 2026-10-17 12:39 MSK; CLI --mock stays"
+    assert phrase in text
     for command in (
         "version",
         "doctor",

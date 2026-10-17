@@ -1,14 +1,12 @@
 # Plotweaver feature map
 
-The simple shell is the same product. Every control that was on the old window, and every `plotweaver` command and flag, still has a place. A row marked **proposed removal, needs Aleksandr OK** is still reachable. Nothing in that state was deleted.
+The simple shell is the same product. Every control that was on the old window, and every `plotweaver` command and flag, still has a place. The mock checkbox is the one control Aleksandr approved taking off the window. The command line still has `--mock`.
 
-## Proposed removal
+## Removed from the window
 
-| Old feature | Where it still is | Status |
+| Old feature | Where it went | Status |
 | --- | --- | --- |
-| Mock model (no GPU) checkbox | Expert panel, and the Tools wizard mock checkbox. `gui --mock` and every command's `--mock` are unchanged. | proposed removal, needs Aleksandr OK |
-
-The shell spec had taken this checkbox off the window and left it on the command line. The suite rule keeps it on the window until Aleksandr agrees it can go.
+| Mock model (no GPU) checkbox | Not on the Expert panel and not in the Tools wizard. `gui --mock` and every command's `--mock` still select the mock backend. | removed from GUI, approved by Aleksandr 2026-10-17 12:39 MSK; CLI --mock stays |
 
 ## Window
 
@@ -28,7 +26,7 @@ The shell spec had taken this checkbox off the window and left it on the command
 | Notes, Help me write the brief, Copy prompt, Paste brief | Book form | kept |
 | Open a synopsis file (`run --synopsis`) | Open synopsis file | kept |
 | Open a brief file (`run --brief`) | Open brief file | kept |
-| Pages, words per page, scenes, chapters | Length chips and the Expert numbers. Target words on the form follow pages × words per page. | moved |
+| Pages, words per page, scenes, chapters | Length chips: story 25 pages, novella 80, novel 250 (the default), long novel 550. Simple mode also has “Your own length, pages” (1–2,000). Editing that field to a count none of the chips own shows Custom. The line under the chips is pages, words (pages × words per page), and reading time at 250 words per minute. Expert pages and words per page are the same settings state. | moved |
 | Target words (`--target-words`) | Expert “Target words (0 = pages)” | kept |
 | Genre, subgenre, tone, setting | Book form | kept |
 | Point of view, tense, audience, ending | Chips. Stored values are unchanged. Ending chips use plain words. Guessed marks stay on the form. | moved |
@@ -76,7 +74,7 @@ The commands themselves are unchanged. Each one also opens from Tools, except `g
 | `run --tier` | Expert model tier | kept |
 | `run --mode` | Stops chips | kept |
 | `run --reference` | Reference books | kept |
-| `run --mock` | Expert mock checkbox. See the proposed-removal row. | proposed removal, needs Aleksandr OK |
+| `run --mock` | Command line only. The window has no mock checkbox. | removed from GUI, approved by Aleksandr 2026-10-17 12:39 MSK; CLI --mock stays |
 | `run --yes` | Expert “Skip approval stops” | kept |
 | `run --approve` | Approve and continue | kept |
 | `run --export-dir` | Expert export folder | kept |
@@ -88,7 +86,7 @@ The commands themselves are unchanged. Each one also opens from Tools, except `g
 | `export` and its flags (`--project`, `--export-dir`, `--mock`, formats, `--sound`, `--author`, `--json`, `--dry-run`, model paths) | Tools → Export a project | kept |
 | `scenario-mars` and its flags | Tools → Mars scenario | kept |
 | `bakeoff` `--results` `--mock` `--limit` `--allow-other-license` | Tools → Bake-off | kept |
-| `gui` `--mock` `--selftest` | This window. Mock starts checked when the flag is set. Window self-test is on the Tools menu. | kept |
+| `gui` `--mock` `--selftest` | This window. `--mock` runs the book on the mock backend. There is no checkbox. Window self-test is on the Tools menu and forces the mock backend for that run only. | kept |
 | `vxbook validate FILE` `--json` `--dry-run` | Tools → Check a Voxprint Book | kept |
 | `models list` `--registry` `--json` `--dry-run` | Tools → List models | kept |
 | `sound add SRC -o` `--mock` `--mirror` `--json` `--dry-run` | Tools → Add sound to a file. The result button is the same markup for the book just written. | kept |
@@ -99,3 +97,18 @@ The commands themselves are unchanged. Each one also opens from Tools, except `g
 | `plotweaver` as the program name | Still prints the deprecation line and asks for `voxprint-plotweaver-cli`. Command line only. | kept |
 
 Simple mode does not hide a command behind a missing control. Expert mode, the Tools wizard, and the overflow are part of the simple window.
+
+## Length limits
+
+The length chips and the free field set `book.pages`. Words are pages × words per page (Expert, 100–600, default 250). The reading line uses 250 words per minute (`READING_WORDS_PER_MINUTE` in `src/plotweaver/ui/presets.py`). A novel of 250 pages is 62,500 words and about 4 hours, not a measured run time.
+
+The generator honours the word target inside these caps. Empty chapters use `min(40, max(8, round(words / 2500)))`. Scenes per chapter default to 2 (Expert 1–8). Words per scene are `max(400, words // (chapters × scenes))`. Expert chapters stop at 40. Pages stop at 2,000.
+
+| Pages | Words at 250 per page | Chapters if left at 0 | Words asked per scene |
+| --- | --- | --- | --- |
+| 25 | 6,250 | 8 (floor; the uncapped round is 2) | 400 (floor). 16 scenes × 400 is 6,400 words, a little over the target. |
+| 80 | 20,000 | 8 | 1,250 |
+| 250 | 62,500 | 25 | 1,250 |
+| 550 | 137,500 | 40 (ceiling; the uncapped round is 55) | 1,718 |
+
+A 500–600 page book does not become 55 chapters. The extra words sit in longer scenes. Each scene call is capped at 4,096 tokens (`min(4096, max(512, words_per_scene × 3))` in `runner._max_tokens`). 1,718 words still fits. At 2,000 pages the same 40-chapter ceiling asks for about 6,250 words a scene, and 4,096 tokens can cut that prose short. The story bible and the outline are separate calls capped at 2,048 tokens, so a 40-chapter outline can come back incomplete. A scene prompt carries the bible, that chapter, that scene, and the last 1,500 characters of the previous scene. It does not carry the whole book. When VRAM is tight the model context is halved and does not go below 4,096. The same numbers are in [Writing a brief](../WRITING-A-BRIEF.md).

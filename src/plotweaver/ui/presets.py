@@ -14,7 +14,25 @@ from voxprint_common.ui.presets import PresetFile, load_presets
 from voxprint_common.ui.settings import Choice, Settings, SettingSpec, SettingType
 
 _PRESET_FILE = Path(__file__).resolve().parents[1] / "data" / "presets" / "book.json"
+# A page of fiction, read aloud or silently. The estimate under the length chips uses this.
+READING_WORDS_PER_MINUTE = 250
 _MANIFEST = Path(__file__).resolve().parents[1] / "data" / "mdl.json"
+
+
+def reading_estimate(pages: int, words_per_page: int) -> tuple[int, int, int]:
+    """Return pages, words, and reading minutes for the length line.
+
+    Minutes use :data:`READING_WORDS_PER_MINUTE`. Zero words is zero minutes.
+    """
+    words = max(0, pages) * max(0, words_per_page)
+    if words <= 0:
+        return max(0, pages), 0, 0
+    return max(0, pages), words, max(1, round(words / READING_WORDS_PER_MINUTE))
+
+
+def grouped_number(value: int) -> str:
+    """Group thousands with a space: 62500 becomes ``62 500``."""
+    return f"{value:,}".replace(",", " ")
 
 
 def preset_path() -> Path:
@@ -31,7 +49,7 @@ def book_settings() -> Settings:
     """
     return Settings(
         (
-            _int("book.pages", "setting.book.pages", 320, 1, 2000, expert=True),
+            _int("book.pages", "setting.book.pages", 250, 1, 2000, expert=True),
             _int("book.words_per_page", "setting.book.words", 250, 100, 600, expert=True),
             _int("book.scenes", "setting.book.scenes", 2, 1, 8, expert=True),
             _int("book.chapters", "setting.book.chapters", 0, 0, 40, expert=True),

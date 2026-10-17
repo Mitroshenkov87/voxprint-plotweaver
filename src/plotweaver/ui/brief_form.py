@@ -62,7 +62,7 @@ class BriefForm:
         self.paste_button.setObjectName("briefPaste")
         self.pages = QSpinBox()
         self.pages.setRange(1, 2000)
-        self.pages.setValue(320)
+        self.pages.setValue(250)
         self.words_per_page = QSpinBox()
         self.words_per_page.setRange(100, 600)
         self.words_per_page.setValue(250)
