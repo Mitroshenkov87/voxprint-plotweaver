@@ -10,13 +10,18 @@ from plotweaver_dev.mock import MockBackend
 from plotweaver.domain import BookMode, BookRequest, Language
 from plotweaver.length import (
     CONTEXT_FLOOR,
+    DRAFT_PROMPT_FLOOR,
     PLAN_MAX_TOKENS,
+    PROOF_INSTRUCTION_TOKENS,
     SCENE_MAX_TOKENS,
     STRUCTURAL_MAX_PAGES,
+    SYSTEM_TOKEN_RESERVE,
+    call_fits,
     chapter_count_for,
     chapters_per_outline_call,
     estimate_tokens,
     plan_shape,
+    proofread_calls,
     scene_max_tokens,
     scene_word_cap,
 )
@@ -27,10 +32,10 @@ from plotweaver.store import Project
 from plotweaver.vxbook import emitted_chapter_id
 
 _PAGES = (
-    (25, 8),
-    (250, 20),
-    (550, 43),
-    (2000, 156),
+    (25, 8, 2, 390),
+    (250, 20, 3, 1041),
+    (550, 43, 3, 1065),
+    (2000, 156, 7, 457),
 )
 
 
@@ -60,16 +65,26 @@ def _phase(call: dict[str, object]) -> str:
     return str(call.get("phase") or "")
 
 
-@pytest.mark.parametrize(("pages", "chapters"), _PAGES)
-def test_page_targets_finish_a_complete_outline(tmp_path: Path, pages: int, chapters: int) -> None:
+@pytest.mark.parametrize(("pages", "chapters", "scenes_each", "words_each"), _PAGES)
+def test_page_targets_finish_a_complete_outline(
+    tmp_path: Path, pages: int, chapters: int, scenes_each: int, words_each: int
+) -> None:
     if pages == STRUCTURAL_MAX_PAGES:
         assert chapters == chapter_count_for(pages * 250)
     request = _request(pages)
-    planned_chapters, scenes, per_scene = request.shape()
-    assert planned_chapters == chapters
-    assert 2 <= scenes <= 16
-    assert per_scene <= scene_word_cap("ru")
+    assert request.shape() == (chapters, scenes_each, words_each)
+    _chapters, scenes, per_scene = request.shape()
     assert scene_max_tokens(per_scene, "ru") <= SCENE_MAX_TOKENS
+    if pages <= 600:
+        assert scenes in (2, 3)
+        assert per_scene <= 1500
+        if pages >= 250:
+            assert 1000 <= per_scene <= 1500
+            full_draft = CONTEXT_FLOOR - SYSTEM_TOKEN_RESERVE - DRAFT_PROMPT_FLOOR
+            assert scene_max_tokens(per_scene, "ru") == full_draft
+    else:
+        assert per_scene <= scene_word_cap("ru")
+        assert scenes > 3
     words = pages * 250
     if words >= 8 * 2500:
         assert 2500 <= words // chapters <= 4000
@@ -172,10 +187,29 @@ def test_scene_words_are_clamped_without_adding_scenes() -> None:
 def test_scene_round_trip_fits_the_context_floor() -> None:
     words = scene_word_cap("ru")
     completion = scene_max_tokens(words, "ru")
-    prose = words * 4
+    full_draft = CONTEXT_FLOOR - SYSTEM_TOKEN_RESERVE - DRAFT_PROMPT_FLOOR
     assert completion <= SCENE_MAX_TOKENS
-    assert 320 + 250 + prose + completion <= CONTEXT_FLOOR
+    assert full_draft - 64 <= completion <= full_draft
     assert plan_shape(500_000, "ru", None, 2)[0] == chapter_count_for(500_000)
+
+
+def test_proofread_of_a_normal_scene_is_chunked() -> None:
+    prose = " ".join(["шов"] * 1041)
+    calls = proofread_calls([prose], russian=True)
+    assert len(calls) > 1
+    covered: list[str] = []
+    for max_tokens, pieces in calls:
+        assert pieces
+        text = "\n\n".join(piece for _index, piece in pieces)
+        assert call_fits(
+            text,
+            russian=True,
+            max_tokens=max_tokens,
+            instruction_tokens=PROOF_INSTRUCTION_TOKENS,
+        )
+        assert max_tokens <= SCENE_MAX_TOKENS
+        covered.extend(piece for _index, piece in pieces)
+    assert " ".join(covered) == prose
 
 
 def test_repair_puts_a_dropped_chapter_back() -> None:
@@ -265,8 +299,19 @@ def test_oversize_beats_are_split(tmp_path: Path) -> None:
         f"ch01-sc{index:02d}" for index in range(1, scenes + 1)
     ]
     for call in backend.calls:
-        if str(call["task"]) in {"draft", "proofread", "fill", "rewrite"}:
-            assert int(str(call["max_tokens"])) == scene_max_tokens(per_scene, "ru")
+        task = str(call["task"])
+        max_tokens = int(str(call["max_tokens"]))
+        if task in {"draft", "fill", "rewrite"}:
+            assert max_tokens == scene_max_tokens(per_scene, "ru")
+        if task == "proofread":
+            user = str(call["user"])
+            assert max_tokens <= SCENE_MAX_TOKENS
+            assert (
+                estimate_tokens(system_message(), russian=False)
+                + estimate_tokens(user, russian=True)
+                + max_tokens
+                <= CONTEXT_FLOOR
+            )
 
 
 def test_scene_prompt_keeps_a_digest_inside_the_window() -> None:

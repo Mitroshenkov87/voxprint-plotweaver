@@ -31,9 +31,10 @@ from plotweaver.length import (
     PLAN_MAX_TOKENS,
     STORY_SO_FAR_CHARS,
     call_fits,
+    proofread_calls,
     scaled_scene_count,
     scene_max_tokens,
-    scene_word_cap,
+    scene_plan_limit,
 )
 from plotweaver.llm import ChatMessage, LLMBackend, ModelSpec, complete_json
 from plotweaver.outline import generate_outline
@@ -569,20 +570,14 @@ class _Engine:
                     self.ck.mark(f"proof:{scene_id}")
                     continue
                 original = _paragraph_dicts(stored)
-                text = "\n\n".join(item["text"] for item in original)
-                self._log(f"proofread {scene_id}")
-                revised = complete_json(
-                    self.backend,
-                    _messages(
-                        proofread_prompt(request, str(chapter.get("title") or scene_id), text)
-                    ),
-                    temperature=0.2,
-                    max_tokens=_max_tokens(request),
+                _proof_scene(
+                    self,
+                    request,
+                    scene_id,
+                    stored,
+                    str(chapter.get("title") or scene_id),
+                    original,
                 )
-                updated = _paragraphs(revised)
-                if len(updated) == len(original):
-                    stored["paragraphs"] = updated
-                    self.project.write_artefact(f"scenes/{scene_id}.json", stored)
                 self.ck.mark(f"proof:{scene_id}")
 
     def _overlap(self, request: BookRequest) -> dict[str, object]:
@@ -866,13 +861,79 @@ def _chapter_words(chapter: dict[str, Any], request: BookRequest) -> int:
     return max(1, request.target_words // max(1, chapters))
 
 
+def _proof_scene(
+    engine: _Engine,
+    request: BookRequest,
+    scene_id: str,
+    stored: dict[str, Any],
+    title: str,
+    original: list[dict[str, str]],
+) -> None:
+    texts = [str(item.get("text") or "") for item in original]
+    joined = "\n\n".join(text for text in texts if text.strip())
+    russian = request.language.value == "ru"
+    budget = _max_tokens(request)
+    if joined and call_fits(joined, russian=russian, max_tokens=budget):
+        engine._log(f"proofread {scene_id}")
+        revised = complete_json(
+            engine.backend,
+            _messages(proofread_prompt(request, title, joined)),
+            temperature=0.2,
+            max_tokens=budget,
+        )
+        updated = _paragraphs(revised)
+        if len(updated) == len(original):
+            stored["paragraphs"] = updated
+            engine.project.write_artefact(f"scenes/{scene_id}.json", stored)
+        return
+    plan = proofread_calls(texts, russian=russian)
+    if not plan:
+        return
+    if len(plan) == 1:
+        engine._log(f"proofread {scene_id}")
+    else:
+        engine._log(f"proofread {scene_id} in {len(plan)} parts")
+    expected: dict[int, int] = {}
+    for _budget, pieces in plan:
+        for index, _text in pieces:
+            expected[index] = expected.get(index, 0) + 1
+    got: dict[int, list[str]] = {}
+    for max_tokens, pieces in plan:
+        chunk = "\n\n".join(text for _index, text in pieces)
+        revised = complete_json(
+            engine.backend,
+            _messages(proofread_prompt(request, title, chunk)),
+            temperature=0.2,
+            max_tokens=max_tokens,
+        )
+        updated = _paragraphs(revised)
+        if len(updated) != len(pieces):
+            continue
+        for (index, _old), new in zip(pieces, updated, strict=True):
+            got.setdefault(index, []).append(str(new.get("text") or ""))
+    changed = False
+    rebuilt: list[dict[str, str]] = []
+    for index, item in enumerate(original):
+        parts = got.get(index, [])
+        if len(parts) != expected.get(index, 0) or not parts:
+            rebuilt.append(item)
+            continue
+        merged = dict(item)
+        merged["text"] = " ".join(part.strip() for part in parts if part.strip())
+        rebuilt.append(merged)
+        changed = True
+    if changed:
+        stored["paragraphs"] = rebuilt
+        engine.project.write_artefact(f"scenes/{scene_id}.json", stored)
+
+
 def _expand_scenes(
     chapter_id: str,
     scenes: list[dict[str, Any]],
     chapter_words: int,
     request: BookRequest,
 ) -> tuple[list[dict[str, Any]], bool]:
-    cap = scene_word_cap(request.language.value)
+    cap = scene_plan_limit(request.target_words, request.language.value)
     count = scaled_scene_count(chapter_words, len(scenes), cap)
     if scenes and count <= len(scenes):
         return scenes, False
