@@ -100,6 +100,7 @@ class MockBackend:
         self.refuse_drafts = refuse_drafts
         self.tasks: list[str] = []
         self.loads: list[str] = []
+        self.calls: list[dict[str, object]] = []
         self.last_user = ""
 
     def load(self, spec: ModelSpec) -> None:
@@ -125,7 +126,7 @@ class MockBackend:
         response_format: Mapping[str, object] | None = None,
     ) -> Completion:
         """One deterministic reply for the TASK line in the latest user message."""
-        del temperature, max_tokens, json_mode, response_format
+        del temperature, json_mode, response_format
         user = ""
         for message in reversed(messages):
             if message.role != "user":
@@ -135,6 +136,14 @@ class MockBackend:
         self.last_user = user
         task = task_of(messages)
         self.tasks.append(task.value)
+        self.calls.append(
+            {
+                "task": task.value,
+                "max_tokens": max_tokens,
+                "phase": _flag(user, "outline_phase") or _flag(user, "extract_phase"),
+                "user": user,
+            }
+        )
         if task is Task.DRAFT and self.refuse_drafts > 0:
             self.refuse_drafts -= 1
             text = "I cannot write this scene."
@@ -153,6 +162,12 @@ class MockBackend:
             case Task.DRAFT | Task.FILL | Task.REWRITE | Task.PROOFREAD:
                 return json.dumps({"paragraphs": self._paragraphs(user, task)}, ensure_ascii=False)
             case Task.EXTRACT:
+                chapter_id = _flag(user, "chapter_id") or "ch01"
+                summary = f"{chapter_id} keeps the mission moving."
+                previous = _story_so_far(user)
+                story = (previous + " " + summary).strip()
+                if len(story) > 700:
+                    story = story[-700:].lstrip()
                 return json.dumps(
                     {
                         "facts": [{"text": "The crew is still on the mission.", "paragraph": 0}],
@@ -163,6 +178,8 @@ class MockBackend:
                             {"description": "The landing promise is still open.", "status": "open"}
                         ],
                         "knowledge": [],
+                        "summary": summary,
+                        "story_so_far": story,
                     },
                     ensure_ascii=False,
                 )
@@ -288,19 +305,15 @@ class MockBackend:
         }
 
     def _outline(self, user: str) -> dict[str, object]:
+        phase = _flag(user, "outline_phase")
         count = _chapter_count(user)
+        if phase in {"parts", "repair-parts"}:
+            return {"parts": _mock_parts(user, count)}
+        if phase in {"chapters", "repair-chapters"}:
+            return {"chapters": _mock_chapter_rows(user)}
         chapters = []
         for index in range(1, count + 1):
-            chapters.append(
-                {
-                    "id": f"ch{index:02d}",
-                    "title": f"Chapter {index}",
-                    "purpose": f"Move the story through part {index} of {count}.",
-                    "pov": "Илья Воронов" if _language_ru(user) else "Ilya Voronov",
-                    "word_budget": 1000,
-                    "dark_hint": False,
-                }
-            )
+            chapters.append(_mock_chapter(index, count, user))
         return {"chapters": chapters}
 
     def _beats(self, user: str) -> dict[str, object]:
@@ -356,6 +369,102 @@ class MockBackend:
 
 def _language_ru(user: str) -> bool:
     return "language: ru" in user
+
+
+def _mock_parts(user: str, count: int) -> list[dict[str, object]]:
+    spans = _part_spans(user)
+    if not spans:
+        spans = [(1, count)] if count else []
+    parts: list[dict[str, object]] = []
+    for index, (start, end) in enumerate(spans, start=1):
+        parts.append(
+            {
+                "index": index,
+                "title": f"Part {index}",
+                "purpose": f"Cover chapters {start} through {end}.",
+                "chapter_start": start,
+                "chapter_end": end,
+            }
+        )
+    return parts
+
+
+def _mock_chapter_rows(user: str) -> list[dict[str, object]]:
+    count = _chapter_count(user)
+    missing = _missing_indexes(user)
+    if missing:
+        indexes = missing
+    else:
+        start = _positive_flag(user, "chapter_start", 1)
+        end = _positive_flag(user, "chapter_end", start)
+        indexes = list(range(start, end + 1))
+    return [_mock_chapter(index, count, user) for index in indexes]
+
+
+def _mock_chapter(index: int, count: int, user: str) -> dict[str, object]:
+    return {
+        "index": index,
+        "id": f"ch{index:02d}",
+        "title": f"Chapter {index}",
+        "purpose": f"Move the story through chapter {index} of {count}.",
+        "pov": "Илья Воронов" if _language_ru(user) else "Ilya Voronov",
+        "word_budget": 1000,
+        "dark_hint": False,
+    }
+
+
+def _part_spans(user: str) -> list[tuple[int, int]]:
+    found: list[tuple[int, int]] = []
+    for line in user.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("part_span:"):
+            continue
+        raw = stripped.split(":", 1)[1].strip()
+        if "-" not in raw:
+            continue
+        left, right = raw.split("-", 1)
+        try:
+            start, end = int(left), int(right)
+        except ValueError:
+            continue
+        if end >= start >= 1:
+            found.append((start, end))
+    return found
+
+
+def _missing_indexes(user: str) -> list[int]:
+    raw = _flag(user, "missing")
+    if not raw:
+        return []
+    found: list[int] = []
+    for part in raw.split(","):
+        try:
+            found.append(int(part.strip()))
+        except ValueError:
+            continue
+    return found
+
+
+def _positive_flag(user: str, name: str, default: int) -> int:
+    raw = _flag(user, name)
+    if not raw:
+        return default
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return default
+
+
+def _story_so_far(user: str) -> str:
+    marker = "STORY SO FAR:"
+    if marker not in user:
+        return ""
+    lines: list[str] = []
+    for line in user.split(marker, 1)[1].splitlines():
+        if line.startswith(("PROSE:", "FACTS:", "TASK:", "CHAPTER:")):
+            break
+        lines.append(line)
+    return "\n".join(lines).strip()
 
 
 def _chapter_count(user: str) -> int:

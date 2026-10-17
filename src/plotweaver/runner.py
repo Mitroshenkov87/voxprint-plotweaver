@@ -25,7 +25,18 @@ from plotweaver.export import (
 from plotweaver.gpu_lock import gpu_job
 from plotweaver.hardware import ThermalGuard
 from plotweaver.jsontext import parse_json_object
+from plotweaver.length import (
+    CHAPTER_SUMMARY_CHARS,
+    EXTRACT_MAX_TOKENS,
+    PLAN_MAX_TOKENS,
+    STORY_SO_FAR_CHARS,
+    call_fits,
+    scaled_scene_count,
+    scene_max_tokens,
+    scene_word_cap,
+)
 from plotweaver.llm import ChatMessage, LLMBackend, ModelSpec, complete_json
+from plotweaver.outline import generate_outline
 from plotweaver.prompts import (
     beats_prompt,
     bible_prompt,
@@ -33,7 +44,6 @@ from plotweaver.prompts import (
     draft_prompt,
     extract_prompt,
     fill_prompt,
-    outline_prompt,
     proofread_prompt,
     rewrite_prompt,
     style_prompt,
@@ -199,7 +209,7 @@ class _Engine:
                 self.backend,
                 _messages(bible_prompt(request)),
                 temperature=0.4,
-                max_tokens=2048,
+                max_tokens=PLAN_MAX_TOKENS,
             )
             self.project.write_artefact("bible.json", bible)
             characters = bible.get("characters")
@@ -213,14 +223,8 @@ class _Engine:
         if self._wait("bible"):
             return self._waiting("bible")
         if not self.ck.done("outline"):
-            self._log("outline")
             bible = _obj(self.project.read_artefact("bible.json"))
-            outline = complete_json(
-                self.backend,
-                _messages(outline_prompt(request, bible)),
-                temperature=0.4,
-                max_tokens=2048,
-            )
+            outline = generate_outline(self.backend, request, bible, log=self._log)
             chapters = outline.get("chapters")
             if not isinstance(chapters, list) or not chapters:
                 raise ModelOutputError("the outline has no chapters")
@@ -280,9 +284,17 @@ class _Engine:
             self.backend.prepare_batch()
             beats = complete_json(
                 self.backend,
-                _messages(beats_prompt(request, bible, chapter, index)),
+                _messages(
+                    beats_prompt(
+                        request,
+                        bible,
+                        chapter,
+                        index,
+                        continuity=_continuity_story(self.project),
+                    )
+                ),
                 temperature=0.4,
-                max_tokens=2048,
+                max_tokens=PLAN_MAX_TOKENS,
             )
             scene_rows = [item for item in _list(beats.get("scenes")) if isinstance(item, dict)]
             _bind_scene_ids(chapter_id, scene_rows)
@@ -291,7 +303,14 @@ class _Engine:
             self.ck.mark(f"beats:{chapter_id}")
         beats = _obj(self.project.read_artefact(f"beats/{chapter_id}.json"))
         scenes = [item for item in _list(beats.get("scenes")) if isinstance(item, dict)]
-        if _bind_scene_ids(chapter_id, scenes):
+        bound = _bind_scene_ids(chapter_id, scenes)
+        scenes, expanded = _expand_scenes(
+            chapter_id,
+            scenes,
+            _chapter_words(chapter, request),
+            request,
+        )
+        if bound or expanded:
             beats["scenes"] = scenes
             self.project.write_artefact(f"beats/{chapter_id}.json", beats)
         for scene_index, scene in enumerate(scenes):
@@ -331,7 +350,15 @@ class _Engine:
         self.thermal.pause_after_batch(log=self._log)
         style = _style_card(self.project)
         tail = _tail(self.project, previous_id)
-        prompt = draft_prompt(request, bible, chapter, scene, tail, style)
+        prompt = draft_prompt(
+            request,
+            bible,
+            chapter,
+            scene,
+            tail,
+            style,
+            continuity=_continuity_payload(self.project),
+        )
         completion = self.backend.complete(
             _messages(prompt),
             temperature=0.9,
@@ -386,6 +413,27 @@ class _Engine:
         text = "\n\n".join(item["text"] for item in flat)
         problems = chapter_problems(text)
         if problems and flat:
+            self._rewrite_prose(request, chapter_id, text, problems, prose_scenes, flat)
+        story = _continuity_story(self.project)
+        extracts = self._extract_rows(request, chapter_id, text, prose_scenes, story)
+        with self.project.canon() as canon:
+            for extract in extracts:
+                canon.commit_extraction(chapter_id, extract)
+        if extracts:
+            _save_continuity(self.project, chapter_id, extracts[-1])
+        self.ck.mark(step)
+
+    def _rewrite_prose(
+        self,
+        request: BookRequest,
+        chapter_id: str,
+        text: str,
+        problems: list[str],
+        prose_scenes: list[dict[str, Any]],
+        flat: list[dict[str, str]],
+    ) -> None:
+        russian = request.language.value == "ru"
+        if call_fits(text, russian=russian, max_tokens=_max_tokens(request)):
             self._log(f"one rewrite for {chapter_id}")
             rewritten = complete_json(
                 self.backend,
@@ -402,15 +450,68 @@ class _Engine:
                     cursor += count
                     self.project.write_artefact(f"scenes/{stored['scene_id']}.json", stored)
             self.rewrites += 1
-        extract = complete_json(
-            self.backend,
-            _messages(extract_prompt(request, chapter_id, text)),
-            temperature=0.2,
-            max_tokens=1024,
-        )
-        with self.project.canon() as canon:
-            canon.commit_extraction(chapter_id, extract)
-        self.ck.mark(step)
+            return
+        self._log(f"one rewrite per scene for {chapter_id}")
+        attempted = False
+        for stored in prose_scenes:
+            scene_flat = _paragraph_dicts(stored)
+            scene_text = "\n\n".join(item["text"] for item in scene_flat)
+            if not chapter_problems(scene_text):
+                continue
+            attempted = True
+            rewritten = complete_json(
+                self.backend,
+                _messages(rewrite_prompt(request, scene_text, chapter_problems(scene_text))),
+                temperature=0.4,
+                max_tokens=_max_tokens(request),
+            )
+            new_paragraphs = _paragraphs(rewritten)
+            if len(new_paragraphs) == len(scene_flat):
+                stored["paragraphs"] = new_paragraphs
+                self.project.write_artefact(f"scenes/{stored['scene_id']}.json", stored)
+        if attempted:
+            self.rewrites += 1
+
+    def _extract_rows(
+        self,
+        request: BookRequest,
+        chapter_id: str,
+        text: str,
+        prose_scenes: list[dict[str, Any]],
+        story: str,
+    ) -> list[dict[str, Any]]:
+        russian = request.language.value == "ru"
+        if call_fits(
+            text,
+            russian=russian,
+            max_tokens=EXTRACT_MAX_TOKENS,
+            instruction_tokens=400,
+        ):
+            return [
+                complete_json(
+                    self.backend,
+                    _messages(extract_prompt(request, chapter_id, text, story)),
+                    temperature=0.2,
+                    max_tokens=EXTRACT_MAX_TOKENS,
+                )
+            ]
+        rows: list[dict[str, Any]] = []
+        rolling = story
+        for stored in prose_scenes:
+            scene_text = "\n\n".join(item["text"] for item in _paragraph_dicts(stored))
+            if not scene_text.strip():
+                continue
+            extract = complete_json(
+                self.backend,
+                _messages(extract_prompt(request, chapter_id, scene_text, rolling)),
+                temperature=0.2,
+                max_tokens=EXTRACT_MAX_TOKENS,
+            )
+            rows.append(extract)
+            updated = str(extract.get("story_so_far") or "").strip()
+            if updated:
+                rolling = updated[:STORY_SO_FAR_CHARS]
+        return rows
 
     def _pass2(
         self,
@@ -435,7 +536,16 @@ class _Engine:
                 next_text = _scene_text(self.project, str(stored.get("next_scene_id") or ""))
                 filled = complete_json(
                     self.backend,
-                    _messages(fill_prompt(request, bible, stored, prev_text, next_text)),
+                    _messages(
+                        fill_prompt(
+                            request,
+                            bible,
+                            stored,
+                            prev_text,
+                            next_text,
+                            continuity=_continuity_story(self.project),
+                        )
+                    ),
                     temperature=0.9,
                     max_tokens=_max_tokens(request),
                 )
@@ -745,7 +855,93 @@ def _paragraph_dicts(stored: dict[str, Any]) -> list[dict[str, str]]:
 
 def _max_tokens(request: BookRequest) -> int:
     _chapters, _scenes, per_scene = request.shape()
-    return min(4096, max(512, per_scene * 3))
+    return scene_max_tokens(per_scene, request.language.value)
+
+
+def _chapter_words(chapter: dict[str, Any], request: BookRequest) -> int:
+    raw = chapter.get("word_budget")
+    if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0:
+        return raw
+    chapters, _scenes, _per_scene = request.shape()
+    return max(1, request.target_words // max(1, chapters))
+
+
+def _expand_scenes(
+    chapter_id: str,
+    scenes: list[dict[str, Any]],
+    chapter_words: int,
+    request: BookRequest,
+) -> tuple[list[dict[str, Any]], bool]:
+    cap = scene_word_cap(request.language.value)
+    count = scaled_scene_count(chapter_words, len(scenes), cap)
+    if scenes and count <= len(scenes):
+        return scenes, False
+    if not scenes:
+        blank = {
+            "goal": "Open the chapter.",
+            "conflict": "Time is short.",
+            "outcome": "The chapter turns.",
+            "emotional_goal": "Stay with the scene.",
+            "pov": request.pov,
+            "dark": False,
+        }
+        created = [dict(blank) for _ in range(count)]
+        _bind_scene_ids(chapter_id, created)
+        return created, True
+    expanded: list[dict[str, Any]] = []
+    for index in range(count):
+        source = scenes[min(len(scenes) - 1, index * len(scenes) // count)]
+        clone = dict(source)
+        clone.pop("id", None)
+        goal = str(clone.get("goal") or "Continue the chapter.")
+        clone["goal"] = f"{goal} (part {index + 1} of {count})"
+        expanded.append(clone)
+    _bind_scene_ids(chapter_id, expanded)
+    return expanded, True
+
+
+def _continuity_payload(project: Project) -> dict[str, Any]:
+    path = project.artefacts / "continuity.json"
+    if not path.is_file():
+        return {"story_so_far": "", "chapters": []}
+    return _obj(project.read_artefact("continuity.json"))
+
+
+def _continuity_story(project: Project) -> str:
+    return str(_continuity_payload(project).get("story_so_far") or "")
+
+
+def _save_continuity(project: Project, chapter_id: str, extract: dict[str, Any]) -> None:
+    previous = _continuity_payload(project)
+    summary = str(extract.get("summary") or "").strip()
+    if not summary:
+        facts = extract.get("facts")
+        if isinstance(facts, list) and facts and isinstance(facts[0], dict):
+            summary = str(facts[0].get("text") or "").strip()
+    if not summary:
+        summary = f"{chapter_id} continues."
+    summary = summary[:CHAPTER_SUMMARY_CHARS]
+    story = str(extract.get("story_so_far") or "").strip()
+    if not story:
+        story = (str(previous.get("story_so_far") or "") + " " + summary).strip()
+    story = story[:STORY_SO_FAR_CHARS]
+    chapters: list[dict[str, str]] = []
+    raw = previous.get("chapters")
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            item_id = str(item.get("id") or "")
+            if not item_id or item_id == chapter_id:
+                continue
+            chapters.append(
+                {
+                    "id": item_id,
+                    "summary": str(item.get("summary") or "")[:CHAPTER_SUMMARY_CHARS],
+                }
+            )
+    chapters.append({"id": chapter_id, "summary": summary})
+    project.write_artefact("continuity.json", {"story_so_far": story, "chapters": chapters})
 
 
 def _style_card(project: Project) -> str:

@@ -106,7 +106,7 @@ The seal on the station fails. The crew stays and keeps the log.
 - ending
 ```
 
-Leave `chapters` and `scenes_per_chapter` empty to derive them. At 250 words per page, 40 pages is 10,000 words. The automatic chapter count for that length is 8, and the scene count is 2 per chapter. Type a chapter count when you want a different split.
+Leave `chapters` and `scenes_per_chapter` empty to derive them. At 250 words per page, 40 pages is 10,000 words. The automatic chapter count for that length is 8, and a short English book keeps 2 scenes per chapter. A longer book, and a Russian book, adds scenes so each one fits a single draft. Type a chapter count when you want a different split. The longest length that is structurally within budget (mock-tested) is 2,000 pages. Prose quality at that length, including Russian scenes of about 377 words and the 700-character rolling summary, has not been checked on a real model.
 
 ## A good brief and a weak one
 
@@ -122,8 +122,8 @@ Words are pages times words per page. The form shows both numbers and the result
 | --- | --- | --- | --- |
 | 40 | 10,000 | 8 | short, one sitting |
 | 80 | 20,000 | 8 | short |
-| 160 | 40,000 | 16 | medium, several hours |
-| 320 | 80,000 | 32 | long, many hours |
+| 160 | 40,000 | 13 | medium, several hours |
+| 320 | 80,000 | 25 | long, many hours |
 
 The 16 GB tier uses the smaller stock model and keeps 2 GB free. The 24 GB tier uses the larger stock model and keeps 3 GB free. The larger model does more work per call, so a 24 GB card is not a shortcut to a shorter wait for the same page count. A long run can pause while the card is hot and resume when it cools.
 

@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from plotweaver.length import plan_shape
+
 
 class Language(StrEnum):
     """Book language: Russian or English."""
@@ -109,16 +111,13 @@ class BookRequest:
 
     def shape(self) -> tuple[int, int, int]:
         """Return (chapters, scenes per chapter, words per scene)."""
-        if self.chapter_count is not None and self.chapter_count > 0:
-            chapters = self.chapter_count
-        else:
-            chapters = min(40, max(8, round(self.target_words / 2500)))
-        scenes = max(1, self.scenes_per_chapter)
-        if self.scene_words is not None and self.scene_words > 0:
-            per_scene = self.scene_words
-        else:
-            per_scene = max(400, self.target_words // (chapters * scenes))
-        return chapters, scenes, per_scene
+        return plan_shape(
+            self.target_words,
+            self.language.value,
+            self.chapter_count,
+            self.scenes_per_chapter,
+            self.scene_words,
+        )
 
 
 def request_to_dict(req: BookRequest) -> dict[str, object]:

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from plotweaver.domain import BookRequest
 from plotweaver.errors import PlotweaverError
+from plotweaver.length import chapter_count_for, plan_shape
 from plotweaver.paths import repo_root
 
 BRIEF_VERSION = 1
@@ -132,16 +133,19 @@ class BookBrief:
         return self.pages * self.words_per_page
 
     def derived_chapters(self) -> int:
-        """Chapter count, or the same automatic split the pipeline uses."""
+        """Chapter count, or the length-based split the pipeline uses."""
         if self.chapter_count is not None and self.chapter_count > 0:
             return self.chapter_count
-        return min(40, max(8, round(self.target_words / 2500)))
+        return chapter_count_for(self.target_words)
 
     def derived_scenes(self) -> int:
-        """Scenes per chapter. An empty override means 2."""
-        if self.scenes_per_chapter is not None and self.scenes_per_chapter > 0:
-            return self.scenes_per_chapter
-        return 2
+        """Scenes per chapter, raised when one scene would not fit a draft call."""
+        return plan_shape(
+            self.target_words,
+            self.language or "en",
+            self.chapter_count,
+            self.scenes_per_chapter,
+        )[1]
 
     def to_dict(self) -> dict[str, object]:
         """JSON object for version 1."""
@@ -314,6 +318,12 @@ def compile_brief(brief: BookBrief) -> str:
     chapters = brief.derived_chapters()
     scenes = brief.derived_scenes()
     chapter_note = "set by the brief" if brief.chapter_count else "derived from the length"
+    if brief.scenes_per_chapter is None:
+        scene_note = "derived from the length"
+    elif scenes != brief.scenes_per_chapter:
+        scene_note = "raised so each scene fits the draft"
+    else:
+        scene_note = "set by the brief"
     lines = [
         "BOOK BRIEF (binding):",
         f"title: {brief.title}",
@@ -322,7 +332,7 @@ def compile_brief(brief: BookBrief) -> str:
         f"words_per_page: {brief.words_per_page}",
         f"target_words: {brief.target_words}",
         f"chapter_count: {chapters} ({chapter_note})",
-        f"scenes_per_chapter: {scenes}",
+        f"scenes_per_chapter: {scenes} ({scene_note})",
         f"genre: {brief.genre}",
         f"subgenre: {brief.subgenre}",
         f"tone: {brief.tone}",
