@@ -69,13 +69,21 @@ from plotweaver.ui.i18n import tr, ui_language
 from plotweaver.ui.icons import suite_icon
 from plotweaver.ui.locked_io import install_locked_writes
 from plotweaver.ui.presets import (
+    MAX_RELIABLE_PAGES,
     book_presets,
     book_settings,
     grouped_number,
     reading_estimate,
     resolved_model_id,
 )
-from plotweaver.ui.theme import CARD_PLAIN, CONTROL_BG, TEXT, TEXT_ON_PRIMARY, enable_acrylic
+from plotweaver.ui.theme import (
+    CARD_PLAIN,
+    CONTROL_BG,
+    TEXT,
+    TEXT_ON_PRIMARY,
+    enable_acrylic,
+    scrollbar_style,
+)
 from plotweaver.ui.tools import ToolsDialog, run_captured
 
 _LOCALES = Path(__file__).resolve().parent / "locales"
@@ -367,7 +375,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(shell_tr("splash.app.plotweaver"))
         self.resize(1200, 900)
         self.setMinimumSize(960, 640)
-        self.setStyleSheet(build_shell_style(False))
+        self.setStyleSheet(build_shell_style(False) + scrollbar_style())
         self._build_form()
         self._contain_presets()
         self._build_expert_extras()
@@ -385,7 +393,7 @@ class MainWindow(QMainWindow):
         super().showEvent(event)  # type: ignore[arg-type]
         self._fit_preset_height()
         if enable_acrylic(int(self.winId())):
-            self.setStyleSheet(build_shell_style(True))
+            self.setStyleSheet(build_shell_style(True) + scrollbar_style())
 
     def resizeEvent(self, event: object) -> None:
         """Keep the preset list from swallowing the book form."""
@@ -755,13 +763,25 @@ class MainWindow(QMainWindow):
         caption.setMinimumWidth(108)
         self._custom_pages = QSpinBox()
         self._custom_pages.setObjectName("customPages")
-        self._custom_pages.setRange(1, 2000)
-        self._custom_pages.setValue(max(1, self._integer("book.pages") or 250))
+        self._custom_pages.setRange(1, MAX_RELIABLE_PAGES)
+        self._custom_pages.setValue(max(1, self._integer("book.pages") or MAX_RELIABLE_PAGES))
         self._custom_pages.valueChanged.connect(self._on_custom_pages)
         row.addWidget(caption)
         row.addWidget(self._custom_pages)
         row.addStretch(1)
         column.addLayout(row)
+        later = QLabel(shell_tr("book.length.big.later"))
+        later.setObjectName("lengthBigLater")
+        later.setProperty("presetLabel", True)
+        later.setWordWrap(True)
+        column.insertWidget(0, later)
+        cap = QLabel(shell_tr("book.length.cap"))
+        cap.setObjectName("lengthCapHint")
+        cap.setProperty("presetLabel", True)
+        cap.setWordWrap(True)
+        cap.hide()
+        self._length_cap = cap
+        column.addWidget(cap)
         estimate = QLabel("")
         estimate.setObjectName("lengthEstimate")
         estimate.setProperty("presetLabel", True)
@@ -769,7 +789,30 @@ class MainWindow(QMainWindow):
         self._length_estimate = estimate
         column.addWidget(estimate)
         layout.insertWidget(_length_row_index(layout) + 1, block)
+        self._add_long_novel_chip(layout)
         self._sync_length()
+
+    def _add_long_novel_chip(self, layout: QVBoxLayout) -> None:
+        """Keep the long-novel chip visible and switched off."""
+        item = layout.itemAt(_length_row_index(layout))
+        row = None if item is None else item.layout()
+        if not isinstance(row, QHBoxLayout):
+            return
+        button = QPushButton(shell_tr("book.length.big"))
+        button.setObjectName("chip-length-big")
+        button.setProperty("chip", "true")
+        button.setAutoDefault(False)
+        button.setEnabled(False)
+        button.ensurePolished()
+        advance = button.fontMetrics().horizontalAdvance(button.text())
+        button.setMinimumWidth(advance + 36)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        insert_at = row.count()
+        last = row.itemAt(row.count() - 1)
+        if last is not None and last.spacerItem() is not None:
+            insert_at = row.count() - 1
+        row.insertWidget(insert_at, button)
 
     def _on_custom_pages(self, value: int) -> None:
         if self._integer("book.pages") == value:
@@ -801,18 +844,48 @@ class MainWindow(QMainWindow):
                     time=time,
                 )
             )
+        hint = getattr(self, "_length_cap", None)
+        if isinstance(hint, QLabel):
+            hint.setVisible(pages >= MAX_RELIABLE_PAGES)
         if hasattr(self, "brief_form"):
             self._sync_hidden()
             self._refresh_target()
+        self._fit_preset_height()
 
     def _fit_preset_height(self) -> None:
         scroll = getattr(self, "_preset_scroll", None)
         if not isinstance(scroll, QScrollArea):
             return
-        # Prompt, history strip, and a usable book form stay on screen.
-        room = self.height() - 460
-        height = min(260, max(140, room))
-        scroll.setMinimumHeight(min(140, height))
+        host = scroll.widget()
+        rows = None if host is None else host.layout()
+        if not isinstance(rows, QVBoxLayout):
+            return
+        # Leave a book form on screen, and stop the preset list on a whole row.
+        top = scroll.mapTo(self, scroll.rect().topLeft()).y()
+        cap = max(180, self.height() - top - 300)
+        bottoms: list[int] = []
+        for index in range(rows.count()):
+            item = rows.itemAt(index)
+            if item is None:
+                continue
+            bottom = item.geometry().y() + item.geometry().height()
+            if bottom > 0:
+                bottoms.append(bottom)
+        if not bottoms:
+            height = min(360, cap)
+        else:
+            height = bottoms[0]
+            for bottom in bottoms:
+                if bottom <= cap:
+                    height = bottom
+                else:
+                    break
+        bar = scroll.horizontalScrollBar()
+        if bar.isVisible():
+            height += bar.height()
+        if scroll.maximumHeight() == height and scroll.minimumHeight() == height:
+            return
+        scroll.setMinimumHeight(height)
         scroll.setMaximumHeight(height)
 
     def _mount_expert_extras(self, extras: QWidget) -> None:
@@ -1386,7 +1459,7 @@ class MainWindow(QMainWindow):
         if brief.ending_type in _ENDING:
             self._choose_known("ending", brief.ending_type)
         self._choose_known("themes", "on" if brief.dark_themes else "off")
-        self.book.set_value("book.pages", brief.pages)
+        self.book.set_value("book.pages", min(MAX_RELIABLE_PAGES, max(1, brief.pages)))
         self.book.set_value("book.words_per_page", brief.words_per_page)
         self.book.set_value("book.scenes", brief.derived_scenes())
         self.book.set_value("book.chapters", brief.chapter_count or 0)

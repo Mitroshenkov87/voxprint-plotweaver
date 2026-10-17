@@ -37,11 +37,6 @@
           "id": "novel",
           "label_key": "book.length.novel",
           "values": {"book.pages": 250}
-        },
-        {
-          "id": "big",
-          "label_key": "book.length.big",
-          "values": {"book.pages": 550}
         }
       ]
     },
