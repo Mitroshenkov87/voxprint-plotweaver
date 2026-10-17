@@ -115,13 +115,15 @@ def preset_path() -> Path:
 def book_settings() -> Settings:
     """Return the descriptors the chips and the expert panel share.
 
-    Expert rows are the page numbers, the prompt, the model tier, VRAM, the
-    abliterated download, and the resolved model id. The other rows exist so
-    a preset can write a typed value. They stay off the expert panel.
+    Expert rows are words per page, scenes, chapters, the prompt, the model
+    tier, VRAM, the abliterated download, and the resolved model id. Page
+    count stays off that form: simple mode edits it, and Expert shows the
+    same value read-only. The other rows exist so a preset can write a typed
+    value.
     """
     return Settings(
         (
-            _int("book.pages", "setting.book.pages", 250, 1, STRUCTURAL_MAX_PAGES, expert=True),
+            _int("book.pages", "setting.book.pages", 250, 1, STRUCTURAL_MAX_PAGES, expert=False),
             _int("book.words_per_page", "setting.book.words", 250, 100, 600, expert=True),
             _int("book.scenes", "setting.book.scenes", 2, 1, MAX_SCENES_PER_CHAPTER, expert=True),
             _int(

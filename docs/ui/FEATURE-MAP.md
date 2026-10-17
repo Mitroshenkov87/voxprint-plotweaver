@@ -12,7 +12,7 @@ The simple shell is the same product. Every control that was on the old window, 
 
 | Old feature | New place | Status |
 | --- | --- | --- |
-| Home: title, version, subtitle, GPU note | Top of the book form, and About | moved |
+| Home: title, version, subtitle, GPU note | Title, subtitle, and the GPU note stay on the book form. The build line stays in Help → About (Справка → О программе) and the overflow. It is not on the book form. | moved |
 | Update check line | Same note under the GPU line, when a newer build exists | kept |
 | Six-click easter egg | The title on the book form | kept |
 | New book | Tools menu and the overflow menu. The window opens on the book form. | moved |
@@ -26,7 +26,7 @@ The simple shell is the same product. Every control that was on the old window, 
 | Notes, Help me write the brief, Copy prompt, Paste brief | Book form | kept |
 | Open a synopsis file (`run --synopsis`) | Open synopsis file | kept |
 | Open a brief file (`run --brief`) | Open brief file | kept |
-| Pages, words per page, scenes, chapters | Length chips: story 25 pages, novella 80, novel 250 (the default), long novel 550. Simple mode has “Your own length, pages” and Expert has Pages; both accept 1 to 2,000. Above 600 pages a note says very long books are written as short scenes and quality is still being checked. A count none of the chips own shows Custom. The line under the chips is pages, words (pages × words per page), and reading time at 250 words per minute. The chapter line uses the same planner as generation. Expert words per page, scenes, and chapters stay on the same settings state. Chapters left at 0 follow the planner, up to 400. | moved |
+| Pages, words per page, scenes, chapters | Length chips: story 25 pages, novella 80, novel 250 (the default), long novel 550. Simple mode’s “Your own length, pages” is the only page editor and accepts 1 to 2,000. Expert shows that same page count as a read-only live value. Above 600 pages a note says very long books are written as short scenes and quality is still being checked. A count none of the chips own shows Custom. The line under the chips is pages, words (pages × words per page), and reading time at 250 words per minute. The chapter line uses the same planner as generation. Expert words per page, scenes, and chapters stay editable on the same settings state. Chapters left at 0 follow the planner, up to 400. | moved |
 | Target words (`--target-words`) | Expert “Target words (0 = pages)” | kept |
 | Genre | Genre chips on the main screen: Drama, Detective, Fantasy, Science fiction, Romance, Thriller, and Other. The brief field stays editable and writes the same value. Other, or any text that is not a chip, is Custom. | moved |
 | Tone | Tone chips on the main screen: Light, Serious, Dark, and With humour. The brief field stays editable. Other, or typed text, is Custom. | moved |
@@ -42,12 +42,12 @@ The simple shell is the same product. Every control that was on the old window, 
 | EPUB (always on) | “EPUB is always saved.” It is not a chip. | kept |
 | FictionBook, DOCX, Markdown, speaker marks | More settings → Also save, one pair per format | moved |
 | Sound markup on the request | More settings → Sound marks | moved |
-| Add sound markup on the result | Result action, and Tools → Add sound to a file | kept |
+| Prepare for audiobook | Result button. The words are «Подготовить для аудиокниги», “Prepare for audiobook”, and “Für Hörbuch vorbereiten”. Tools uses the same words on its sound checkbox. Tools → Add sound to a file is the file action. | kept |
 | Write the book | Shell Write button (`simple.action.write`) | moved |
 | Progress log, bar, Approve and continue | Busy page. Cancel is on that page and on the status row. | kept |
-| Result path, Open folder, Save as, Save a copy | Document view and the action bar | kept |
+| Result path, Open folder, Save, Save as, Save a copy | Document view and the action bar. Save stays a button. Save as and Save a copy are in the ▾ menu beside Save. | kept |
 | VRAM tier, abliterated download, Manage models, Save | Expert panel | moved |
-| Resolved model id | Expert “Resolved model”, from `mdl.json`. The window does not list model ids of its own. | kept |
+| Resolved model id | Expert “Resolved model”, from `mdl.json`, shown in full. The window does not list model ids of its own. The Expert values are a full-height side panel. | kept |
 | Acrylic on Windows | Unchanged | kept |
 | `gui --selftest` | Tools → Window self-test | kept |
 | Choose project folder, export folder | Expert | kept |
@@ -103,11 +103,13 @@ Simple mode does not hide a command behind a missing control. Expert mode, the T
 
 The main preset rows, top to bottom, are Genre, Tone, Length (with the page field and the reading line), Point of view, Readers, Ending, and Language. At 1200×900 those rows sit on screen without a vertical scroll. Tense, Stops, Dark/mature themes, Also save, and Sound marks are under More settings («Ещё настройки»). That expander is still simple mode.
 
+The strip under the book form is the result and progress area. Before a book exists it says “The book text will appear here” («Здесь появится текст книги», “Hier erscheint der Text des Buches”). A run shows the progress text there, and a finished export shows the result path.
+
 ## Length limits
 
 The length chips and the free field set `book.pages`. Words are pages × words per page (Expert, 100–600, default 250). The reading line uses 250 words per minute (`READING_WORDS_PER_MINUTE` in `src/plotweaver/ui/presets.py`). A novel of 250 pages is 62,500 words and about 4 hours, not a measured run time.
 
-The free field and Expert pages accept 1 to 2,000 (`STRUCTURAL_MAX_PAGES`). The long-novel chip writes 550 and is on. Above 600 pages (`LONG_BOOK_NOTE_PAGES`) the window shows a plain note and does not block: very long books are written as short scenes, and quality is still being checked. 550 and 600 do not show that note.
+The free field accepts 1 to 2,000 (`STRUCTURAL_MAX_PAGES`). Expert shows the same number and does not edit it. The long-novel chip writes 550 and is on. Above 600 pages (`LONG_BOOK_NOTE_PAGES`) the window shows a plain note and does not block: very long books are written as short scenes, and quality is still being checked. 550 and 600 do not show that note.
 
 Empty chapters follow `chapter_count_for` in `src/plotweaver/length.py`: at least 8 chapters, about 3,200 words a chapter, kept between 2,500 and 4,000. Scene count starts at 2 and rises so each scene fits a 4,096-token draft. English scenes stay near 750 words. Russian scenes stay near 377 words. An explicit chapter count is kept, up to the safety ceiling of 400. An explicit scene count is a minimum; the planner still adds scenes. Outlines are written in batches that fit a 2,048-token reply. The chapter line on the book form uses this same split.
 
