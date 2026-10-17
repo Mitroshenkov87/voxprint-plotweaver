@@ -78,8 +78,7 @@ def _grab(
     window.shell.set_prompt_text(window.synopsis.toPlainText())
     if modified:
         window.book.set_value("book.pages", 200)
-    if expert:
-        window._open_settings()
+    _use_expert(window, expert)
     window.shell.refresh()
     _pump()
     return _save(window, folder / name)
@@ -93,6 +92,7 @@ def _progress(path: Path) -> Path:
     window.show()
     window.synopsis.setPlainText(sample_synopsis("en"))
     window.shell.set_prompt_text(window.synopsis.toPlainText())
+    _use_expert(window, False)
     window.book.generate()
     window.book.progress(1, 1, tr("progress"))
     window.log.setPlainText("story bible\noutline")
@@ -113,6 +113,7 @@ def _approve(path: Path) -> Path:
     window.book.set_value("book.pages", 4)
     window.book.set_value("book.words_per_page", 200)
     window.book.set_value("book.chapters", 1)
+    _use_expert(window, False)
     window.skip_approval.setChecked(False)
     window.dry_run.setChecked(False)
     window.start(synchronous=True)
@@ -120,6 +121,15 @@ def _approve(path: Path) -> Path:
         raise RuntimeError("approval grab did not reach a gate")
     _pump()
     return _save(window, path)
+
+
+def _use_expert(window: MainWindow, expert: bool) -> None:
+    """Open or close Expert for this grab. The flag is stored between windows."""
+    if expert:
+        window._open_settings()
+        return
+    if window._expert.enabled():
+        window._expert.set_enabled(False)
 
 
 def _pump() -> None:
