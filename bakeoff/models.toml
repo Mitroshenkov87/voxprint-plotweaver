@@ -8,17 +8,80 @@
 # TheDrummer tunes (no licence tag) are not listed.
 # YandexGPT-5-Lite (custom licence) is not listed.
 # A quant whose repository tag is the Gemma licence, rather than Apache-2.0, is not listed.
-# optional + uncensored rows are finished abliterated files, or disabled placeholders
+# Default install (optional = false): abliterated drafters. 24 GB takes Huihui Qwen3.6 27B
+# abliterated Q5_K until the Model Forge T-pro file is published. 16 GB takes Huihui
+# Gemma 4 12B abliterated Q4_K_M and the Model Forge T-lite IQ4_XS.
+# Stock T-pro, Gemma 4 12B, and T-lite rows stay listed as optional rows.
+# Other optional + uncensored rows are finished abliterated files, or disabled placeholders
 # for files Model Forge has not published. Plotweaver does not abliterate or quantize.
-# Settings offers an enabled least-censored file when the selected tier can run it.
-# A 16 GB card shows that download when a forge quant for 16 GB fits. A 24 GB-only
-# file still needs a 24 GB card.
-# Least-censored rows come from Model Forge. Stock rows are T-pro on 24 GB, and
-# Gemma 4 12B plus the official T-lite Q4_K_M on 16 GB. The official T-lite Q5
-# is not part of the stock set. min_vram_gb is the file size plus the model card's
-# 8192-context KV, rounded up to the next 0.5 GB. A row fits 16 GB when that number
-# is at most 14 (16 minus 2 GB headroom) and 24 GB when it is at most 21 (24 minus 3).
-# Read from the Forge cards on 2026-10-10.
+# min_vram_gb is the file size plus the model card's 8192-context KV, rounded up to the
+# next 0.5 GB. A row fits 16 GB when that number is at most 14 (16 minus 2 GB headroom)
+# and 24 GB when it is at most 21 (24 minus 3).
+
+[[model]]
+id = "qwen3.6-27b-abliterated-q5"
+role = "main"
+card = "24gb"
+tier = "24gb"
+optional = false
+uncensored = true
+repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF"
+revision = "2da8c0432f0a42c25c14cbc99f90028a90d3dcd3"
+filename = "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf"
+sha256 = "a4fd0da6216fb8b9a74e25a688a118b001888b704e17f5c851c2bd80f4f5e284"
+size = 19535700288
+license = "apache-2.0"
+base_repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF"
+base_revision = "2da8c0432f0a42c25c14cbc99f90028a90d3dcd3"
+base_license = "apache-2.0"
+min_vram_gb = 18.5
+context = 8192
+moe = false
+notes = "24 GB default drafter until the Model Forge T-pro file is published. The author's own Q5_K, downloaded from huihui-ai at the pinned commit; Mitroshenkov87/voxprint-huihui-qwen36-27b keeps a byte-identical backup copy (MDL fallback mirror in mdl.json). File 19535700288 bytes plus 285212672 bytes of KV is 18.5 GB, so the row stays on 24 GB."
+
+[[model]]
+id = "gemma-4-12b-it-abliterated-q4"
+role = "main"
+card = "16gb"
+tier = "16gb"
+repo = "mradermacher/Huihui-gemma-4-12B-it-abliterated-GGUF"
+revision = "a1aefdaefe83e63588bab0d7850d968955e58b75"
+filename = "Huihui-gemma-4-12B-it-abliterated.Q4_K_M.gguf"
+sha256 = "46fce9e43ba9d625317e95513c6a47d126196a300536b54391c88e6d1ad9573a"
+size = 7381382720
+license = "apache-2.0"
+base_repo = "huihui-ai/Huihui-gemma-4-12B-it-abliterated"
+base_revision = "060ea173c4d1e30b636819f5281e7791b6e9be2f"
+base_license = "apache-2.0"
+min_vram_gb = 10
+context = 8192
+moe = false
+optional = false
+uncensored = true
+notes = "16 GB default drafter. Huihui Gemma 4 12B abliterated Q4_K_M from mradermacher, read from the HF API on 2026-10-19. File 7381382720 bytes plus the Gemma 4 12B KV at context 8192, rounded up to 10 GB."
+
+[[model]]
+id = "t-lite-it-2.1-abliterated-iq4-xs"
+role = "main"
+card = "16gb"
+tier = "16gb"
+languages = ["ru"]
+optional = false
+uncensored = true
+enabled = true
+repo = "Mitroshenkov87/voxprint-t-lite-it-2.1"
+revision = "d06307f15311bc5d385c213ef82f52d6dc20ced3"
+filename = "IQ4_XS.gguf"
+sha256 = "0f0d10020cd7186c5fa46eed0feb5007f5af7fdef01dcd90883e8fe5ee758df0"
+size = 4561837632
+license = "apache-2.0"
+base_repo = "t-tech/T-lite-it-2.1"
+base_revision = "d125c970c553de58fcee3c937d5e4867d4a448d8"
+base_license = "apache-2.0"
+min_vram_gb = 5
+context = 8192
+moe = false
+notes = "16 GB default Russian drafter from Model Forge. File 4561837632 bytes plus 641728512 bytes of KV is 4.9 GB, so min_vram_gb is 5."
 
 [[model]]
 id = "t-pro-it-2.1-q4"
@@ -37,9 +100,9 @@ base_license = "apache-2.0"
 min_vram_gb = 20
 context = 8192
 moe = false
-optional = false
+optional = true
 uncensored = false
-notes = "24 GB standard drafter. About 19.8 GB. Context stays 8192 and the KV cache is q4_0."
+notes = "Stock T-pro Q4_K_M, about 19.8 GB. Context stays 8192 and the KV cache is q4_0. Not part of the default install."
 
 [[model]]
 id = "gemma-4-12b-it-q4"
@@ -58,9 +121,9 @@ base_license = "apache-2.0"
 min_vram_gb = 9.5
 context = 8192
 moe = false
-optional = false
+optional = true
 uncensored = false
-notes = "16 GB standard drafter. Same file Audiobook Builder stores at <models>/llm/gemma-4-12b-it-Q4_K_M.gguf."
+notes = "Stock Gemma 4 12B Q4_K_M. Same file Audiobook Builder stores at <models>/llm/gemma-4-12b-it-Q4_K_M.gguf. Not part of the default install."
 
 [[model]]
 id = "t-lite-it-2.1-q4"
@@ -79,9 +142,9 @@ base_license = "apache-2.0"
 min_vram_gb = 6
 context = 8192
 moe = false
-optional = false
+optional = true
 uncensored = false
-notes = "16 GB stock Russian candidate. Official T-lite-it-2.1 and this Q4_K_M quant are Apache-2.0."
+notes = "Official T-lite-it-2.1 Q4_K_M (Apache-2.0). Not part of the default install."
 
 [[model]]
 id = "t-lite-it-2.1-q5"
@@ -259,29 +322,6 @@ moe = false
 notes = "16 GB on-demand Gemma 4 31B IQ3_XXS from Mitroshenkov87/voxprint-gemma4-31b. Not part of the stock install."
 
 [[model]]
-id = "t-lite-it-2.1-abliterated-iq4-xs"
-role = "least-censored"
-card = "16gb"
-tier = "16gb"
-languages = ["ru"]
-optional = true
-uncensored = true
-enabled = true
-repo = "Mitroshenkov87/voxprint-t-lite-it-2.1"
-revision = "d06307f15311bc5d385c213ef82f52d6dc20ced3"
-filename = "IQ4_XS.gguf"
-sha256 = "0f0d10020cd7186c5fa46eed0feb5007f5af7fdef01dcd90883e8fe5ee758df0"
-size = 4561837632
-license = "apache-2.0"
-base_repo = "t-tech/T-lite-it-2.1"
-base_revision = "d125c970c553de58fcee3c937d5e4867d4a448d8"
-base_license = "apache-2.0"
-min_vram_gb = 5
-context = 8192
-moe = false
-notes = "16 GB Russian least-censored model. The Forge card is an in-house ablation of stock T-lite, not the official Q4. File 4561837632 bytes plus 641728512 bytes of KV is 4.9 GB, so min_vram_gb is 5. Not part of the stock install."
-
-[[model]]
 id = "t-lite-it-2.1-abliterated-q5"
 role = "least-censored"
 card = "16gb"
@@ -303,27 +343,6 @@ min_vram_gb = 6.5
 context = 8192
 moe = false
 notes = "16 GB Russian least-censored model. The Forge card lists this ablation under a 24 GB evaluation budget, but the file is 5850952896 bytes plus 641728512 bytes of KV, 6.1 GB. That fits a 16 GB card after 2 GB headroom, so the row stays on 16 GB. Not the official stock Q5. Not part of the stock install."
-
-[[model]]
-id = "qwen3.6-27b-abliterated-q5"
-role = "least-censored"
-card = "24gb"
-tier = "24gb"
-optional = true
-uncensored = true
-repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF"
-revision = "2da8c0432f0a42c25c14cbc99f90028a90d3dcd3"
-filename = "Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf"
-sha256 = "a4fd0da6216fb8b9a74e25a688a118b001888b704e17f5c851c2bd80f4f5e284"
-size = 19535700288
-license = "apache-2.0"
-base_repo = "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF"
-base_revision = "2da8c0432f0a42c25c14cbc99f90028a90d3dcd3"
-base_license = "apache-2.0"
-min_vram_gb = 18.5
-context = 8192
-moe = false
-notes = "24 GB least-censored Qwen. The author's own Q5_K, downloaded from huihui-ai at the pinned commit; Mitroshenkov87/voxprint-huihui-qwen36-27b keeps a byte-identical backup copy (MDL fallback mirror in mdl.json). File 19535700288 bytes plus 285212672 bytes of KV is 18.5 GB. That does not fit a 16 GB card after 2 GB headroom, so the row stays on 24 GB. Not part of the stock install."
 
 [[model]]
 id = "gemma-4-31b-abliterated-q4"

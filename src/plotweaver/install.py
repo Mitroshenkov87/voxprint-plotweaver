@@ -1,11 +1,11 @@
-"""Default stock downloads, and the separate least-censored download from Settings.
+"""Default downloads, and the extra optional downloads from Settings.
 
-The installer downloads the stock models for the detected tier. A later launch
-only repairs a file that is missing or corrupt. Least-censored models come
-from Model Forge and stay out of that set until Settings asks for them. A
-Russian book prefers the forge T-lite file when it is installed. Otherwise
-the largest installed forge model for the tier is used, and the stock drafter
-is the fallback.
+The installer downloads the default models for the detected tier (rows with
+optional = false). A later launch only repairs a file that is missing or
+corrupt. Extra least-censored quants and the stock models stay out of that set
+until Settings asks for them. A Russian book prefers an installed T-lite file
+for its language. Otherwise the largest installed uncensored model for the tier
+is used, and the default drafter is the fallback.
 """
 
 from __future__ import annotations
@@ -149,13 +149,13 @@ def _least_censored(
     store: Path,
     language: Language,
 ) -> RegistryEntry:
-    """Installed Model Forge model for this language and tier, else the stock drafter."""
+    """Installed uncensored model for this language and tier, else the default drafter."""
     installed = [
         entry
         for entry in entries
         if entry.enabled
         and entry.uncensored
-        and entry.role == "least-censored"
+        and entry.role in {"least-censored", "main"}
         and _offered(entry, total_gb, free_gb)
         and weight_path(store, entry).is_file()
     ]

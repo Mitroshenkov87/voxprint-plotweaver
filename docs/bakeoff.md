@@ -32,7 +32,7 @@ That command:
 | gemma-4-31b-abliterated-q4 | 24 GB | least censored | Apache-2.0 | paperscarecrow/Gemma-4-31B-it-abliterated, Apache-2.0 |
 | gemma-4-31b-abliterated-iq3-xxs | 16 GB, on demand | least censored | Apache-2.0 | paperscarecrow/Gemma-4-31B-it-abliterated, Apache-2.0 |
 
-Stock install is Gemma 4 12B Q4 and T-lite Q4 on 16 GB, plus T-pro Q4 on 24 GB. Least censored is a Model Forge file. Qwen Q3_K_M, both Forge T-lite quants, and Gemma 4 31B IQ3_XXS fit 16 GB. The Forge T-lite card is an ablation, not the official stock GGUF. Qwen Q5 is 18.5 GB with KV and does not fit 16 GB after 2 GB headroom, so it stays on 24 GB. Gemma Q4 stays on 24 GB at min_vram_gb 18. Other 16 GB fit rows with empty hashes stay disabled. TheDrummer tunes are omitted because their cards have no licence tag.
+Default install is Huihui Gemma 4 12B abliterated Q4_K_M and the Forge T-lite IQ4_XS on 16 GB, plus Huihui Qwen3.6 27B abliterated Q5_K on 24 GB until the Forge T-pro file is published. Stock Gemma 4 12B Q4, T-lite Q4, and T-pro Q4 stay as optional rows. Qwen Q3_K_M, both Forge T-lite quants, and Gemma 4 31B IQ3_XXS fit 16 GB. The Forge T-lite card is an ablation, not the official stock GGUF. Qwen Q5 is 18.5 GB with KV and does not fit 16 GB after 2 GB headroom, so it stays on 24 GB. Gemma Q4 stays on 24 GB at min_vram_gb 18. Other 16 GB fit rows with empty hashes stay disabled. TheDrummer tunes are omitted because their cards have no licence tag.
 
 Manage models asks VOXPrint MDL for an on-demand file. A Forge publication still uses this JSON shape when a row is filled by hand:
 

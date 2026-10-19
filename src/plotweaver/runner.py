@@ -7,7 +7,7 @@ least-censored model once, fills every placeholder, and proofreads while that mo
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,7 @@ from plotweaver.length import (
 )
 from plotweaver.llm import ChatMessage, LLMBackend, ModelSpec, complete_json
 from plotweaver.outline import generate_outline
+from plotweaver.output_check import CheckedBackend
 from plotweaver.prompts import (
     beats_prompt,
     bible_prompt,
@@ -71,6 +72,7 @@ class RunResult:
     refusals: int
     placeholders: int
     rewrites: int
+    output_codes: dict[str, int] = field(default_factory=dict)
 
 
 def draft_book_brief(idea: str, language: str, backend: LLMBackend) -> BookBrief:
@@ -179,9 +181,14 @@ class _Engine:
         thermal: ThermalGuard,
     ) -> None:
         self.project = project
-        self.backend = backend
         self.yes = yes
         self.on_progress = on_progress
+        self.checked = (
+            backend
+            if isinstance(backend, CheckedBackend)
+            else CheckedBackend(backend, log=self._log)
+        )
+        self.backend = self.checked
         self.export_to = export_to
         self.thermal = thermal
         self.ck = project.checkpoint()
@@ -275,6 +282,7 @@ class _Engine:
             self.refusals,
             self.placeholders,
             self.rewrites,
+            self.checked.counts(),
         )
 
     def _chapter(self, request: BookRequest, chapter: dict[str, Any], index: int) -> str | None:
@@ -767,6 +775,7 @@ class _Engine:
             self.refusals,
             self.placeholders,
             self.rewrites,
+            self.checked.counts(),
         )
 
     def _write_report(self, export_dir: Path | None) -> None:
@@ -777,6 +786,8 @@ class _Engine:
                 "refusals": self.refusals,
                 "placeholders": self.placeholders,
                 "rewrites": self.rewrites,
+                "output_codes": self.checked.counts(),
+                "output_events": [event.as_dict() for event in self.checked.events],
                 "export_dir": str(export_dir) if export_dir else "",
             },
         )

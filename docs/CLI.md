@@ -75,6 +75,7 @@ After a real `run`:
   "gate": null,
   "swaps": 0,
   "refusals": 0,
+  "output_codes": {},
   "placeholders": 0,
   "rewrites": 0,
   "project": "/absolute/project",
@@ -83,7 +84,7 @@ After a real `run`:
 }
 ```
 
-`status` is `completed` or `waiting`. `gate` is a string while the book is waiting for approval, otherwise null. `scenario-mars` omits `gate`, `refusals`, `placeholders`, and `rewrites`. Its `code` is 3 and `ok` is false when `status` is not `completed`.
+`status` is `completed` or `waiting`. `gate` is a string while the book is waiting for approval, otherwise null. `output_codes` counts replies that were retried once, by reason code (`REFUSAL_EXPLICIT`, `REFUSAL_SOFT`, `MORALIZING`); `run-report.json` lists each one under `output_events`. `scenario-mars` omits `gate`, `refusals`, `output_codes`, `placeholders`, and `rewrites`. Its `code` is 3 and `ok` is false when `status` is not `completed`.
 
 `--brief PATH` reads a version-1 JSON brief or the Markdown template in [Writing a brief](WRITING-A-BRIEF.md). It supplies the title, language, length, genre, point of view, tense, characters, and synopsis. `--synopsis` still wins when both are set. A new project needs one of the two. An invalid brief exits 1. With `--json` the object adds `errors`, a list of `{field, code, message}`.
 
