@@ -1,6 +1,6 @@
 # VOXPrint AI Plotweaver
 
-VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Shti. `voxprint-plotweaver-cli --version` prints `0.2.0 RC · build N "Shti"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
+VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Erev. `voxprint-plotweaver-cli --version` prints `0.2.0 RC · build N "Erev"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
 
@@ -16,15 +16,15 @@ Release files are on the project [releases page](https://github.com/Mitroshenkov
 
 Windows:
 
-1. Download `VoxprintPlotweaver-0.2.0rc7-win64-setup.exe`.
-2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc7-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc7-win64-setup.exe` line in `SHA256SUMS`.
+1. Download `VoxprintPlotweaver-0.2.0rc8-win64-setup.exe`.
+2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc8-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc8-win64-setup.exe` line in `SHA256SUMS`.
 3. Run the setup. It installs to `C:\Program Files\VOXPrint AI Suite\Plotweaver` and needs administrator rights. The Start menu folder is VOXPrint AI Suite and the shortcut is VOXPrint AI Plotweaver. The window is `voxprint-plotweaver.exe`. `voxprint-plotweaver-cli` is added to PATH. Provisioning fills `%LOCALAPPDATA%\Voxprint\shared` while the setup window is still open. A silent install (`/SILENT` or `/VERYSILENT`) does not open the window. An interactive install offers Launch only after that step has finished.
 
 Linux, Debian package:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo dpkg -i voxprint-plotweaver_0.2.0rc7_amd64.deb
+sudo dpkg -i voxprint-plotweaver_0.2.0rc8_amd64.deb
 sudo apt-get install -f
 ```
 
@@ -36,7 +36,7 @@ Linux, tarball (any distribution with the libraries named in the `.deb` control 
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc7-linux-x86_64.tar.gz
+sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc8-linux-x86_64.tar.gz
 voxprint-plotweaver-cli mdl-progress --quiet --installer
 ```
 

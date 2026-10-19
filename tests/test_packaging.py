@@ -19,12 +19,12 @@ def test_version_is_shared() -> None:
     root = repo_root()
     payload = json.loads((root / "BUILD.json").read_text(encoding="utf-8"))
     assert payload["version"] == "0.2.0"
-    assert payload["prerelease"] == "rc7"
-    assert payload["codename"] == "Shti"
+    assert payload["prerelease"] == "rc8"
+    assert payload["codename"] == "Erev"
     assert payload["build"] is None
-    assert APP_VERSION == "0.2.0rc7"
-    assert version_label() == '0.2.0 RC · build dev "Shti"'
-    assert release_title(52) == '0.2.0 RC · build 52 "Shti"'
+    assert APP_VERSION == "0.2.0rc8"
+    assert version_label() == '0.2.0 RC · build dev "Erev"'
+    assert release_title(52) == '0.2.0 RC · build 52 "Erev"'
     assert list((root / "packaging" / "wheels").glob("voxprint_common-0.2.*.whl"))
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
