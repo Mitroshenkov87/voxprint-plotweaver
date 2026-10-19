@@ -5,7 +5,7 @@ The installed command is `voxprint-plotweaver-cli`. `plotweaver` is a deprecated
 `voxprint-plotweaver-cli --version` and `voxprint-plotweaver-cli version` print the display label and nothing else:
 
 ```text
-0.2.0 RC · build dev "Shti"
+0.2.0 RC · build dev "Erev"
 ```
 
 `BUILD.json` at the repository root is the source for the version, the prerelease, the codename, and the build offset. A packaged CI build replaces `dev` with `GITHUB_RUN_NUMBER + offset`. A final release (`prerelease` null or empty) drops ` RC`.
