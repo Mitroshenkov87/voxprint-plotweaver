@@ -209,12 +209,12 @@ def registry_path() -> Path:
 
 
 def is_stock(entry: RegistryEntry) -> bool:
-    """Stock models are the default install. Abliterated rows are optional."""
-    return entry.enabled and not entry.optional and not entry.uncensored
+    """Rows in the default install: enabled and not optional."""
+    return entry.enabled and not entry.optional
 
 
 def stock_for_tier(entries: list[RegistryEntry], *, total_gb: float) -> list[RegistryEntry]:
-    """Stock models for the detected tier only. A 24 GB card does not also take 16 GB files."""
+    """Default-install models for the detected tier only, not the other tier."""
     selected = resolve_tier(total_gb)
     return [entry for entry in entries if is_stock(entry) and entry_tier(entry) == selected]
 
@@ -541,7 +541,7 @@ def import_forge_manifest(
 
     Each object needs ``id``, ``revision``, ``sha256``, and ``size``. Optional
     ``repo``, ``filename``, and ``min_vram_gb`` replace those fields. The row
-    is enabled. Stock rows are refused. ``dry_run`` validates and returns the
+    is enabled. Stock and default-install rows are refused. ``dry_run`` validates and returns the
     ids without writing the registry.
     """
     path = registry or registry_path()
@@ -561,8 +561,10 @@ def import_forge_manifest(
         entry = known.get(model_id)
         if entry is None:
             raise PlotweaverError(f"{model_id} is not in the registry")
-        if is_stock(entry):
-            raise PlotweaverError(f"{model_id} is a stock model. Model Forge cannot replace it.")
+        if is_stock(entry) or not entry.uncensored:
+            raise PlotweaverError(
+                f"{model_id} is a stock or default-install model. Model Forge cannot replace it."
+            )
         text = _fill_registry_block(text, model_id, _forge_updates(row))
         enabled.append(model_id)
     if dry_run:

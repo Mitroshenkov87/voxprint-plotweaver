@@ -197,7 +197,7 @@ def test_suite_icons_and_splash() -> None:
     assert splash_art().is_file()
     window = MainWindow(mock=True)
     window.show()
-    assert window.about_text() == '0.2.0 RC · build dev "Shti"'
+    assert window.about_text() == '0.2.0 RC · build dev "Erev"'
     save = next(
         button
         for button in window.findChildren(type(window.manage_models))

@@ -70,6 +70,9 @@ def test_gguf_dir_is_the_shared_llm_folder(monkeypatch: pytest.MonkeyPatch, tmp_
 def test_registry_lists_confirmed_apache_models() -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
     assert [entry.id for entry in entries] == [
+        "qwen3.6-27b-abliterated-q5",
+        "gemma-4-12b-it-abliterated-q4",
+        "t-lite-it-2.1-abliterated-iq4-xs",
         "t-pro-it-2.1-q4",
         "gemma-4-12b-it-q4",
         "t-lite-it-2.1-q4",
@@ -81,12 +84,15 @@ def test_registry_lists_confirmed_apache_models() -> None:
         "gemma-4-31b-abliterated-iq3-m",
         "gemma-4-31b-abliterated-q3-k-m",
         "gemma-4-31b-abliterated-iq3-xxs",
-        "t-lite-it-2.1-abliterated-iq4-xs",
         "t-lite-it-2.1-abliterated-q5",
-        "qwen3.6-27b-abliterated-q5",
         "gemma-4-31b-abliterated-q4",
     ]
-    shared = entries[1]
+    default_gemma = entries[1]
+    assert default_gemma.repo == "mradermacher/Huihui-gemma-4-12B-it-abliterated-GGUF"
+    assert default_gemma.revision.startswith("a1aefdae")
+    assert default_gemma.sha256.startswith("46fce9e4")
+    assert default_gemma.uncensored and not default_gemma.optional
+    shared = entries[4]
     assert shared.filename == "gemma-4-12b-it-Q4_K_M.gguf"
     assert shared.revision.startswith("fc034cff")
     assert shared.size == 7_121_861_440
@@ -117,7 +123,7 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert qwen_q3.min_vram_gb == 13
     assert qwen_q3.default is False
     qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
-    assert qwen.role == "least-censored"
+    assert qwen.role == "main"
     assert qwen.enabled is True
     assert qwen.tier == "24gb"
     assert qwen.repo == "huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF"
@@ -161,8 +167,8 @@ def test_registry_lists_confirmed_apache_models() -> None:
     assert fit.enabled is False
     assert fit.default is False
     assert fit.tier == "16gb"
-    assert is_stock(lite)
-    assert not is_stock(qwen)
+    assert not is_stock(lite)
+    assert is_stock(qwen)
     for entry in entries:
         if entry.enabled:
             assert entry.license == "apache-2.0"
@@ -236,7 +242,7 @@ def test_users_file_keeps_other_suite_apps(tmp_path: Path) -> None:
     assert (tmp_path / ".users.json").read_text(encoding="utf-8") == again
 
 
-def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None:
+def test_default_install_is_abliterated_and_stock_rows_stay_optional() -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
     offered_16 = [
         entry.id
@@ -244,8 +250,8 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
         if is_stock(entry) and model_offered(entry, total_gb=16, free_gb=16)
     ]
     assert offered_16 == [
-        "gemma-4-12b-it-q4",
-        "t-lite-it-2.1-q4",
+        "gemma-4-12b-it-abliterated-q4",
+        "t-lite-it-2.1-abliterated-iq4-xs",
     ]
     offered_24 = [
         entry.id
@@ -253,9 +259,9 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
         if is_stock(entry) and model_offered(entry, total_gb=24, free_gb=22)
     ]
     assert offered_24 == [
-        "t-pro-it-2.1-q4",
-        "gemma-4-12b-it-q4",
-        "t-lite-it-2.1-q4",
+        "qwen3.6-27b-abliterated-q5",
+        "gemma-4-12b-it-abliterated-q4",
+        "t-lite-it-2.1-abliterated-iq4-xs",
     ]
     assert tier_headroom_gb(16) == 2
     assert tier_headroom_gb(24) == 3
@@ -281,7 +287,7 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert model_offered(t_pro_early, total_gb=23.99, free_gb=10) is True
     assert tier_capacity_gb(23.99) >= t_pro_early.min_vram_gb
     qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
-    assert qwen.optional is True and qwen.uncensored is True
+    assert qwen.optional is False and qwen.uncensored is True
     assert qwen.tier == "24gb"
     assert model_offered(qwen, total_gb=16, free_gb=14) is False
     assert model_offered(qwen, total_gb=24, free_gb=22) is True
@@ -289,7 +295,7 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     qwen_q3 = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q3-k-m")
     assert model_offered(qwen_q3, total_gb=16, free_gb=14) is True
     t_pro = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
-    assert is_stock(t_pro)
+    assert not is_stock(t_pro)
     assert t_pro.tier == "24gb"
     assert bakeoff_skip_reason(t_pro, free_gb=14)
     placeholder = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-iq3-xxs")
@@ -297,19 +303,17 @@ def test_default_install_is_stock_and_bakeoff_keeps_abliterated_models() -> None
     assert placeholder.tier == "16gb"
 
 
-def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> None:
+def test_dark_pass_uses_the_largest_installed_uncensored_model(tmp_path: Path) -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
     qwen = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q5")
     qwen_q3 = next(entry for entry in entries if entry.id == "qwen3.6-27b-abliterated-q3-k-m")
     gemma_31 = next(entry for entry in entries if entry.id == "gemma-4-31b-abliterated-q4")
-    gemma = next(entry for entry in entries if entry.filename == "gemma-4-12b-it-Q4_K_M.gguf")
-    t_pro = next(entry for entry in entries if entry.id == "t-pro-it-2.1-q4")
-    (tmp_path / gemma.filename).write_bytes(b"g")
-    (tmp_path / t_pro.filename).write_bytes(b"p")
+    gemma = next(entry for entry in entries if entry.id == "gemma-4-12b-it-abliterated-q4")
+    (tmp_path / stored_filename(gemma)).write_bytes(b"g")
     request = BookRequest(title="T", language=Language.RU, synopsis="s", dark_themes=True)
     assign_book_models(request, free_gb=16, total_gb=16, store=tmp_path)
-    assert request.main_model_id == "gemma-4-12b-it-q4"
-    assert request.least_censored_model_id == "gemma-4-12b-it-q4"
+    assert request.main_model_id == "gemma-4-12b-it-abliterated-q4"
+    assert request.least_censored_model_id == "gemma-4-12b-it-abliterated-q4"
     small = BookRequest(
         title="T",
         language=Language.RU,
@@ -317,17 +321,17 @@ def test_dark_pass_uses_an_installed_forge_model_else_stock(tmp_path: Path) -> N
         tier=ModelTier.LEAST_CENSORED,
     )
     assign_book_models(small, free_gb=16, total_gb=16, store=tmp_path)
-    assert small.main_model_id == "gemma-4-12b-it-q4"
+    assert small.main_model_id == "gemma-4-12b-it-abliterated-q4"
     (tmp_path / stored_filename(qwen_q3)).write_bytes(b"3")
     fitted = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
     assign_book_models(fitted, free_gb=14, total_gb=16, store=tmp_path)
-    assert fitted.main_model_id == "gemma-4-12b-it-q4"
+    assert fitted.main_model_id == "gemma-4-12b-it-abliterated-q4"
     assert fitted.least_censored_model_id == "qwen3.6-27b-abliterated-q3-k-m"
     (tmp_path / qwen.filename).write_bytes(b"q")
     (tmp_path / gemma_31.filename).write_bytes(b"G")
     request = BookRequest(title="T", language=Language.EN, synopsis="s", dark_themes=True)
     assign_book_models(request, free_gb=22, total_gb=24, store=tmp_path)
-    assert request.main_model_id == "t-pro-it-2.1-q4"
+    assert request.main_model_id == "qwen3.6-27b-abliterated-q5"
     assert request.least_censored_model_id == "qwen3.6-27b-abliterated-q5"
     least = BookRequest(
         title="T",
@@ -363,7 +367,7 @@ def test_uncensored_count_does_not_download(
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
     for entry in entries:
         if entry.id in {
-            "gemma-4-12b-it-q4",
+            "gemma-4-12b-it-abliterated-q4",
             "t-lite-it-2.1-q4",
             "qwen3.6-27b-abliterated-q3-k-m",
             "gemma-4-31b-abliterated-iq3-xxs",
@@ -372,15 +376,17 @@ def test_uncensored_count_does_not_download(
         }:
             (tmp_path / stored_filename(entry)).write_bytes(b"x")
     assert ensure_default_install(free_gb=16, total_gb=16, store=tmp_path) == 2
-    assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 4
+    assert ensure_uncensored_models(total_vram_gb=16, free_gb=14, store=tmp_path) == 5
 
 
 def test_stock_for_tier_excludes_the_other_tier() -> None:
     entries = load_registry(repo_root() / "bakeoff" / "models.toml")
-    assert [entry.id for entry in stock_for_tier(entries, total_gb=24)] == ["t-pro-it-2.1-q4"]
+    assert [entry.id for entry in stock_for_tier(entries, total_gb=24)] == [
+        "qwen3.6-27b-abliterated-q5"
+    ]
     assert [entry.id for entry in stock_for_tier(entries, total_gb=16)] == [
-        "gemma-4-12b-it-q4",
-        "t-lite-it-2.1-q4",
+        "gemma-4-12b-it-abliterated-q4",
+        "t-lite-it-2.1-abliterated-iq4-xs",
     ]
 
 

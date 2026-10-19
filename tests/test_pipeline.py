@@ -73,7 +73,7 @@ def test_dark_toggle_swaps_once_and_fills(tmp_path: Path) -> None:
 
 
 def test_refusal_becomes_a_placeholder_only_when_dark_is_on(tmp_path: Path) -> None:
-    dark = MockBackend(refuse_drafts=1)
+    dark = MockBackend(refuse_drafts=2)
     project = Project.open_or_create(
         tmp_path / "refuse-dark", _request(tmp_path, dark=True, chapters=1)
     )
@@ -81,7 +81,7 @@ def test_refusal_becomes_a_placeholder_only_when_dark_is_on(tmp_path: Path) -> N
     assert result.swaps == 1
     assert result.refusals >= 1
     assert Task.FILL.value in dark.tasks
-    plain_backend = MockBackend(refuse_drafts=1)
+    plain_backend = MockBackend(refuse_drafts=2)
     plain = Project.open_or_create(
         tmp_path / "refuse-plain", _request(tmp_path, dark=False, chapters=1)
     )

@@ -684,6 +684,7 @@ def _run(args: argparse.Namespace) -> int:
         "gate": result.gate,
         "swaps": result.swaps,
         "refusals": result.refusals,
+        "output_codes": result.output_codes,
         "placeholders": result.placeholders,
         "rewrites": result.rewrites,
         "project": str(project.root.resolve()),

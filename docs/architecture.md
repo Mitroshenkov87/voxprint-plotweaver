@@ -1,6 +1,6 @@
 # Architecture
 
-Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Shti, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. Model files are downloaded by VOXPrint MDL. `docs/vm-test.md` is the short RTX 4090 check.
+Plotweaver turns a synopsis into a book on one machine. Version 0.2.0 RC, codename Erev, is the engine, the bake-off harness, and a desktop shell. The label and the build number come from `BUILD.json`. Cloud writing APIs are not called. Model files are downloaded by VOXPrint MDL. `docs/vm-test.md` is the short RTX 4090 check.
 
 ## Pipeline
 

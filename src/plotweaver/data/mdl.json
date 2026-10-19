@@ -3,9 +3,39 @@
   "app": "plotweaver",
   "models": [
     {
+      "id": "gemma-4-12b-it-abliterated-q4",
+      "version": "1",
+      "vram_tier": "16gb",
+      "display_name": "Huihui Gemma 4 12B abliterated Q4_K_M",
+      "files": [
+        {
+          "path": "Huihui-gemma-4-12B-it-abliterated.Q4_K_M.gguf",
+          "size": 7381382720,
+          "sha256": "46fce9e43ba9d625317e95513c6a47d126196a300536b54391c88e6d1ad9573a",
+          "mirrors": [
+            {
+              "source": "huggingface",
+              "repo": "mradermacher/Huihui-gemma-4-12B-it-abliterated-GGUF",
+              "filename": "Huihui-gemma-4-12B-it-abliterated.Q4_K_M.gguf",
+              "revision": "a1aefdaefe83e63588bab0d7850d968955e58b75"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gemma-4-12b-it-abliterated-q4",
+      "version": "1",
+      "vram_tier": "24gb",
+      "display_name": "Huihui Gemma 4 12B abliterated Q4_K_M",
+      "status": "unavailable",
+      "reason": "The 24 GB default model is Huihui Qwen3.6 27B abliterated Q5_K_M."
+    },
+    {
       "id": "t-lite-it-2.1-q4",
       "version": "1",
       "vram_tier": "16gb",
+      "on_demand": true,
       "display_name": "T-lite-it-2.1 Q4_K_M",
       "files": [
         {
@@ -29,12 +59,13 @@
       "vram_tier": "24gb",
       "display_name": "T-lite-it-2.1 Q4_K_M",
       "status": "unavailable",
-      "reason": "The 24 GB stock model is T-pro-it-2.1 Q4_K_M."
+      "reason": "The 24 GB default model is Huihui Qwen3.6 27B abliterated Q5_K_M."
     },
     {
       "id": "gemma-4-12b-it-q4",
       "version": "1",
       "vram_tier": "16gb",
+      "on_demand": true,
       "display_name": "Gemma 4 12B Q4_K_M",
       "files": [
         {
@@ -58,12 +89,13 @@
       "vram_tier": "24gb",
       "display_name": "Gemma 4 12B Q4_K_M",
       "status": "unavailable",
-      "reason": "The 24 GB stock model is T-pro-it-2.1 Q4_K_M."
+      "reason": "The 24 GB default model is Huihui Qwen3.6 27B abliterated Q5_K_M."
     },
     {
       "id": "t-pro-it-2.1-q4",
       "version": "1",
       "vram_tier": "24gb",
+      "on_demand": true,
       "display_name": "T-pro-it-2.1 Q4_K_M",
       "files": [
         {
@@ -129,7 +161,6 @@
       "id": "t-lite-it-2.1-abliterated-iq4-xs",
       "version": "1",
       "vram_tier": "16gb",
-      "on_demand": true,
       "display_name": "T-lite-it-2.1 abliterated IQ4_XS",
       "files": [
         {
@@ -146,6 +177,14 @@
           ]
         }
       ]
+    },
+    {
+      "id": "t-lite-it-2.1-abliterated-iq4-xs",
+      "version": "1",
+      "vram_tier": "24gb",
+      "display_name": "T-lite-it-2.1 abliterated IQ4_XS",
+      "status": "unavailable",
+      "reason": "The 24 GB default model is Huihui Qwen3.6 27B abliterated Q5_K_M."
     },
     {
       "id": "t-lite-it-2.1-abliterated-q5",
@@ -173,7 +212,6 @@
       "id": "qwen3.6-27b-abliterated-q5",
       "version": "1",
       "vram_tier": "24gb",
-      "on_demand": true,
       "display_name": "Huihui Qwen3.6 27B abliterated Q5_K_M",
       "files": [
         {
