@@ -441,7 +441,7 @@ def test_expert_panel_shows_full_values_without_overlap(tmp_path: Path) -> None:
     assert _chips_share_a_line(window, "preset-genre", "chip-genre-thriller")
     long_id = "t-lite-it-2.1-abliterated-iq4-xs"
     full_id = resolved_model_id(vram="auto", tier="standard", detected="16gb")
-    assert full_id == "t-lite-it-2.1-q4"
+    assert full_id == "gemma-4-12b-it-abliterated-q4"
     window._open_settings()
     window._expert.toggle()
     window._expert.toggle()

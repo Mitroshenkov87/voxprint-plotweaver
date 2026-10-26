@@ -13,7 +13,7 @@ import json
 import os
 import shutil
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from PySide6 import QtGui
@@ -372,7 +372,7 @@ class BookScreen(SimpleWidget):
         layout: SimpleLayout,
         settings: Settings,
         *,
-        on_generate: Callable[[], None] | None = None,
+        on_generate: Callable[[Mapping[str, object]], None] | None = None,
         on_command: Callable[[str], None] | None = None,
         on_chip: Callable[[str], None] | None = None,
         on_length: Callable[[], None] | None = None,
@@ -515,7 +515,7 @@ class MainWindow(QMainWindow):
         self.shell = BookScreen(
             self.book,
             self._setting_specs,
-            on_generate=lambda: self.start(synchronous=False),
+            on_generate=lambda _settings: self.start(synchronous=False),
             on_command=self._on_command,
             on_chip=self._on_chip,
             on_length=self._sync_length,
