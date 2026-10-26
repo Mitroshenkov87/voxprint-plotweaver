@@ -1,5 +1,10 @@
 # VOXPrint AI Plotweaver
 
+> [!WARNING]
+> **⚠️ Deep alpha.** This software is experimental; nothing is guaranteed to work. Use at your own risk.
+>
+> **⚠️ Глубокая альфа.** Программа экспериментальная, работа не гарантируется.
+
 VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages. It is a local desktop app in the Voxprint AI Media Suite. This release is 0.2.0 RC, codename Erev. `voxprint-plotweaver-cli --version` prints `0.2.0 RC · build N "Erev"` (a local checkout shows `dev` in place of N). It plans the book, drafts it, and exports it with local models only. No cloud writing API is called.
 
 ## System requirements
