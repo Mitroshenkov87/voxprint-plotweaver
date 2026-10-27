@@ -85,7 +85,7 @@ def test_suite_install_layout() -> None:
     desktop = (root / "packaging" / "linux" / "plotweaver.desktop").read_text(encoding="utf-8")
     assemble = (root / "packaging" / "assemble.py").read_text(encoding="utf-8")
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
-    readme = (root / "README.md").read_text(encoding="utf-8")
+    readme = (root / "docs" / "README-full.md").read_text(encoding="utf-8")
     head, support = readme.split("## ☕ Support the Project", 1)
     assert r"{autopf}\VOXPrint AI Suite\Plotweaver" in installer
     assert "DefaultGroupName=VOXPrint AI Suite" in installer
