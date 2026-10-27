@@ -7,6 +7,7 @@ Writes a whole novel from a synopsis using local LLMs.
 
 - **Latest pre-release:** [v0.2.0-rc8](https://github.com/Mitroshenkov87/voxprint-plotweaver/releases/tag/v0.2.0-rc8)
 - **Full documentation:** [docs/README-full.md](docs/README-full.md) and the [docs/](docs/) folder
+- **Writing a brief:** [docs/WRITING-A-BRIEF.md](docs/WRITING-A-BRIEF.md)
 
 License: [Apache-2.0](LICENSE)
 
