@@ -172,7 +172,7 @@ def test_chat_prompt_and_guide_are_shipped() -> None:
     packaged = Path(__file__).parents[1] / "src" / "plotweaver" / "data" / "writing-a-brief.md"
     docs = repo_root() / "docs" / "WRITING-A-BRIEF.md"
     assert packaged.read_text(encoding="utf-8") == docs.read_text(encoding="utf-8")
-    readme = (repo_root() / "README.md").read_text(encoding="utf-8")
+    readme = (repo_root() / "docs" / "README-full.md").read_text(encoding="utf-8")
     assert "docs/WRITING-A-BRIEF.md" in readme
     nav = (repo_root() / "mkdocs.yml").read_text(encoding="utf-8")
     assert "WRITING-A-BRIEF.md" in nav
