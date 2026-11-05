@@ -4,12 +4,12 @@ Plotweaver shares runtimes and model files with the other Voxprint apps. The ins
 
 ## Location
 
-`VOXPRINT_HOME` replaces the Voxprint directory when it is set. Otherwise:
+`VOXPRINT_HOME` replaces the suite directory when it is set. Otherwise the suite home is `%LOCALAPPDATA%\VOXPrint AI Suite` on Windows and `$XDG_DATA_HOME/voxprint-ai-suite` or `~/.local/share/voxprint-ai-suite` on Linux. The first use moves an existing `%LOCALAPPDATA%\Voxprint` or `~/.local/share/voxprint` directory there.
 
 | System | Shared folder |
 | --- | --- |
-| Windows | `%LOCALAPPDATA%\Voxprint\shared\` |
-| Linux | `$XDG_DATA_HOME/voxprint/shared` or `~/.local/share/voxprint/shared` |
+| Windows | `%LOCALAPPDATA%\VOXPrint AI Suite\shared\` |
+| Linux | `$XDG_DATA_HOME/voxprint-ai-suite/shared` or `~/.local/share/voxprint-ai-suite/shared` |
 
 Inside that folder:
 
@@ -49,11 +49,11 @@ Removing Plotweaver runs `plotweaver release-shared`. That drops `plotweaver` fr
 
 ## Model weights
 
-Plotweaver stores GGUF files under the suite models root from voxprint-common, `<home>/models/llm`. On Windows that is `%LOCALAPPDATA%\Voxprint\models\llm`. On Linux it is `~/.local/share/voxprint/models/llm`. `PLOTWEAVER_MODELS` and `VOXPRINT_MODELS_DIR` override it. A matching file already in `shared/models/llm` from an older Plotweaver install is hard-linked and not downloaded again. Audiobook Builder copies in the same `<home>/models/llm` folder are reused. Plotweaver still writes `plotweaver: true` in `<home>/models/.users.json`. The older file is not deleted.
+Plotweaver stores GGUF files under the suite models root from voxprint-common, `<home>/models/llm`. On Windows that is `%LOCALAPPDATA%\VOXPrint AI Suite\models\llm`. On Linux it is `~/.local/share/voxprint-ai-suite/models/llm`. `PLOTWEAVER_MODELS` and `VOXPRINT_MODELS_DIR` override it. A matching file already in `shared/models/llm` from an older Plotweaver install is hard-linked and not downloaded again. Audiobook Builder copies in the same `<home>/models/llm` folder are reused. Plotweaver still writes `plotweaver: true` in `<home>/models/.users.json`. The older file is not deleted.
 
 ## What the installer checks
 
-1. Python 3.14, copied from the app bundle or recorded from the interpreter that is already running.
+1. Python 3.15, copied from the app bundle or recorded from the interpreter that is already running.
 2. llama.cpp b11476 Vulkan. The copy shipped beside the app is reused. Otherwise the pinned archive is downloaded.
 3. llama.cpp b11476 CUDA, when the NVIDIA driver is new enough: 570.117 or newer on Linux, 551.61 or newer on Windows. Those floors are the CUDA toolkit drivers paired with the pinned builds (CUDA 12.8 on Linux, CUDA 12.4 on Windows).
 4. The stock models for the detected VRAM tier.

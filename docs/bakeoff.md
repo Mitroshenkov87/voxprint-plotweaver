@@ -1,10 +1,10 @@
 # Bake-off and the Mars run
 
-Both scripts pick an interpreter that can already `import plotweaver`. If none can, they install `uv`, create `.venv` on Python 3.14, and install this checkout. `PLOTWEAVER_PYTHON` overrides the picker.
+Both scripts pick an interpreter that can already `import plotweaver`. If none can, they install `uv`, create `.venv` on Python 3.15.2, and install this checkout. `PLOTWEAVER_PYTHON` overrides the picker.
 
 ## RTX 4090 bake-off
 
-Use a Linux VM with an RTX 4090 (or another RTX 40-series card) and the NVIDIA driver. The script downloads llama.cpp `llama-server` b11476, the Vulkan build Audiobook Builder pins, into `~/.local/share/voxprint/shared/runtime/llama.cpp-b11476`. GGUF weights land in `~/.local/share/voxprint/models/llm` and are checked by revision, size, and SHA-256. The installer downloads the stock files for the detected tier. A later launch only repairs a missing or corrupt file. It detects VRAM and selects the 16 GB tier (2 GB held back) or the 24 GB tier (3 GB held back). Plotweaver does not abliterate, quantize, or fit weights. Model Forge publishes those files. The bake-off downloads every enabled candidate that fits free VRAM, stock and abliterated, and writes `refusal-rates.json` for those probes. The installer does not: that set is stock models for the selected tier. Least-censored models are a separate Settings download when a published file fits the card. A model from a higher tier, or whose `min_vram_gb` exceeds the usable memory, is hidden in the app. The bake-off skip is free VRAM only. A licence other than Apache-2.0 or MIT is refused unless you pass `--allow-other-license`. An empty licence tag is refused either way.
+Use a Linux VM with an RTX 4090 (or another RTX 40-series card) and the NVIDIA driver. The script downloads llama.cpp `llama-server` b11476, the Vulkan build Audiobook Builder pins, into `~/.local/share/voxprint-ai-suite/shared/runtime/llama.cpp-b11476`. GGUF weights land in `~/.local/share/voxprint-ai-suite/models/llm` and are checked by revision, size, and SHA-256. The installer downloads the stock files for the detected tier. A later launch only repairs a missing or corrupt file. It detects VRAM and selects the 16 GB tier (2 GB held back) or the 24 GB tier (3 GB held back). Plotweaver does not abliterate, quantize, or fit weights. Model Forge publishes those files. The bake-off downloads every enabled candidate that fits free VRAM, stock and abliterated, and writes `refusal-rates.json` for those probes. The installer does not: that set is stock models for the selected tier. Least-censored models are a separate Settings download when a published file fits the card. A model from a higher tier, or whose `min_vram_gb` exceeds the usable memory, is hidden in the app. The bake-off skip is free VRAM only. A licence other than Apache-2.0 or MIT is refused unless you pass `--allow-other-license`. An empty licence tag is refused either way.
 
 ```bash
 bash scripts/bakeoff.sh
@@ -13,7 +13,7 @@ bash scripts/bakeoff.sh
 That command:
 
 1. Installs Python dependencies if this checkout is not importable yet.
-2. Uses the GGUF files VOXPrint MDL has already stored under `~/.local/share/voxprint/models/llm`. T-pro Q4_K_M is the 24 GB stock drafter. Gemma 4 12B Q4_K_M and T-lite-it-2.1 Q4_K_M are the 16 GB stock set. T-lite Q5_K_M is optional and is not stock. On 16 GB the enabled least-censored files include Forge Qwen Q3_K_M, both Forge T-lite quants, and Gemma 4 31B IQ3_XXS. On 24 GB the set also includes Forge Qwen Q5 and Forge Gemma 31B Q4_K_M. Disabled placeholders are skipped. Each manifest records the quant licence and the confirmed base licence (Apache-2.0).
+2. Uses the GGUF files VOXPrint MDL has already stored under `~/.local/share/voxprint-ai-suite/models/llm`. T-pro Q4_K_M is the 24 GB stock drafter. Gemma 4 12B Q4_K_M and T-lite-it-2.1 Q4_K_M are the 16 GB stock set. T-lite Q5_K_M is optional and is not stock. On 16 GB the enabled least-censored files include Forge Qwen Q3_K_M, both Forge T-lite quants, and Gemma 4 31B IQ3_XXS. On 24 GB the set also includes Forge Qwen Q5 and Forge Gemma 31B Q4_K_M. Disabled placeholders are skipped. Each manifest records the quant licence and the confirmed base licence (Apache-2.0).
 3. Uses the bundled llama.cpp b11476 Vulkan `llama-server` when the installer shipped one. Otherwise downloads it into the shared `llm/llama.cpp-b11476` tree. An existing Audiobook Builder copy is reused.
 4. Writes every synopsis in `bakeoff/synopses/` as three chapters with dark themes off, one candidate at a time.
 5. Writes them again with dark themes on: T-pro drafts, then each least-censored model fills placeholders in one swap and proofreads. The judge scores every export, including the Russian prose from those dark-scene passes.
@@ -87,10 +87,10 @@ bash scripts/e2e_mars.sh
 Equivalent:
 
 ```bash
-bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
+bash scripts/e2e_mars.sh --main-gguf "$HOME/.local/share/voxprint-ai-suite/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
 ```
 
-The 16 GB drafter, shared with Audiobook Builder, is `~/.local/share/voxprint/models/llm/gemma-4-12b-it-Q4_K_M.gguf`.
+The 16 GB drafter, shared with Audiobook Builder, is `~/.local/share/voxprint-ai-suite/models/llm/gemma-4-12b-it-Q4_K_M.gguf`.
 
 Default output is `./out/mars-e2e/`. Override with `PLOTWEAVER_MARS_OUT`. The script runs autopilot with `--yes` (no bible gate), six chapters, about 6,000 words as the target. The Audiobook Builder file is:
 

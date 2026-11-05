@@ -48,7 +48,7 @@ pick_python() {
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
-  uv venv --python 3.14 "$ROOT/.venv"
+  uv venv --python 3.15.2 "$ROOT/.venv"
   uv pip install --python "$ROOT/.venv/bin/python" --find-links "$ROOT/packaging/wheels" -e "$ROOT"
   echo "$ROOT/.venv/bin/python"
 }

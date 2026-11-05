@@ -65,10 +65,10 @@ When no GPU is visible, the Settings panel is rendered against a stand-in RTX 40
 
 24 GB least-censored files: Qwen 27B `Huihui-Qwen3.6-27B-abliterated-ggml-model-Q5_K.gguf` (min_vram_gb 18.5) and Gemma 31B `gemma-4-31b-abliterated-Q4_K_M.gguf` (18). The Qwen Q5 file is 18.5 GB with KV, which does not fit a 16 GB card after 2 GB headroom, so it stays on 24 GB.
 
-`gemma-4-31b-abliterated-iq3-xxs` is published and enabled. It is an on-demand 16 GB file, not part of the stock install. The script stops llama-server only when that process lives under the Plotweaver install or `%LOCALAPPDATA%\Voxprint` (`~/.local/share/voxprint` on Linux). It writes only in the install, that Voxprint folder, and the test output folder.
+`gemma-4-31b-abliterated-iq3-xxs` is published and enabled. It is an on-demand 16 GB file, not part of the stock install. The script stops llama-server only when that process lives under the Plotweaver install or `%LOCALAPPDATA%\VOXPrint AI Suite` (`~/.local/share/voxprint-ai-suite` on Linux), including a process still under the older `%LOCALAPPDATA%\Voxprint` (`~/.local/share/voxprint`) directory. It writes only in the install, that suite folder, and the test output folder.
 
 ## Requirements
 
 - Linux or Windows, an NVIDIA RTX 4090, the current driver, and `nvidia-smi` on `PATH`. `scripts/vm_test.ps1` is the Windows command. `scripts/vm_test.sh` is the Linux command.
 - A network connection for the GGUF files. The shared folder needs tens of gigabytes free.
-- Python 3.14. The script installs a `.venv` with `uv` when this checkout cannot be imported yet.
+- Python 3.15.2. The script installs a `.venv` with `uv` when this checkout cannot be imported yet.

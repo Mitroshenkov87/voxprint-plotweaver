@@ -1,7 +1,7 @@
 # Source-tree helper. The full installer does not run this script:
 # that setup already contains Python, dependencies, and llama.cpp.
-# Downloads uv, installs CPython 3.14, and installs this checkout into a venv.
-# Shared model files under LOCALAPPDATA\Voxprint\models are not touched.
+# Downloads uv, installs CPython 3.15.2, and installs this checkout into a venv.
+# Shared model files under LOCALAPPDATA\VOXPrint AI Suite\models are not touched.
 $ErrorActionPreference = "Stop"
 $AppRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $AppRoot
@@ -15,9 +15,9 @@ if (-not (Test-Path $Uv)) {
     Expand-Archive -Path $Zip -DestinationPath $UvDir -Force
 }
 
-& $Uv python install 3.14
+& $Uv python install 3.15.2
 $Python = Join-Path $AppRoot ".venv\Scripts\python.exe"
-& $Uv venv --python 3.14 (Join-Path $AppRoot ".venv")
+& $Uv venv --python 3.15.2 (Join-Path $AppRoot ".venv")
 & $Uv pip install --python $Python --find-links (Join-Path $AppRoot "packaging\wheels") -e $AppRoot
 if (-not (Test-Path $Python)) {
     throw "Plotweaver venv was not created"

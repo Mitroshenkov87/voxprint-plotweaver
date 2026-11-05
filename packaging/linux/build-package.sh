@@ -57,9 +57,9 @@ Depends: libglib2.0-0t64 | libglib2.0-0, libegl1, libgl1, libxkbcommon0, libfont
 Description: VOXPrint AI Plotweaver
  Local synopsis-to-novel app. Python, dependencies, and llama.cpp b11476
  are included. The package installer runs voxprint-mdl download for
- plotweaver and logs to ~/.local/share/voxprint/logs/plotweaver-mdl-install.log.
+ plotweaver and logs to ~/.local/share/voxprint-ai-suite/logs/plotweaver-mdl-install.log.
  A failed download does not fail the package. It does not open the window.
- Shared files stay under ~/.local/share/voxprint/shared.
+ Shared files stay under ~/.local/share/voxprint-ai-suite/shared.
 EOF
 
 cat > "$PKG/usr/bin/voxprint-plotweaver-cli" << 'EOF'

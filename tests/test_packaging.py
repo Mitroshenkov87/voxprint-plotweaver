@@ -25,25 +25,25 @@ def test_version_is_shared() -> None:
     assert APP_VERSION == "0.2.0rc8"
     assert version_label() == '0.2.0 RC · build dev "Erev"'
     assert release_title(52) == '0.2.0 RC · build 52 "Erev"'
-    assert list((root / "packaging" / "wheels").glob("voxprint_common-0.2.*.whl"))
+    assert list((root / "packaging" / "wheels").glob("voxprint_common-0.6.3-*.whl"))
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     pin = (
         "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/"
-        "releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl"
+        "releases/download/v0.6.3/voxprint_common-0.6.3-py3-none-any.whl"
     )
     assert pin in project
     wheels = root / "packaging" / "wheels"
-    wheel = wheels / "voxprint_common-0.2.4-py3-none-any.whl"
+    wheel = wheels / "voxprint_common-0.6.3-py3-none-any.whl"
     assert wheel.is_file()
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    assert digest == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+    assert digest == "a18e5760863e34042c6eb16dd25d37d28055b9eb90a460c62407cdc2a09b43e4"
     requirements = (root / "packaging" / "requirements-common.txt").read_text(encoding="utf-8")
     assert f"--hash=sha256:{digest}" in requirements
-    assert (wheels / "voxprint_common-0.2.4-py3-none-any.whl.sha256").is_file()
-    assert (wheels / "voxprint_common-0.2.4.tar.gz").is_file()
-    assert (wheels / "voxprint_common-0.2.4.tar.gz.sha256").is_file()
-    assert not list(wheels.glob("voxprint_common-0.2.1*"))
+    assert (wheels / "voxprint_common-0.6.3-py3-none-any.whl.sha256").is_file()
+    assert (wheels / "voxprint_common-0.6.3.tar.gz").is_file()
+    assert (wheels / "voxprint_common-0.6.3.tar.gz.sha256").is_file()
+    assert not list(wheels.glob("voxprint_common-0.2.*"))
     assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")
     windows = (root / "packaging" / "windows" / "build-installer.ps1").read_text(encoding="utf-8")
@@ -142,8 +142,8 @@ def test_appinfo_does_not_import_the_package() -> None:
 
 
 def test_choose_cpython_prefers_the_patch_install(tmp_path: Path) -> None:
-    alias = tmp_path / "cpython-3.14-windows-x86_64-none"
-    concrete = tmp_path / "cpython-3.14.8-windows-x86_64-none"
+    alias = tmp_path / "cpython-3.15-windows-x86_64-none"
+    concrete = tmp_path / "cpython-3.15.2-windows-x86_64-none"
     alias.mkdir()
     concrete.mkdir()
     spec = importlib.util.spec_from_file_location(

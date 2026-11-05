@@ -1,7 +1,7 @@
 # Suite GGUF registry. Each row is tier 16gb or 24gb, the levels Model Forge publishes.
 # min_vram_gb is what the file needs. The app keeps 2 GB free on a card under 24 GB
 # and 3 GB free on a 24 GB card, and it hides a tier the card cannot run.
-# Files land in <models>/llm (Linux ~/.local/share/voxprint/models/llm), the folder
+# Files land in <models>/llm (Linux ~/.local/share/voxprint-ai-suite/models/llm), the folder
 # Audiobook Builder uses, and are checked by revision, size, and SHA-256.
 # Licences were read from the Hugging Face model cards on 2026-10-10.
 # Apache-2.0 and MIT only. An empty licence tag excludes the file.
