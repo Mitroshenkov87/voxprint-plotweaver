@@ -6,7 +6,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $Root
 
-python -m pip install -q "uv==0.13.0"
+python -m pip install -q "uv==0.13.7"
 $Stage = Join-Path $Root "build\stage"
 if (Test-Path $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
 python packaging\assemble.py --dest $Stage

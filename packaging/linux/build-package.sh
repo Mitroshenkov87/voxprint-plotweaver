@@ -36,7 +36,7 @@ else
 fi
 VERSION="$("$PY" -c 'import sys; sys.path.insert(0, "src"); from plotweaver.appinfo import APP_VERSION; print(APP_VERSION)')"
 if ! "$PY" -m uv --version >/dev/null 2>&1; then
-  "$PY" -m pip install -q "uv==0.13.0"
+  "$PY" -m pip install -q "uv==0.13.7"
 fi
 "$PY" packaging/assemble.py --dest "$STAGE"
 
