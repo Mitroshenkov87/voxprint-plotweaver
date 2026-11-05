@@ -42,6 +42,7 @@ if ($env:PLOTWEAVER_MOCK -eq "1") {
 
 function Stop-PlotweaverLlama {
     $roots = @(
+        (Join-Path $env:LOCALAPPDATA "VOXPrint AI Suite"),
         (Join-Path $env:LOCALAPPDATA "Voxprint"),
         (Join-Path $env:ProgramFiles "VOXPrint AI Suite\Plotweaver")
     )
@@ -88,7 +89,7 @@ function Find-Python {
         [Console]::Error.WriteLine("uv is not on PATH and plotweaver is not installed")
         return $null
     }
-    & uv venv --python 3.14 (Join-Path $Root ".venv")
+    & uv venv --python 3.15.2 (Join-Path $Root ".venv")
     if ($LASTEXITCODE -ne 0) { return $null }
     $created = Join-Path $Root ".venv\Scripts\python.exe"
     & uv pip install --python $created --require-hashes --no-deps -r (Join-Path $Root "packaging\requirements-common.txt")

@@ -1,1 +1,1 @@
-voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239
+voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.6.4/voxprint_common-0.6.4-py3-none-any.whl --hash=sha256:1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b

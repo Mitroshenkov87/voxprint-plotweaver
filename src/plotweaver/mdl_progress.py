@@ -73,7 +73,7 @@ def launch_repair() -> int:
 def mdl_gui_supported() -> bool:
     """True when this voxprint-common build ships the MDL window.
 
-    The localized window is in 0.2.4. Older builds are not used.
+    The localized window has shipped since voxprint-common 0.2.2. This app pins 0.6.4.
     """
     text = version("voxprint-common")
     parts: list[int] = []

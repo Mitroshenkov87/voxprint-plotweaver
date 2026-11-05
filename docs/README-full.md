@@ -11,7 +11,7 @@ VOXPrint AI Plotweaver writes a whole novel from a synopsis of about five pages.
 - An NVIDIA GPU whose name contains RTX and whose compute capability is at least 8.9. That is the RTX 40-series and newer. Older cards, including the RTX 30-series, are refused.
 - A card under 23.5 GB keeps 2 GB free and uses the 16 GB model tier. A card of 23.5 GB or more keeps 3 GB free and uses the 24 GB tier. Settings can override the choice when the card can run it.
 
-The installer includes the app, Python 3.14, the Python dependencies (including voxprint-common 0.2.4, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. After the files are copied, an interactive setup opens the VOXPrint MDL window (`voxprint-mdl download --gui --app plotweaver`). A silent install (`/VERYSILENT`) writes the same events to `%LOCALAPPDATA%\Voxprint\logs\plotweaver-mdl-install.log` on Windows and `~/.local/share/voxprint/logs/plotweaver-mdl-install.log` on Linux, and it does not open a window. A failed download does not fail setup. The app then says the models are not ready and offers Manage models, which opens `voxprint-mdl --gui --app plotweaver`. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
+The installer includes the app, Python 3.15.2, the Python dependencies (including voxprint-common 0.6.4, bundled so setup does not download it), and the pinned llama.cpp b11476 Vulkan runtime. After the files are copied, an interactive setup opens the VOXPrint MDL window (`voxprint-mdl download --gui --app plotweaver`). A silent install (`/VERYSILENT`) writes the same events to `%LOCALAPPDATA%\VOXPrint AI Suite\logs\plotweaver-mdl-install.log` on Windows and `~/.local/share/voxprint-ai-suite/logs/plotweaver-mdl-install.log` on Linux, and it does not open a window. A failed download does not fail setup. The app then says the models are not ready and offers Manage models, which opens `voxprint-mdl --gui --app plotweaver`. Least-censored models stay optional. The stock set follows the card's total memory, not memory another program is using at that moment.
 
 ## Download and install
 
@@ -21,7 +21,7 @@ Windows:
 
 1. Download `VoxprintPlotweaver-0.2.0rc8-win64-setup.exe`.
 2. In PowerShell, from the download folder: `Get-FileHash .\VoxprintPlotweaver-0.2.0rc8-win64-setup.exe -Algorithm SHA256`. The hash must match the `VoxprintPlotweaver-0.2.0rc8-win64-setup.exe` line in `SHA256SUMS`.
-3. Run the setup. It installs to `C:\Program Files\VOXPrint AI Suite\Plotweaver` and needs administrator rights. The Start menu folder is VOXPrint AI Suite and the shortcut is VOXPrint AI Plotweaver. The window is `voxprint-plotweaver.exe`. `voxprint-plotweaver-cli` is added to PATH. Provisioning fills `%LOCALAPPDATA%\Voxprint\shared` while the setup window is still open. A silent install (`/SILENT` or `/VERYSILENT`) does not open the window. An interactive install offers Launch only after that step has finished.
+3. Run the setup. It installs to `C:\Program Files\VOXPrint AI Suite\Plotweaver` and needs administrator rights. The Start menu folder is VOXPrint AI Suite and the shortcut is VOXPrint AI Plotweaver. The window is `voxprint-plotweaver.exe`. `voxprint-plotweaver-cli` is added to PATH. Provisioning fills `%LOCALAPPDATA%\VOXPrint AI Suite\shared` while the setup window is still open. A silent install (`/SILENT` or `/VERYSILENT`) does not open the window. An interactive install offers Launch only after that step has finished.
 
 Linux, Debian package:
 
@@ -31,7 +31,7 @@ sudo dpkg -i voxprint-plotweaver_0.2.0rc8_amd64.deb
 sudo apt-get install -f
 ```
 
-The package installer runs `voxprint-plotweaver-cli mdl-progress --quiet --installer` as the user who invoked sudo. That step logs to `~/.local/share/voxprint/logs/plotweaver-mdl-install.log`. It does not open the window, and a failed download does not fail the package.
+The package installer runs `voxprint-plotweaver-cli mdl-progress --quiet --installer` as the user who invoked sudo. That step logs to `~/.local/share/voxprint-ai-suite/logs/plotweaver-mdl-install.log`. It does not open the window, and a failed download does not fail the package.
 
 The menu entry is VOXPrint AI Plotweaver. The files live in `/opt/voxprint-ai-suite/plotweaver`. `voxprint-plotweaver-cli` is on PATH.
 
@@ -43,16 +43,16 @@ sudo tar -C / -xzf voxprint-plotweaver-0.2.0rc8-linux-x86_64.tar.gz
 voxprint-plotweaver-cli mdl-progress --quiet --installer
 ```
 
-An upgrade on Linux removes the previous program folder `/opt/voxprint-plotweaver`. It does not delete `%LOCALAPPDATA%\Voxprint` or the suite home. Shortcuts and PATH are updated, and models and shared files stay. `plotweaver` remains on PATH for this release and prints `plotweaver is deprecated; use voxprint-plotweaver-cli`.
+An upgrade on Linux removes the previous program folder `/opt/voxprint-plotweaver`. It does not delete `%LOCALAPPDATA%\VOXPrint AI Suite`, the older `%LOCALAPPDATA%\Voxprint` directory, or the suite home. Shortcuts and PATH are updated, and models and shared files stay. `plotweaver` remains on PATH for this release and prints `plotweaver is deprecated; use voxprint-plotweaver-cli`.
 
 ## Shared files
 
 The installer puts shared files in one place:
 
-- Windows: `%LOCALAPPDATA%\Voxprint\shared\` (`runtime\`, `models\`, `tools\`)
-- Linux: `~/.local/share/voxprint/shared/`
+- Windows: `%LOCALAPPDATA%\VOXPrint AI Suite\shared\` (`runtime\`, `models\`, `tools\`)
+- Linux: `~/.local/share/voxprint-ai-suite/shared/`
 
-GGUF weights go in the suite models folder, `<home>/models/llm` (`%LOCALAPPDATA%\Voxprint\models\llm` on Windows, `~/.local/share/voxprint/models/llm` on Linux). `PLOTWEAVER_MODELS` or `VOXPRINT_MODELS_DIR` overrides that folder. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded and a copy left in `shared/models/llm` by an older Plotweaver install. A Forge file whose published name is only the quant, such as `Q5_K_M.gguf`, is stored as the registry id plus that name so two models cannot overwrite each other. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it.
+GGUF weights go in the suite models folder, `<home>/models/llm` (`%LOCALAPPDATA%\VOXPrint AI Suite\models\llm` on Windows, `~/.local/share/voxprint-ai-suite/models/llm` on Linux). The first launch moves an existing `%LOCALAPPDATA%\Voxprint` or `~/.local/share/voxprint` directory to that suite home. `PLOTWEAVER_MODELS` or `VOXPRINT_MODELS_DIR` overrides that folder. llama.cpp b11476 goes in `shared/runtime`. A file another Voxprint app already installed is reused when the size and SHA-256 match, including a Forge GGUF Audiobook Builder already downloaded and a copy left in `shared/models/llm` by an older Plotweaver install. A Forge file whose published name is only the quant, such as `Q5_K_M.gguf`, is stored as the registry id plus that name so two models cannot overwrite each other. `shared/manifest.json` lists the apps that use each file. Removing Plotweaver deletes a file only when no other app still uses it.
 
 Every launch checks whether VOXPrint MDL reports the models ready. The main window opens only then. Otherwise the app shows a short notice and Manage models, which opens `voxprint-mdl --gui --app plotweaver`. If that window cannot start, Plotweaver shows the download events in its own dialog. If the NVIDIA driver is older than the CUDA runtime needs (570.117 on Linux, 551.61 on Windows), the message includes <https://www.nvidia.com/Download/index.aspx> and the app uses the Vulkan runtime.
 
@@ -105,7 +105,7 @@ Import `book.vxbook` into Audiobook Builder. Import `book.sound.vxbook` when you
 
 ## From source
 
-Python 3.14 is required. From a checkout:
+Python 3.15 is required. From a checkout:
 
 ```bash
 python -m venv .venv

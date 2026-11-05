@@ -25,7 +25,7 @@ _COPY_FILES = (
     "NOTICE",
     "BUILD.json",
 )
-_COMMON_SHA256 = "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+_COMMON_SHA256 = "1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b"
 _FETCH = """
 from pathlib import Path
 import sys
@@ -99,8 +99,9 @@ class Program {
 def _refuse_suite_root(path: Path) -> None:
     """Refuse a suite home, a shared root, or an ancestor of one.
 
-    Same refuse-list as ``plotweaver.manifest.refuse_shared_delete``. This
-    script runs before the staged tree exists, so it does not import it.
+    The live guard is ``plotweaver.manifest.refuse_shared_delete``. This
+    script also refuses the previous Voxprint directory. It runs before the
+    staged tree exists, so it does not import plotweaver.
     """
     resolved = path.resolve()
     homes: list[Path] = []
@@ -109,7 +110,13 @@ def _refuse_suite_root(path: Path) -> None:
         homes.append(Path(configured))
     local = os.environ.get("LOCALAPPDATA", "").strip()
     if local:
+        homes.append(Path(local) / "VOXPrint AI Suite")
         homes.append(Path(local) / "Voxprint")
+    data_home = os.environ.get("XDG_DATA_HOME", "").strip()
+    if data_home and Path(data_home).is_absolute():
+        homes.append(Path(data_home) / "voxprint-ai-suite")
+        homes.append(Path(data_home) / "voxprint")
+    homes.append(Path.home() / ".local" / "share" / "voxprint-ai-suite")
     homes.append(Path.home() / ".local" / "share" / "voxprint")
     protected: list[Path] = []
     for item in homes:
@@ -189,10 +196,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _common_wheel() -> Path:
-    """Vendored voxprint-common 0.2.4 wheel. Installers must not fetch it."""
-    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.2.4-py3-none-any.whl"
+    """Vendored voxprint-common 0.6.4 wheel. Installers must not fetch it."""
+    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.6.4-py3-none-any.whl"
     if not wheel.is_file():
-        raise SystemExit("packaging/wheels is missing voxprint-common 0.2.4")
+        raise SystemExit("packaging/wheels is missing voxprint-common 0.6.4")
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
     if digest != _COMMON_SHA256:
         raise SystemExit(f"voxprint-common wheel sha256 is {digest}")
@@ -223,7 +230,7 @@ def _install_python(dest: Path) -> Path:
     if parent.exists():
         shutil.rmtree(parent)
     parent.mkdir(parents=True)
-    _uv("python", "install", "3.14", "--install-dir", str(parent), "--no-bin")
+    _uv("python", "install", "3.15.2", "--install-dir", str(parent), "--no-bin")
     matches = [item for item in parent.iterdir() if item.name.startswith("cpython-")]
     if not matches:
         raise SystemExit(f"no CPython install in {parent}")
@@ -246,7 +253,7 @@ def choose_cpython(candidates: list[Path]) -> Path:
 
 
 def _base_python(prefix: Path) -> Path:
-    names = ("python.exe", "python3.14", "python3", "python")
+    names = ("python.exe", "python3.15", "python3", "python")
     for folder in (prefix, prefix / "bin"):
         for name in names:
             candidate = folder / name

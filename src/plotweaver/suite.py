@@ -406,7 +406,7 @@ def _register_python(folder: Path) -> None:
         return
     register_resource(
         shared_dir(),
-        "python-3.14",
+        "python-3.15",
         kind="runtime",
         path=relative,
         nbytes=tracked.stat().st_size,
@@ -473,7 +473,7 @@ def _find_python(folder: Path) -> Path | None:
 
 def _write_version_marker(folder: Path) -> None:
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "VERSION").write_text("3.14\n", encoding="utf-8")
+    (folder / "VERSION").write_text("3.15\n", encoding="utf-8")
 
 
 def _marker_version(text: str) -> bool:
@@ -482,7 +482,7 @@ def _marker_version(text: str) -> bool:
     if len(parts) < 2:
         return False
     try:
-        return (int(parts[0]), int(parts[1])) >= (3, 14)
+        return (int(parts[0]), int(parts[1])) >= (3, 15)
     except ValueError:
         return False
 

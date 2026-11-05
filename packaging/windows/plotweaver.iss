@@ -1,4 +1,4 @@
-; VOXPrint AI Plotweaver. Full installer: the app, Python 3.14, dependencies,
+; VOXPrint AI Plotweaver. Full installer: the app, Python 3.15.2, dependencies,
 ; and the pinned llama.cpp b11476 Vulkan runtime. Files go in
 ; C:\Program Files\VOXPrint AI Suite\Plotweaver. An interactive setup opens
 ; voxprint-mdl download --gui --app plotweaver. /VERYSILENT logs the download
@@ -80,8 +80,9 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep <> ssPostInstall then
     exit;
-  // Per-user shortcuts only. Do not delete %LOCALAPPDATA%\Voxprint or anything
-  // outside {app}. A failed install rolls back only the files copied into {app}.
+  // Per-user shortcuts only. Do not delete %LOCALAPPDATA%\VOXPrint AI Suite,
+  // the older %LOCALAPPDATA%\Voxprint directory, or anything outside {app}.
+  // A failed install rolls back only the files copied into {app}.
   // Uninstall runs release-shared, then Inno removes {app}.
   DeleteFile(ExpandConstant('{userdesktop}\Voxprint AI Plotweaver.lnk'));
   DeleteFile(ExpandConstant('{userprograms}\Voxprint\Voxprint AI Plotweaver.lnk'));

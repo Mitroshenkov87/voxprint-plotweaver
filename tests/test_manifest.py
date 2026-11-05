@@ -106,17 +106,17 @@ def test_runtime_tree_is_removed_only_at_zero(
     shared = shared_dir()
     marker = shared / "runtime" / "python" / "VERSION"
     marker.parent.mkdir(parents=True)
-    marker.write_text("3.14\n", encoding="utf-8")
+    marker.write_text("3.15\n", encoding="utf-8")
     register_resource(
         shared,
-        "python-3.14",
+        "python-3.15",
         kind="runtime",
         path="runtime/python",
         nbytes=marker.stat().st_size,
         files={"VERSION": file_sha256(marker)},
         app="plotweaver",
     )
-    assert unregister_app(shared, "plotweaver") == ["python-3.14"]
+    assert unregister_app(shared, "plotweaver") == ["python-3.15"]
     assert not marker.exists()
     assert marker.parent.is_dir()
     assert (shared / "runtime").is_dir()
@@ -494,7 +494,7 @@ def test_installers_provision_the_shared_folder() -> None:
     assert "release-shared" in windows
     assert "mdl-progress --quiet --installer" in linux
     assert "plotweaver-mdl-install.log" in linux
-    assert "voxprint/shared" in linux
+    assert "voxprint-ai-suite/shared" in linux
     assert "mdl-progress --quiet --installer" in Path("packaging/assemble.py").read_text(
         encoding="utf-8"
     )

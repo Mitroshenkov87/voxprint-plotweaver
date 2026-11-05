@@ -10,7 +10,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 OUT="${PLOTWEAVER_MARS_OUT:-./out/mars-e2e}"
-DEFAULT_GGUF="${HOME}/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
+DEFAULT_GGUF="${HOME}/.local/share/voxprint-ai-suite/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
+LEGACY_GGUF="${HOME}/.local/share/voxprint/models/llm/T-pro-it-2.1-Q4_K_M.gguf"
 MOCK=0
 ARGS=()
 for arg in "$@"; do
@@ -43,6 +44,8 @@ else
     ARGS+=("--main-gguf" "$PLOTWEAVER_MAIN_GGUF")
   elif [[ "$has_gguf" == "0" && -f "$DEFAULT_GGUF" ]]; then
     ARGS+=("--main-gguf" "$DEFAULT_GGUF")
+  elif [[ "$has_gguf" == "0" && -f "$LEGACY_GGUF" ]]; then
+    ARGS+=("--main-gguf" "$LEGACY_GGUF")
   fi
 fi
 
@@ -63,7 +66,7 @@ pick_python() {
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
-  uv venv --python 3.14 "$ROOT/.venv"
+  uv venv --python 3.15.2 "$ROOT/.venv"
   uv pip install --python "$ROOT/.venv/bin/python" --find-links "$ROOT/packaging/wheels" -e "$ROOT"
   echo "$ROOT/.venv/bin/python"
 }

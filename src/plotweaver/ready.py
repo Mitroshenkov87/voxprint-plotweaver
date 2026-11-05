@@ -1,7 +1,7 @@
 """One readiness gate for the window.
 
 The main window opens only when :func:`voxprint_common.mdl.ready` is true for
-``plotweaver``. In voxprint-common 0.2.4 that call checks each required file's
+``plotweaver``. In voxprint-common 0.6.4 that call checks each required file's
 presence and size. It does not trust the status file and it does not download.
 Otherwise the window shows a short notice and Manage models.
 """
@@ -29,7 +29,7 @@ class Failed:
 
 
 def ensure_ready(progress_cb: Callable[[str], None]) -> Ready | Failed:
-    """Return ready only when 0.2.4 ``ready('plotweaver')`` is true.
+    """Return ready only when 0.6.4 ``ready('plotweaver')`` is true.
 
     ``progress_cb`` receives one plain sentence. This function does not
     download and does not draw a window.

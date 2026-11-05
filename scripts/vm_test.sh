@@ -51,7 +51,7 @@ pick_python() {
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
   fi
-  uv venv --python 3.14 "$ROOT/.venv"
+  uv venv --python 3.15.2 "$ROOT/.venv"
   uv pip install --python "$ROOT/.venv/bin/python" --require-hashes --no-deps -r "$ROOT/packaging/requirements-common.txt"
   uv pip install --python "$ROOT/.venv/bin/python" --find-links "$ROOT/packaging/wheels" -e "$ROOT[dev]" -e "$ROOT/dev/plotweaver_dev"
   echo "$ROOT/.venv/bin/python"
@@ -89,12 +89,13 @@ fi
 status=0
 
 stop_plotweaver_llama() {
-  local home="${HOME}/.local/share/voxprint"
+  local home="${HOME}/.local/share/voxprint-ai-suite"
+  local legacy="${HOME}/.local/share/voxprint"
   local install="/opt/voxprint-ai-suite/plotweaver"
   local pid cmd
   while read -r pid cmd; do
     case "$cmd" in
-      "$home"*|"$install"*) kill "$pid" 2>/dev/null || true ;;
+      "$home"*|"$legacy"*|"$install"*) kill "$pid" 2>/dev/null || true ;;
     esac
   done < <(ps -eo pid=,args= | awk '/llama-server/ && !/awk/')
 }
