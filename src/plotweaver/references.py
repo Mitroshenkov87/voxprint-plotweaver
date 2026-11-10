@@ -71,7 +71,10 @@ def read_reference(path: Path) -> str:
         chunks: list[str] = []
         for item in book.get_items_of_type(ITEM_DOCUMENT):
             parser = _TextExtractor()
-            parser.feed(item.get_content().decode("utf-8", errors="replace"))
+            content = item.get_content()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8", errors="replace")
+            parser.feed(content)
             chunks.append(" ".join(parser.parts))
         return "\n".join(chunks)
     raise PlotweaverError(f"unsupported reference type: {path.suffix}")
