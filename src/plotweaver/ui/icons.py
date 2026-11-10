@@ -24,9 +24,11 @@ def suite_icon(name: str, color: str, *, size: int = 22) -> QIcon:
     if not renderer.isValid():
         raise RuntimeError(f"could not render {path.name}")
     pixmap = QPixmap(size * 2, size * 2)
-    pixmap.setDevicePixelRatio(2)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     renderer.render(painter)
     painter.end()
+    # Set the ratio after painting. A ratio of 2 during render maps the
+    # 22-unit icon into a 22-logical box and clips the left half.
+    pixmap.setDevicePixelRatio(2)
     return QIcon(pixmap)

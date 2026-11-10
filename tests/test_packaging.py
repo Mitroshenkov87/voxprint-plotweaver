@@ -29,20 +29,20 @@ def test_version_is_shared() -> None:
     assert (root / "assets" / "splash.jpg").is_file()
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     pin = (
-        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/"
-        "releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl"
+        "voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@"
+        "8a94b531cb4f3526425a80a86a1e64624b5de606"
     )
     assert pin in project
     wheels = root / "packaging" / "wheels"
-    wheel = wheels / "voxprint_common-0.2.4-py3-none-any.whl"
+    wheel = wheels / "voxprint_common-0.2.5-py3-none-any.whl"
     assert wheel.is_file()
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    assert digest == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+    assert digest == "334fdac85082b64fe6bb2f4c7ef17ed71419550f6050e043f29519a4139fea87"
     requirements = (root / "packaging" / "requirements-common.txt").read_text(encoding="utf-8")
     assert f"--hash=sha256:{digest}" in requirements
-    assert (wheels / "voxprint_common-0.2.4-py3-none-any.whl.sha256").is_file()
-    assert (wheels / "voxprint_common-0.2.4.tar.gz").is_file()
-    assert (wheels / "voxprint_common-0.2.4.tar.gz.sha256").is_file()
+    assert (wheels / "voxprint_common-0.2.5-py3-none-any.whl.sha256").is_file()
+    assert (wheels / "voxprint_common-0.2.5.tar.gz").is_file()
+    assert (wheels / "voxprint_common-0.2.5.tar.gz.sha256").is_file()
     assert not list(wheels.glob("voxprint_common-0.2.1*"))
     assert "file:packaging/wheels" not in project
     installer = (root / "packaging" / "windows" / "plotweaver.iss").read_text(encoding="utf-8")

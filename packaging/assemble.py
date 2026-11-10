@@ -25,7 +25,9 @@ _COPY_FILES = (
     "NOTICE",
     "BUILD.json",
 )
-_COMMON_SHA256 = "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+# Wheel built from voxprint-common v0.2.5 Yitro, 8a94b531cb4f3526425a80a86a1e64624b5de606.
+# The normative pin is the git URL in pyproject.toml. --require-hashes cannot use it.
+_COMMON_SHA256 = "334fdac85082b64fe6bb2f4c7ef17ed71419550f6050e043f29519a4139fea87"
 _FETCH = """
 from pathlib import Path
 import sys
@@ -189,10 +191,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _common_wheel() -> Path:
-    """Vendored voxprint-common 0.2.4 wheel. Installers must not fetch it."""
-    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.2.4-py3-none-any.whl"
+    """Vendored voxprint-common 0.2.5 wheel. Installers must not fetch it."""
+    wheel = _ROOT / "packaging" / "wheels" / "voxprint_common-0.2.5-py3-none-any.whl"
     if not wheel.is_file():
-        raise SystemExit("packaging/wheels is missing voxprint-common 0.2.4")
+        raise SystemExit("packaging/wheels is missing voxprint-common 0.2.5")
     digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
     if digest != _COMMON_SHA256:
         raise SystemExit(f"voxprint-common wheel sha256 is {digest}")

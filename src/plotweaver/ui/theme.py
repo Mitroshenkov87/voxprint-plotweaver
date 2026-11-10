@@ -103,6 +103,39 @@ def build_style(*, glass: bool) -> str:
     return suite_style(glass) + extra
 
 
+def scrollbar_style() -> str:
+    """Dark scroll bars. The suite stylesheet leaves the platform white bar."""
+    handle = "#5c5c70"
+    return f"""
+    QScrollBar:vertical {{
+        background: {CARD_PLAIN}; width: 10px; margin: 0; border: none;
+    }}
+    QScrollBar::handle:vertical {{
+        background: {handle}; min-height: 24px; border-radius: 4px; border: none;
+    }}
+    QScrollBar::handle:vertical:hover {{ background: {TEXT_DISABLED}; }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+        height: 0; background: {CARD_PLAIN}; border: none;
+    }}
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+        background: {CARD_PLAIN};
+    }}
+    QScrollBar:horizontal {{
+        background: {CARD_PLAIN}; height: 10px; margin: 0; border: none;
+    }}
+    QScrollBar::handle:horizontal {{
+        background: {handle}; min-width: 24px; border-radius: 4px; border: none;
+    }}
+    QScrollBar::handle:horizontal:hover {{ background: {TEXT_DISABLED}; }}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+        width: 0; background: {CARD_PLAIN}; border: none;
+    }}
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+        background: {CARD_PLAIN};
+    }}
+    """
+
+
 def enable_acrylic(hwnd: int) -> bool:
     """Windows 11 Acrylic. Returns False on every other platform."""
     if sys.platform != "win32" or hwnd == 0:
