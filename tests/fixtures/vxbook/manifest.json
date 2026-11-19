@@ -1,0 +1,55 @@
+{
+  "format_version": "1.0",
+  "title": "Тихий берег",
+  "author": "Example Author",
+  "language": "ru",
+  "created_by": {
+    "app": "Voxprint AI Plotweaver",
+    "version": "0.1.0"
+  },
+  "generator": {
+    "app": "Voxprint AI Plotweaver",
+    "version": "0.1.0"
+  },
+  "created": "2026-10-10T08:00:00Z",
+  "source": {
+    "format": "plotweaver"
+  },
+  "book": "book.md",
+  "speakers": "speakers.json",
+  "chapters": [
+    {
+      "id": "ch01",
+      "title": "Глава 1. Тихий берег",
+      "anchor": "ch01",
+      "offset": 0
+    },
+    {
+      "id": "ch02",
+      "title": "Глава 2. Письмо",
+      "anchor": "ch02",
+      "offset": 582
+    }
+  ],
+  "notes": [
+    "notes/author.md"
+  ],
+  "files": {
+    "book.md": {
+      "sha256": "2e3ae691c5d14eb37d0a02b13842f84b1de2e757aa91e3b9a07379babe73f32a",
+      "size": 691
+    },
+    "speakers.json": {
+      "sha256": "21a7c0d431156a8cf2cdec2b884e96c3687c1e52dfd75829c29c54e761525128",
+      "size": 849
+    },
+    "cast.json": {
+      "sha256": "a3e0aa6ad102447d947ddd888bc2b6634d55f2efe372c7151cd397a784ce2962",
+      "size": 279
+    },
+    "notes/author.md": {
+      "sha256": "350a1ede077f8c5b55177e4649fdcd9cea066a6ef0035f879b684f6626243b2d",
+      "size": 92
+    }
+  }
+}

@@ -1,0 +1,185 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PLOTWEAVER_NO_UPDATE_CHECK: "1"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Qt libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libglib2.0-0 libdbus-1-3 libxkbcommon0 libfontconfig1 libx11-xcb1 libxcb1
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          python -m pip install --require-hashes --no-deps -r packaging/requirements-common.txt
+          python -m pip install --find-links packaging/wheels -e ".[dev]" -e dev/plotweaver_dev
+      - name: Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+          mypy src
+          bandit -c pyproject.toml -r src -ll
+          interrogate src/plotweaver
+      - name: EPUBCheck
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y default-jre-headless
+          curl -sSfL -o epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.4.0/epubcheck-5.4.0.zip
+          echo "33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c  epubcheck.zip" | sha256sum -c -
+          unzip -q epubcheck.zip
+          echo "EPUBCHECK=$GITHUB_WORKSPACE/epubcheck-5.4.0/epubcheck.jar" >> "$GITHUB_ENV"
+      - name: Tests
+        run: pytest
+      - name: Latin and Cyrillic glyphs
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest tests/test_fonts.py
+      - name: Wheel has no mock modules
+        run: |
+          python -m pip install -q build
+          python -m build --wheel --outdir "$RUNNER_TEMP/plotweaver-wheel"
+          python packaging/check_no_mock.py --wheel-dir "$RUNNER_TEMP/plotweaver-wheel"
+      - name: Mock bake-off and Mars scripts
+        if: runner.os == 'Linux'
+        run: |
+          PLOTWEAVER_MOCK=1 bash scripts/bakeoff.sh --mock --limit 1 --results "$RUNNER_TEMP/bakeoff"
+          PLOTWEAVER_MOCK=1 PLOTWEAVER_MARS_OUT="$RUNNER_TEMP/mars" bash scripts/e2e_mars.sh
+          bash scripts/vm_test.sh --mock --out "$RUNNER_TEMP/vm-test"
+      - name: pip-audit
+        run: pip-audit --skip-editable
+      - name: gitleaks
+        if: runner.os == 'Linux'
+        run: |
+          curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --source . --config .gitleaks.toml --redact --exit-code 1
+
+  windows-powershell-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          python -m pip install --require-hashes --no-deps -r packaging/requirements-common.txt
+          python -m pip install --find-links packaging/wheels -e ".[dev]" -e dev/plotweaver_dev
+      - name: Windows PowerShell 5.1 mock smoke
+        shell: powershell
+        run: powershell.exe -NoProfile -File scripts/vm_test.ps1 -Smoke -Mock -Json
+
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build the full setup
+        shell: pwsh
+        run: ./packaging/windows/build-installer.ps1
+      - name: Staged tree has common and no mock
+        shell: pwsh
+        run: python packaging/check_no_mock.py --tree build/stage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoxprintPlotweaver-windows
+          path: packaging/windows/Output/*
+          retention-days: 14
+
+  linux-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Qt and Vulkan libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libglib2.0-0t64 libdbus-1-3 libxkbcommon0 libfontconfig1 libx11-6 libxcb1 libvulkan1
+      - name: Build the full package
+        run: bash packaging/linux/build-package.sh
+      - name: Staged tree has common and no mock
+        run: python packaging/check_no_mock.py --tree build/stage
+      - name: The staged app imports Qt
+        run: |
+          QT_QPA_PLATFORM=offscreen build/stage/python/bin/python3 -c "import PySide6.QtWidgets, plotweaver; from plotweaver.llama_release import find_server; from pathlib import Path; binary = find_server(Path('build/stage/runtime/llama.cpp-b11476')); assert binary and binary.is_file(); print(plotweaver.__version__, binary)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoxprintPlotweaver-linux
+          path: dist/*
+          retention-days: 14
+
+  release:
+    needs: [windows-installer, linux-package]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: VoxprintPlotweaver-*
+          path: release-parts
+      - name: SHA256SUMS and pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          title="$(python3 -c 'import os, sys; sys.path.insert(0, "src"); from plotweaver.appinfo import release_title; print(release_title(int(os.environ["GITHUB_RUN_NUMBER"])))')"
+          pre="$(python3 -c 'import sys; sys.path.insert(0, "src"); from plotweaver.appinfo import is_prerelease; print("1" if is_prerelease() else "0")')"
+          mkdir -p assets
+          find release-parts -type f ! -name 'SHA256SUMS' -exec cp -t assets {} +
+          cd assets
+          sha256sum -- * | LC_ALL=C sort -k2 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            args=(release create "$tag" --title "$title" --notes "The Windows setup and the Linux package include the app, Python 3.14, dependencies, and llama.cpp b11476. The installer fills the shared suite folder with anything still missing.")
+            if [[ "$pre" == "1" ]]; then
+              args+=(--prerelease)
+            fi
+            gh "${args[@]}"
+          fi
+          gh release upload "$tag" --clobber ./*

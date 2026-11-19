@@ -1,0 +1,17 @@
+{
+  "format_version": "1.0",
+  "cast": {
+    "narrator": {
+      "voice_id": "levi",
+      "library": "voxprint"
+    },
+    "anna": {
+      "voice_id": "miriam",
+      "library": "voxprint"
+    },
+    "pyotr": {
+      "voice_id": "natan",
+      "library": "voxprint"
+    }
+  }
+}

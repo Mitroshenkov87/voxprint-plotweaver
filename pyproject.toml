@@ -1,0 +1,113 @@
+[project]
+name = "voxprint-plotweaver"
+dynamic = ["version"]
+description = "VOXPrint AI Plotweaver writes a whole novel from a synopsis with local LLMs."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+authors = [{ name = "Aleksandr Mitroshenkov" }]
+dependencies = [
+  "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl",
+  "PySide6-Essentials>=6.10",
+  "httpx>=0.28",
+  "python-docx>=1.2",
+  "ebooklib>=0.18",
+  "datasketch>=1.6",
+  "pymorphy3>=2.0.3",
+  "pymorphy3-dicts-ru",
+  "pillow>=12",
+]
+
+[project.optional-dependencies]
+# The mock package lives in dev/plotweaver_dev and is installed beside this
+# extra (`pip install -e ".[dev]" -e dev/plotweaver_dev`). A relative path here
+# is copied into the built wheel, and uv then refuses to install the app.
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.12",
+  "mypy>=1.17",
+  "bandit>=1.8",
+  "pip-audit>=2.9",
+  "interrogate>=1.7",
+]
+docs = [
+  "mkdocs>=1.6,<2",
+  "mkdocs-material>=9.6",
+  "mkdocstrings[python]>=0.28",
+]
+
+[project.scripts]
+voxprint-plotweaver-cli = "plotweaver.cli:main"
+plotweaver = "plotweaver.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
+Repository = "https://github.com/Mitroshenkov87/voxprint-plotweaver"
+Documentation = "https://mitroshenkov87.github.io/voxprint-plotweaver/"
+
+[tool.setuptools.dynamic]
+version = {attr = "plotweaver.appinfo.APP_VERSION"}
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+plotweaver = ["data/fb2/*", "data/splash.jpg", "data/*.json", "ui/icons/*.svg", "ui/fonts/*", "data/writing-a-brief.md"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.14"
+mypy_path = "src"
+packages = ["plotweaver"]
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+  "PySide6.*",
+  "ebooklib.*",
+  "docx.*",
+  "datasketch.*",
+  "pymorphy3.*",
+  "PIL.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-private = true
+ignore-semiprivate = true
+ignore-nested-functions = true
+ignore-nested-classes = true
+ignore-module = false
+# 75.6% after the public one-line docstrings. The gate stays in the 60–70 band.
+fail-under = 70
+verbose = 1
+color = false
